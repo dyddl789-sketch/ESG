@@ -1,0 +1,78 @@
+﻿# =========================
+# Environment variables
+# =========================
+.env
+.env.*
+!.env.example
+application-secret.yml
+application-prod.yml
+
+# =========================
+# IntelliJ IDEA
+# =========================
+.idea/
+*.iml
+out/
+
+# =========================
+# Eclipse / STS
+# =========================
+.project
+.classpath
+.settings/
+.factorypath
+.springBeans
+.sts4-cache/
+
+# =========================
+# Java / Gradle
+# =========================
+.gradle/
+build/
+backend/build/
+backend/.gradle/
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# =========================
+# React / Node.js
+# =========================
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+# Logs
+# =========================
+logs/
+*.log
+
+# =========================
+# Upload files
+# =========================
+uploads/
+backend/uploads/
+
+# =========================
+# AWS / SSH / Security
+# =========================
+*.pem
+*.key
+*.p12
+*.jks
+
+# =========================
+# OS
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Editor
+# =========================
+.vscode/
