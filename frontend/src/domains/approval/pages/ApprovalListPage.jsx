@@ -1,0 +1,7 @@
+import { useNavigate } from "react-router-dom";
+import { useDemoData } from "../../../app/providers/DemoDataProvider";
+import PageHeader from "../../../shared/components/PageHeader";
+import Card from "../../../shared/components/Card";
+import DataTable from "../../../shared/components/DataTable";
+import StatusBadge from "../../../shared/components/StatusBadge";
+export default function ApprovalListPage(){ const {db}=useDemoData(); const nav=useNavigate(); const rows=db.metrics.filter(m=>m.status==="PENDING"); return <div className="page-stack"><PageHeader breadcrumbs={["시스템 개요","승인 관리"]} title="ESG 데이터 승인 관리" description="기업 ESG 관리자가 요청한 지표와 증빙자료를 최종 검토합니다."/><div className="approval-summary"><article><span>승인 대기</span><strong>{rows.length}</strong></article><article><span>금일 승인</span><strong>2</strong></article><article><span>금일 반려</span><strong>1</strong></article></div><Card title="승인 요청 목록"><DataTable rows={rows} onRowClick={r=>nav(`/admin/approvals/${r.id}`)} columns={[{key:"period",label:"기준기간"},{key:"category",label:"영역"},{key:"title",label:"지표명",render:(v,r)=><><strong>{v}</strong><small className="cell-sub">{r.indicatorCode}</small></>},{key:"facility",label:"사업장"},{key:"value",label:"제출 실적",render:(v,r)=>`${v.toLocaleString()} ${r.unit}`},{key:"assignee",label:"요청자"},{key:"risk",label:"AI 검토",render:v=><StatusBadge status={v==="정상"?"NORMAL":"DELAYED"}/>}]} /></Card></div>; }

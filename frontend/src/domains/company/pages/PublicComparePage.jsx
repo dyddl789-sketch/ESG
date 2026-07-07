@@ -1,0 +1,4 @@
+import { Line } from "react-chartjs-2";
+import PageHeader from "../../../shared/components/PageHeader";
+import Card from "../../../shared/components/Card";
+export default function PublicComparePage(){ const data={labels:["2022","2023","2024","2025","2026"],datasets:[{label:"환경(E)",data:[68,72,77,81,85],borderColor:"#2a7d55",tension:.3},{label:"사회(S)",data:[65,68,72,75,78],borderColor:"#d59231",tension:.3},{label:"거버넌스(G)",data:[70,73,77,80,83],borderColor:"#3a74b7",tension:.3}]}; return <div className="page-stack"><PageHeader breadcrumbs={["공개 ESG 정보","연도별 비교"]} title="연도별 ESG 성과 비교" description="공개 승인된 연도별 E·S·G 점수 추이를 비교합니다."/><Card title="2022–2026 ESG 점수"><div className="chart-box large"><Line data={data} options={{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}},scales:{y:{min:50,max:100}}}}/></div></Card></div>; }

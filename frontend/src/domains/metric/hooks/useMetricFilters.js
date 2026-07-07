@@ -1,0 +1,2 @@
+import { useMemo, useState } from "react";
+export function useMetricFilters(metrics){ const [filters,setFilters]=useState({status:"ALL",category:"ALL",keyword:""}); const rows=useMemo(()=>metrics.filter(m=>(filters.status==="ALL"||m.status===filters.status)&&(filters.category==="ALL"||m.category===filters.category)&&(!filters.keyword||[m.title,m.indicatorCode,m.facility].join(" ").toLowerCase().includes(filters.keyword.toLowerCase()))),[metrics,filters]); return {filters,setFilters,rows}; }

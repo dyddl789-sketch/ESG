@@ -5,6 +5,15 @@
 
 ---
 
+## 빠른 문서 링크
+
+- [협업 규칙 확인](./CONTRIBUTING.md)
+- [docs 문서 관리 가이드 확인](./docs/docs_README.md)
+
+> 현재 `docs` 폴더의 가이드 파일명이 `docs_README.md`이므로 위 경로를 사용합니다.
+
+---
+
 ## 1. 프로젝트 개요
 
 ### 프로젝트명
@@ -97,6 +106,7 @@ ESG/
 │   ├── nginx/                       # Nginx 설정
 │   └── scripts/                     # 배포 및 운영 스크립트
 ├── docs/
+│   ├── docs_README.md                # docs 문서 배치 및 작성 가이드
 │   ├── 01-planning/                 # 요구사항, 일정, 역할 분담
 │   ├── 02-design/                   # 화면설계서, ERD, 아키텍처
 │   ├── 03-api/                      # API 명세
@@ -529,7 +539,7 @@ gradlew.bat bootRun
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -568,3 +578,106 @@ docker compose logs -f
 8. DB 변경, 환경변수 추가, API 변경은 PR 설명에 반드시 기록합니다.
 9. 비밀키와 개인정보는 GitHub와 Slack에 공유하지 않습니다.
 10. 배포 가능한 상태는 `main`, 개발 통합 상태는 `develop`에서 관리합니다.
+
+---
+
+# 12. 저장소 루트 파일 안내
+
+저장소 루트의 설정 파일은 팀원의 운영체제와 IDE가 달라도 같은 방식으로 개발하고, 민감정보와 불필요한 파일이 GitHub에 올라가는 것을 방지하기 위해 사용합니다.
+
+| 파일 | 역할 | GitHub 업로드 | 수정 시 주의사항 |
+|---|---|---|---|
+| `README.md` | 프로젝트 목적, 기술 스택, 실행 방법, 저장소 구조를 안내하는 대표 문서 | 포함 | 구조·실행 방법이 변경되면 함께 수정 |
+| `CONTRIBUTING.md` | 브랜치, 커밋, PR, 코드 리뷰, 폴더 규칙을 정의하는 공식 협업 규칙 | 포함 | 협업 규칙의 원본 문서로 사용 |
+| `.editorconfig` | Java는 4칸, React·JSON·CSS는 2칸 등 IDE 공통 편집 형식을 지정 | 포함 | 개인 취향으로 임의 변경하지 않음 |
+| `.gitattributes` | Windows와 Linux 사이의 줄바꿈 차이를 제어하고 불필요한 전체 파일 변경을 방지 | 포함 | 배치 파일은 CRLF, 소스 파일은 LF 유지 |
+| `.gitignore` | `node_modules`, `dist`, IDE 설정, 로그 등 Git에 올리지 않을 파일을 정의 | 포함 | 필요한 소스나 설정 파일을 실수로 제외하지 않도록 확인 |
+| `.env.example` | 프로젝트 실행에 필요한 환경변수 이름만 제공하는 견본 | 포함 | 실제 비밀번호·키·토큰은 절대 작성하지 않음 |
+| `.env` | 각 개발자의 실제 로컬 환경변수 | 제외 | GitHub·Slack·Notion에 업로드 금지 |
+| `docker-compose.yml` | Frontend, Backend, PostgreSQL, Redis 등의 컨테이너 실행 구성을 정의 | 포함 | 서비스명과 환경변수 변경 시 팀에 공지 |
+
+## 12.1 현재 설정 파일의 실제 의미
+
+### `.editorconfig`
+
+```text
+전체 파일: UTF-8, LF, 마지막 줄 추가, 불필요한 공백 제거
+Java: 공백 4칸
+JS/JSX/TS/JSON/CSS/HTML/YAML: 공백 2칸
+Markdown: 문장 끝 공백 유지 허용
+```
+
+### `.env.example`
+
+현재 프로젝트에서 사용하는 환경변수의 이름과 형식을 알려줍니다.
+
+```text
+Backend 포트
+PostgreSQL 접속 정보
+Redis 접속 정보
+JWT Secret
+AWS 리전 및 인증정보 이름
+Frontend API 기본 주소
+```
+
+팀원은 이 파일을 복사해 실제 `.env`를 만든 뒤 개인 환경에 맞는 값을 입력합니다.
+
+```bash
+# Windows CMD
+copy .env.example .env
+
+# macOS / Linux
+cp .env.example .env
+```
+
+### `.gitattributes`
+
+```text
+Java, JavaScript, JSX, YAML, Shell Script → LF
+Windows BAT, CMD → CRLF
+```
+
+### `.gitignore`
+
+현재 다음 항목은 GitHub에 올라가지 않습니다.
+
+```text
+node_modules/
+dist/
+각종 로그
+.idea/
+대부분의 .vscode 설정
+운영체제 임시 파일
+*.local
+```
+
+`package.json`과 `package-lock.json`은 제외 목록에 없으므로 반드시 GitHub에 포함됩니다.
+
+---
+
+# 13. 문서 폴더 사용 안내
+
+`docs/`는 단순 참고자료 보관함이 아니라 프로젝트의 기획·설계·API·테스트·발표 산출물을 단계별로 관리하는 공간입니다.
+
+상세한 파일 배치 기준과 이름 규칙은 [`docs/docs_README.md`](./docs/docs_README.md)에서 확인합니다.
+
+```text
+docs/
+├── docs_README.md        # 문서 폴더 사용 가이드
+├── 01-planning/          # 기획·요구사항·일정·역할분담
+├── 02-design/            # 업무흐름도·화면설계·ERD·아키텍처
+├── 03-api/               # API 명세와 요청·응답 예시
+├── 04-test/              # 테스트 계획·케이스·결과·결함 기록
+├── 05-presentation/      # 발표 자료·대본·시연 시나리오
+└── meeting-notes/        # 날짜별 회의록과 결정사항
+```
+
+## 13.1 문서 업로드 원칙
+
+1. 문서를 작성하기 전에 목적에 맞는 폴더를 선택합니다.
+2. 파일명만 보고도 내용을 알 수 있게 작성합니다.
+3. 최종본과 작업본을 무분별하게 중복 저장하지 않습니다.
+4. 변경 이력은 Git 커밋과 PR로 관리하며 `최종`, `진짜최종`, `최종수정2` 같은 이름을 사용하지 않습니다.
+5. API·DB·화면 흐름이 변경되면 관련 문서를 같은 PR에서 함께 수정합니다.
+6. 실제 개인정보, 운영 DB 백업, 비밀키, 인증서, 대용량 원본 영상은 올리지 않습니다.
+

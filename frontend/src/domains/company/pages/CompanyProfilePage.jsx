@@ -1,0 +1,5 @@
+import { useDemoData } from "../../../app/providers/DemoDataProvider";
+import PageHeader from "../../../shared/components/PageHeader";
+import Card from "../../../shared/components/Card";
+import Button from "../../../shared/components/Button";
+export default function CompanyProfilePage(){ const {db}=useDemoData(); const c=db.company; return <div className="page-stack"><PageHeader breadcrumbs={["기업 설정","기업·사업장 정보"]} title="기업·사업장 정보" description="ESG 데이터의 조직·사업장 기준정보를 관리합니다." actions={<Button>정보 수정</Button>}/><div className="two-cols"><Card title="기업 기본정보"><div className="detail-grid">{[["기업명",c.name],["업종",c.industry],["기업규모",c.scale],["사업자번호",c.businessNumber],["대표자",c.representative],["운영 상태","사용 중"]].map(([l,v])=><div key={l}><span>{l}</span><strong>{v}</strong></div>)}</div></Card><Card title="사업장"><div className="facility-list">{db.facilities.map(f=><article key={f.id}><span>{f.id}</span><div><strong>{f.name}</strong><small>{f.address}</small></div><button>상세</button></article>)}</div></Card></div></div>; }

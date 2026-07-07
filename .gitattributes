@@ -1,10 +1,42 @@
-﻿* text=auto
+﻿# 기본 텍스트 파일 자동 감지
+* text=auto
 
+# Linux·Docker·AWS 환경에서 LF 사용
 *.sh text eol=lf
-*.bat text eol=crlf
-*.cmd text eol=crlf
 *.java text eol=lf
 *.js text eol=lf
 *.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.html text eol=lf
+*.md text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
+*.gradle text eol=lf
+*.properties text eol=lf
+*.xml text eol=lf
+*.sql text eol=lf
+*.conf text eol=lf
+
+Dockerfile text eol=lf
+*.dockerignore text eol=lf
+.env.example text eol=lf
+
+# Windows 실행 스크립트는 CRLF 사용
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 바이너리 파일은 줄바꿈 변환 제외
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.pdf binary
+*.zip binary
+*.xlsx binary
+*.pptx binary
+*.docx binary
