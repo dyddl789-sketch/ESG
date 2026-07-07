@@ -1,0 +1,111 @@
+export const initialDb = {
+  company: {
+    id: 1,
+    name: "에코모빌리티 파츠 주식회사",
+    industry: "자동차 부품 제조업",
+    scale: "중견기업",
+    businessNumber: "123-45-67890",
+    representative: "김대표",
+  },
+  facilities: [
+    { id: 1, name: "본사", address: "부산광역시 해운대구" },
+    { id: 2, name: "부산공장", address: "부산광역시 강서구" },
+    { id: 3, name: "울산공장", address: "울산광역시 북구" },
+    { id: 4, name: "창원공장", address: "경상남도 창원시" },
+  ],
+  users: [
+    { id: 1, name: "박시스템", email: "admin@ecoflow.co.kr", role: "SYSTEM_ADMIN", department: "플랫폼운영팀", active: true },
+    { id: 2, name: "김ESG", email: "manager@ecoflow.co.kr", role: "COMPANY_MANAGER", department: "지속가능경영팀", active: true },
+    { id: 3, name: "이투자", email: "external@example.com", role: "EXTERNAL_USER", department: "일반 사용자", active: true },
+  ],
+  integrations: [
+    { id: "EMS", name: "EMS", description: "전력·가스 사용량", schedule: "매월 1일 02:00", lastRun: "2026-07-01 02:00", newCount: 12, duplicateCount: 0, errorCount: 0, status: "NORMAL" },
+    { id: "HR", name: "인사 시스템", description: "임직원·다양성·교육", schedule: "매월 1일 02:10", lastRun: "2026-07-01 02:10", newCount: 8, duplicateCount: 0, errorCount: 0, status: "NORMAL" },
+    { id: "SAFETY", name: "안전 시스템", description: "산업재해·안전점검", schedule: "매일 01:30", lastRun: "2026-07-07 01:30", newCount: 3, duplicateCount: 0, errorCount: 1, status: "DELAYED" },
+    { id: "GROUPWARE", name: "그룹웨어", description: "이사회·윤리·감사 문서", schedule: "매주 월요일 03:00", lastRun: "2026-07-06 03:00", newCount: 4, duplicateCount: 1, errorCount: 0, status: "NORMAL" },
+  ],
+  metrics: [
+    {
+      id: 101, category: "ENVIRONMENT", subCategory: "에너지", indicatorCode: "E-POWER-001", title: "전력 사용량",
+      facility: "부산공장", year: 2026, period: "2026-06", value: 428500, unit: "kWh", source: "EMS", method: "API",
+      status: "PENDING", evidence: "부산공장_2026년6월_전력고지서.pdf", risk: "정상",
+      aiFinding: "EMS 수집값과 증빙문서 추출값이 일치합니다.", assignee: "김ESG",
+      months: [68100000, 73400000, 76908000, 81200000, 78500000, 82400000],
+      history: [
+        { at: "2026-07-01 02:00", user: "시스템", action: "자동 수집", comment: "EMS 월간 연동" },
+        { at: "2026-07-02 10:12", user: "김ESG", action: "승인 요청", comment: "증빙 확인 완료" },
+      ],
+    },
+    {
+      id: 102, category: "ENVIRONMENT", subCategory: "에너지", indicatorCode: "E-POWER-001", title: "전력 사용량",
+      facility: "울산공장", year: 2026, period: "2026-06", value: 610000, unit: "kWh", source: "EMS", method: "API",
+      status: "DRAFT", evidence: null, risk: "확인 필요",
+      aiFinding: "전월 대비 43.5% 증가했습니다. 설비 가동 또는 계량 단위를 확인하세요.", assignee: "김ESG",
+      months: [59000000, 61200000, 68800000, 70000000, 72500000, 104000000],
+      history: [{ at: "2026-07-01 02:00", user: "시스템", action: "자동 수집", comment: "EMS 월간 연동" }],
+    },
+    {
+      id: 103, category: "ENVIRONMENT", subCategory: "폐기물", indicatorCode: "E-WASTE-003", title: "폐기물 재활용률",
+      facility: "창원공장", year: 2026, period: "2026-Q2", value: 82.4, unit: "%", source: "안전 시스템", method: "API",
+      status: "APPROVED", evidence: "폐기물처리실적_Q2.xlsx", risk: "정상",
+      aiFinding: "목표 80%를 2.4%p 초과했습니다.", assignee: "김ESG",
+      months: [78.2, 79.0, 79.8, 80.4, 81.2, 82.4],
+      history: [
+        { at: "2026-07-01 02:00", user: "시스템", action: "자동 수집", comment: "안전 시스템 연동" },
+        { at: "2026-07-02 09:00", user: "김ESG", action: "승인 요청", comment: "증빙 확인" },
+        { at: "2026-07-03 14:10", user: "박시스템", action: "최종 승인", comment: "공개 승인" },
+      ],
+    },
+    {
+      id: 104, category: "SOCIAL", subCategory: "임직원", indicatorCode: "S-EMP-001", title: "전체 임직원 수",
+      facility: "전체", year: 2026, period: "2026-06", value: 1250, unit: "명", source: "인사 시스템", method: "API",
+      status: "PENDING", evidence: "인사현황_2026년6월.xlsx", risk: "정상",
+      aiFinding: "전월 대비 12명 증가했습니다.", assignee: "김ESG",
+      months: [1198, 1206, 1215, 1224, 1238, 1250],
+      history: [
+        { at: "2026-07-01 02:10", user: "시스템", action: "자동 수집", comment: "HR 연동" },
+        { at: "2026-07-02 09:40", user: "김ESG", action: "승인 요청", comment: "인사 원장 확인" },
+      ],
+    },
+    {
+      id: 105, category: "SOCIAL", subCategory: "산업안전", indicatorCode: "S-SAFE-002", title: "산업재해 건수",
+      facility: "울산공장", year: 2026, period: "2026-Q2", value: 1, unit: "건", source: "안전 시스템", method: "DOCUMENT_AI",
+      status: "REJECTED", evidence: "산업재해조사표_2026-04.pdf", risk: "확인 필요",
+      aiFinding: "휴업일수 항목이 보고서 본문과 입력값에서 일치하지 않습니다.", assignee: "김ESG",
+      months: [0, 0, 0, 1, 0, 0],
+      history: [
+        { at: "2026-07-01 02:00", user: "시스템", action: "문서 수집", comment: "안전 보고서" },
+        { at: "2026-07-02 16:10", user: "김ESG", action: "승인 요청", comment: "AI 추출 결과 반영" },
+        { at: "2026-07-03 13:20", user: "박시스템", action: "반려", comment: "휴업일수 증빙을 보완해주세요." },
+      ],
+    },
+    {
+      id: 106, category: "GOVERNANCE", subCategory: "이사회", indicatorCode: "G-BOARD-001", title: "이사회 평균 참석률",
+      facility: "본사", year: 2026, period: "2026-Q2", value: 92.5, unit: "%", source: "그룹웨어", method: "DOCUMENT_AI",
+      status: "APPROVED", evidence: "2026년_2분기_이사회회의록.pdf", risk: "정상",
+      aiFinding: "회의록 3건에서 평균 참석률 92.5%를 추출했습니다.", assignee: "김ESG",
+      months: [88.0, 89.5, 90.0, 91.2, 92.0, 92.5],
+      history: [
+        { at: "2026-07-01 03:00", user: "시스템", action: "문서 수집", comment: "그룹웨어 연동" },
+        { at: "2026-07-02 12:10", user: "김ESG", action: "승인 요청", comment: "회의록 분석 완료" },
+        { at: "2026-07-04 11:00", user: "박시스템", action: "최종 승인", comment: "공개 승인" },
+      ],
+    },
+  ],
+  indicators: [
+    { code: "E-POWER-001", category: "환경", title: "전력 사용량", unit: "kWh", type: "정량", active: true },
+    { code: "E-WASTE-003", category: "환경", title: "폐기물 재활용률", unit: "%", type: "정량", active: true },
+    { code: "S-EMP-001", category: "사회", title: "전체 임직원 수", unit: "명", type: "정량", active: true },
+    { code: "S-SAFE-002", category: "사회", title: "산업재해 건수", unit: "건", type: "정량", active: true },
+    { code: "G-BOARD-001", category: "거버넌스", title: "이사회 참석률", unit: "%", type: "정량", active: true },
+  ],
+  reports: [
+    { id: 1, title: "2025 지속가능경영보고서", year: 2025, version: "v1.0", publishedAt: "2026-04-20", status: "공개" },
+    { id: 2, title: "2026 상반기 ESG 성과보고서", year: 2026, version: "draft", publishedAt: "-", status: "작성 중" },
+  ],
+  auditLogs: [
+    { id: 1, at: "2026-07-07 14:10", user: "박시스템", action: "APPROVE", target: "E-WASTE-003", detail: "폐기물 재활용률 승인" },
+    { id: 2, at: "2026-07-07 13:22", user: "김ESG", action: "UPDATE", target: "S-SAFE-002", detail: "산업재해 증빙 교체" },
+    { id: 3, at: "2026-07-07 10:03", user: "시스템", action: "INTEGRATION", target: "EMS", detail: "월간 수집 성공" },
+  ],
+};

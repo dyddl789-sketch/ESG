@@ -1,0 +1,44 @@
+import { ROLES } from "./roles";
+
+export const NAVIGATION = Object.freeze({
+  [ROLES.COMPANY_MANAGER]: [
+    { label: "개요", items: [
+      { to: "/manager/dashboard", icon: "dashboard", label: "ESG 대시보드" },
+    ]},
+    { label: "데이터 관리", items: [
+      { to: "/manager/integrations", icon: "sync", label: "외부 시스템 연동" },
+      { to: "/manager/metrics", icon: "database", label: "ESG 데이터 관리" },
+      { to: "/manager/documents", icon: "document", label: "문서·AI 분석" },
+    ]},
+    { label: "성과·보고", items: [
+      { to: "/manager/performance", icon: "chart", label: "ESG 실적 조회" },
+      { to: "/manager/reports", icon: "report", label: "리포트 빌더" },
+    ]},
+    { label: "기업 설정", items: [
+      { to: "/manager/company", icon: "company", label: "기업·사업장 정보" },
+    ]},
+  ],
+  [ROLES.SYSTEM_ADMIN]: [
+    { label: "시스템 개요", items: [
+      { to: "/admin/dashboard", icon: "dashboard", label: "관리자 대시보드" },
+      { to: "/admin/approvals", icon: "approval", label: "승인 관리", badgeKey: "pendingApprovals" },
+    ]},
+    { label: "플랫폼 관리", items: [
+      { to: "/admin/companies", icon: "company", label: "기업 관리" },
+      { to: "/admin/users", icon: "users", label: "사용자·권한 관리" },
+      { to: "/admin/indicators", icon: "indicator", label: "ESG 지표 관리" },
+    ]},
+    { label: "운영 관리", items: [
+      { to: "/admin/integrations", icon: "sync", label: "연동 모니터링" },
+      { to: "/admin/audit", icon: "audit", label: "감사 로그" },
+    ]},
+  ],
+  [ROLES.EXTERNAL_USER]: [
+    { label: "공개 ESG 정보", items: [
+      { to: "/public/dashboard", icon: "dashboard", label: "공개 대시보드" },
+      { to: "/public/company", icon: "company", label: "기업 ESG 정보" },
+      { to: "/public/compare", icon: "compare", label: "연도별 실적 비교" },
+      { to: "/public/reports", icon: "report", label: "공개 보고서" },
+    ]},
+  ],
+});

@@ -1,0 +1,7 @@
+import { useDemoData } from "../../../app/providers/DemoDataProvider";
+import PageHeader from "../../../shared/components/PageHeader";
+import Card from "../../../shared/components/Card";
+import Button from "../../../shared/components/Button";
+import DataTable from "../../../shared/components/DataTable";
+import StatusBadge from "../../../shared/components/StatusBadge";
+export default function IntegrationPage(){ const {db,runIntegration,resetDemo}=useDemoData(); const cols=[{key:"name",label:"원천 시스템",render:(v,r)=><><strong>{v}</strong><small className="cell-sub">{r.description}</small></>},{key:"schedule",label:"운영 스케줄"},{key:"lastRun",label:"마지막 실행"},{key:"newCount",label:"신규"},{key:"duplicateCount",label:"중복"},{key:"errorCount",label:"오류"},{key:"status",label:"상태",render:v=><StatusBadge status={v}/>},{key:"id",label:"실행",render:v=><Button variant="outline" size="sm" onClick={(e)=>{e.stopPropagation();runIntegration(v);}}>즉시 실행</Button>}]; return <div className="page-stack"><PageHeader breadcrumbs={["데이터 관리","외부 시스템 연동"]} title="외부 시스템 연동" description="EMS·인사·안전·그룹웨어의 데이터를 API·배치·스케줄러 방식으로 수집합니다." actions={<><Button variant="outline" onClick={resetDemo}>데모 초기화</Button><Button onClick={()=>runIntegration("ALL")}>전체 연동 실행</Button></>}/><div className="notice-grid"><div><b>운영 모드</b><span>매월/매일 정기 스케줄러</span></div><div><b>시연 모드</b><span>즉시 실행 버튼으로 동일 서비스 호출</span></div><div><b>중복 방지</b><span>Redis Lock + PostgreSQL UNIQUE</span></div></div><Card title="시스템별 수집 현황"><DataTable rows={db.integrations} columns={cols} rowKey="id"/></Card></div>; }

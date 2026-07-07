@@ -1,0 +1,8 @@
+import { useDemoData } from "../../../app/providers/DemoDataProvider";
+import PageHeader from "../../../shared/components/PageHeader";
+import Card from "../../../shared/components/Card";
+import StatCard from "../../../shared/components/StatCard";
+import DataTable from "../../../shared/components/DataTable";
+import StatusBadge from "../../../shared/components/StatusBadge";
+import { getDashboardSummary } from "../api/dashboardApi";
+export default function AdminDashboardPage(){ const {db}=useDemoData(); const s=getDashboardSummary(db); const pending=db.metrics.filter(m=>m.status==="PENDING"); return <div className="page-stack"><PageHeader breadcrumbs={["시스템","대시보드"]} title="시스템 관리자 대시보드" description="승인 대기, 연동 오류, 기업·사용자 운영 현황을 확인합니다."/><div className="summary-grid four"><StatCard label="승인 대기" value={`${s.pending}건`} helper="최종 검토 필요" icon="✓"/><StatCard label="연동 지연" value={`${db.integrations.filter(i=>i.status!=="NORMAL").length}건`} helper="운영 상태 확인" tone="orange" icon="↻"/><StatCard label="등록 기업" value="1개" helper="운영 중" tone="blue" icon="C"/><StatCard label="활성 사용자" value={`${db.users.filter(u=>u.active).length}명`} helper="전체 권한" tone="purple" icon="U"/></div><Card title="최근 승인 요청" action={<a className="text-link" href="/admin/approvals">전체 보기 →</a>}><DataTable rows={pending} columns={[{key:"period",label:"기준기간"},{key:"title",label:"지표명",render:(v,r)=><><strong>{v}</strong><small className="cell-sub">{r.indicatorCode}</small></>},{key:"facility",label:"사업장"},{key:"value",label:"실적",render:(v,r)=>`${v.toLocaleString()} ${r.unit}`},{key:"assignee",label:"요청자"},{key:"status",label:"상태",render:v=><StatusBadge status={v}/>}]} /></Card></div>; }
