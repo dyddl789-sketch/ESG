@@ -33,7 +33,10 @@ backend/build/
 backend/.gradle/
 *.class
 *.jar
+
+# Gradle Wrapper JAR는 GitHub에 포함
 !gradle/wrapper/gradle-wrapper.jar
+!backend/gradle/wrapper/gradle-wrapper.jar
 
 # =========================
 # React / Node.js
@@ -42,6 +45,20 @@ node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+
+# npm cache
+.npm/
+.npm-cache/
+npm-cache/
+**/.npm/
+**/.npm-cache/
+**/npm-cache/
+
+# Common tool cache
+.cache/
+**/.cache/
+
+# npm/yarn logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
