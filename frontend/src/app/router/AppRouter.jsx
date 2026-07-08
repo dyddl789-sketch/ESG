@@ -8,8 +8,6 @@ import PortalLayout from "../../layouts/PortalLayout";
 const LandingPage = lazy(() => import("../../domains/auth/pages/LandingPage"));
 const LoginPage = lazy(() => import("../../domains/auth/pages/LoginPage"));
 const ManagerDashboardPage = lazy(() => import("../../domains/dashboard/pages/ManagerDashboardPage"));
-const AdminDashboardPage = lazy(() => import("../../domains/dashboard/pages/AdminDashboardPage"));
-const PublicDashboardPage = lazy(() => import("../../domains/dashboard/pages/PublicDashboardPage"));
 const IntegrationPage = lazy(() => import("../../domains/integration/pages/IntegrationPage"));
 const IntegrationMonitorPage = lazy(() => import("../../domains/integration/pages/IntegrationMonitorPage"));
 const ExternalBenchmarkPage = lazy(() => import("../../domains/benchmark/pages/ExternalBenchmarkPage"));
@@ -24,8 +22,6 @@ const ApprovalDetailPage = lazy(() => import("../../domains/approval/pages/Appro
 const ReportBuilderPage = lazy(() => import("../../domains/report/pages/ReportBuilderPage"));
 const PublicReportsPage = lazy(() => import("../../domains/report/pages/PublicReportsPage"));
 const CompanyProfilePage = lazy(() => import("../../domains/company/pages/CompanyProfilePage"));
-const CompanyAdminPage = lazy(() => import("../../domains/company/pages/CompanyAdminPage"));
-const PublicCompanyPage = lazy(() => import("../../domains/company/pages/PublicCompanyPage"));
 const PublicComparePage = lazy(() => import("../../domains/company/pages/PublicComparePage"));
 const UserAdminPage = lazy(() => import("../../domains/admin/pages/UserAdminPage"));
 const IndicatorAdminPage = lazy(() => import("../../domains/admin/pages/IndicatorAdminPage"));
@@ -35,6 +31,10 @@ const layout = (roles) => (
   <ProtectedRoute allowedRoles={roles}>
     <PortalLayout />
   </ProtectedRoute>
+);
+
+const guard = (roles, element) => (
+  <ProtectedRoute allowedRoles={roles}>{element}</ProtectedRoute>
 );
 
 const fallback = <div className="route-loading">화면을 불러오는 중입니다.</div>;
@@ -47,37 +47,58 @@ export default function AppRouter() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/home" element={<RoleHome />} />
 
-        <Route path="/manager" element={layout([ROLES.COMPANY_MANAGER])}>
+        {/* /manager: 기업 ESG 관리자 전용 + 일부 페이지는 시스템 관리자·일반 사용자와 공유 */}
+        <Route
+          path="/manager"
+          element={layout([ROLES.COMPANY_MANAGER, ROLES.SYSTEM_ADMIN, ROLES.EXTERNAL_USER])}
+        >
           <Route index element={<Navigate to="dashboard" replace />} />
+
+          {/* 3개 role 공유 페이지 (조회 가능) */}
           <Route path="dashboard" element={<ManagerDashboardPage />} />
           <Route path="integrations" element={<IntegrationPage />} />
-          <Route path="benchmarks" element={<ExternalBenchmarkPage />} />
           <Route path="social" element={<SocialDataPage />} />
           <Route path="governance" element={<GovernanceDataPage />} />
-          <Route path="metrics" element={<MetricListPage />} />
-          <Route path="metrics/:metricId" element={<MetricDetailPage />} />
-          <Route path="documents" element={<DocumentAiPage />} />
-          <Route path="performance" element={<PerformancePage />} />
-          <Route path="reports" element={<ReportBuilderPage />} />
+          <Route path="benchmarks" element={<ExternalBenchmarkPage />} />
           <Route path="company" element={<CompanyProfilePage />} />
+
+          {/* 기업 ESG 관리자 전용 - 개별 재보호 */}
+          <Route
+            path="metrics"
+            element={guard([ROLES.COMPANY_MANAGER], <MetricListPage />)}
+          />
+          <Route
+            path="metrics/:metricId"
+            element={guard([ROLES.COMPANY_MANAGER], <MetricDetailPage />)}
+          />
+          <Route
+            path="documents"
+            element={guard([ROLES.COMPANY_MANAGER], <DocumentAiPage />)}
+          />
+          <Route
+            path="performance"
+            element={guard([ROLES.COMPANY_MANAGER], <PerformancePage />)}
+          />
+          <Route
+            path="reports"
+            element={guard([ROLES.COMPANY_MANAGER], <ReportBuilderPage />)}
+          />
         </Route>
 
+        {/* /admin: 시스템 총괄 관리자 전용 */}
         <Route path="/admin" element={layout([ROLES.SYSTEM_ADMIN])}>
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<AdminDashboardPage />} />
+          <Route index element={<Navigate to="/manager/dashboard" replace />} />
           <Route path="approvals" element={<ApprovalListPage />} />
           <Route path="approvals/:metricId" element={<ApprovalDetailPage />} />
-          <Route path="companies" element={<CompanyAdminPage />} />
           <Route path="users" element={<UserAdminPage />} />
           <Route path="indicators" element={<IndicatorAdminPage />} />
           <Route path="integrations" element={<IntegrationMonitorPage />} />
           <Route path="audit" element={<AuditLogPage />} />
         </Route>
 
+        {/* /public: 일반 사용자 전용 (공유 페이지는 /manager 쪽에서 처리) */}
         <Route path="/public" element={layout([ROLES.EXTERNAL_USER])}>
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<PublicDashboardPage />} />
-          <Route path="company" element={<PublicCompanyPage />} />
+          <Route index element={<Navigate to="/manager/dashboard" replace />} />
           <Route path="compare" element={<PublicComparePage />} />
           <Route path="reports" element={<PublicReportsPage />} />
         </Route>
