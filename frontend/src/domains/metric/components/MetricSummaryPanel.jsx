@@ -1,2 +1,10 @@
-import { formatNumber } from "../../../shared/utils/format";
-export default function MetricSummaryPanel({ metrics }){ const env=metrics.filter(m=>m.category==="ENVIRONMENT"); const total=env.reduce((s,m)=>s+Number(m.value||0),0); return <div className="metric-summary"><article><span>환경 데이터 합계</span><strong>{formatNumber(total,0)}</strong><small>수집 원천값 단순 합계(데모)</small></article><article><span>승인 완료</span><strong>{metrics.filter(m=>m.status==="APPROVED").length}건</strong><small>대시보드·보고서 반영</small></article><article><span>승인 대기</span><strong>{metrics.filter(m=>m.status==="PENDING").length}건</strong><small>시스템 관리자 검토 필요</small></article><article><span>반려</span><strong>{metrics.filter(m=>m.status==="REJECTED").length}건</strong><small>보완 후 재요청</small></article></div>; }
+export default function MetricSummaryPanel({ metrics }) {
+  return (
+    <div className="metric-summary">
+      <article><span>환경 지표</span><strong>{metrics.filter((item) => item.category === "ENVIRONMENT").length}건</strong><small>전력 사용량·Scope 2</small></article>
+      <article><span>사회 지표</span><strong>{metrics.filter((item) => item.category === "SOCIAL").length}건</strong><small>안전·교육·위험·퇴사</small></article>
+      <article><span>거버넌스 지표</span><strong>{metrics.filter((item) => item.category === "GOVERNANCE").length}건</strong><small>이사회·사외이사·윤리</small></article>
+      <article><span>승인 대기 / 반려</span><strong>{metrics.filter((item) => item.status === "PENDING").length} / {metrics.filter((item) => item.status === "REJECTED").length}건</strong><small>관리자 검토가 필요한 데이터</small></article>
+    </div>
+  );
+}

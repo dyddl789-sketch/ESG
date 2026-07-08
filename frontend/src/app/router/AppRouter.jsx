@@ -12,6 +12,9 @@ const AdminDashboardPage = lazy(() => import("../../domains/dashboard/pages/Admi
 const PublicDashboardPage = lazy(() => import("../../domains/dashboard/pages/PublicDashboardPage"));
 const IntegrationPage = lazy(() => import("../../domains/integration/pages/IntegrationPage"));
 const IntegrationMonitorPage = lazy(() => import("../../domains/integration/pages/IntegrationMonitorPage"));
+const ExternalBenchmarkPage = lazy(() => import("../../domains/benchmark/pages/ExternalBenchmarkPage"));
+const SocialDataPage = lazy(() => import("../../domains/social/pages/SocialDataPage"));
+const GovernanceDataPage = lazy(() => import("../../domains/governance/pages/GovernanceDataPage"));
 const MetricListPage = lazy(() => import("../../domains/metric/pages/MetricListPage"));
 const MetricDetailPage = lazy(() => import("../../domains/metric/pages/MetricDetailPage"));
 const PerformancePage = lazy(() => import("../../domains/metric/pages/PerformancePage"));
@@ -48,6 +51,9 @@ export default function AppRouter() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<ManagerDashboardPage />} />
           <Route path="integrations" element={<IntegrationPage />} />
+          <Route path="benchmarks" element={<ExternalBenchmarkPage />} />
+          <Route path="social" element={<SocialDataPage />} />
+          <Route path="governance" element={<GovernanceDataPage />} />
           <Route path="metrics" element={<MetricListPage />} />
           <Route path="metrics/:metricId" element={<MetricDetailPage />} />
           <Route path="documents" element={<DocumentAiPage />} />

@@ -15,4 +15,13 @@ export const STATUS_LABELS = Object.freeze({
   NORMAL: "정상",
   DELAYED: "지연",
   ERROR: "오류",
+  EMPTY: "미생성",
+  READY: "준비 완료",
+  WAITING: "수집 대기",
+  PROCESSING: "처리 중",
+  SUCCESS: "성공",
+  PARTIAL: "일부 실패",
+  COMPLETED: "수집 완료",
+  INCOMPLETE: "수집 미완료",
+  SYNCED: "동기화 완료",
 });
