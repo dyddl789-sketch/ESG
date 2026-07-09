@@ -1,8 +1,21 @@
 import { useState } from "react";
 import Button from "../../../shared/components/Button";
+import {
+  overlayStyle,
+  contentStyle,
+  headerStyle,
+  titleStyle,
+  closeBtnStyle,
+  footerStyle,
+  fieldGridStyle,
+  fieldStyle,
+  labelStyle,
+  inputStyle,
+} from "./modalStyles";
 
 export default function CompanyEditModal({ company, onClose, onSave }) {
   const [formData, setFormData] = useState({ ...company });
+  const [focused, setFocused] = useState(null);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -14,39 +27,46 @@ export default function CompanyEditModal({ company, onClose, onSave }) {
     onSave(formData);
   };
 
+  const getInputStyle = (name) => ({
+    ...inputStyle,
+    borderColor: focused === name ? "#2a7d55" : "#dcdfe3",
+    boxShadow: focused === name ? "0 0 0 3px rgba(42,125,85,0.12)" : "none",
+  });
+
+  const fields = [
+    ["기업명", "name", true],
+    ["업종", "industry", false],
+    ["기업규모", "scale", false],
+    ["사업자번호", "business_number", false],
+    ["대표자", "representative", false],
+  ];
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>기업 정보 수정</h2>
-          <button className="close-btn" onClick={onClose}>&times;</button>
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={contentStyle} onClick={(e) => e.stopPropagation()}>
+        <div style={headerStyle}>
+          <h2 style={titleStyle}>기업 정보 수정</h2>
+          <button style={closeBtnStyle} onClick={onClose}>&times;</button>
         </div>
+
         <form onSubmit={handleSubmit}>
-          <div className="modal-body">
-            <div className="form-grid">
-              <div className="form-field">
-                <label>기업명</label>
-                <input name="name" value={formData.name || ""} onChange={handleChange} required />
+          <div style={fieldGridStyle}>
+            {fields.map(([label, name, required]) => (
+              <div key={name} style={fieldStyle}>
+                <label style={labelStyle}>{label}</label>
+                <input
+                  name={name}
+                  value={formData[name] || ""}
+                  onChange={handleChange}
+                  onFocus={() => setFocused(name)}
+                  onBlur={() => setFocused(null)}
+                  required={required}
+                  style={getInputStyle(name)}
+                />
               </div>
-              <div className="form-field">
-                <label>업종</label>
-                <input name="industry" value={formData.industry || ""} onChange={handleChange} />
-              </div>
-              <div className="form-field">
-                <label>기업규모</label>
-                <input name="scale" value={formData.scale || ""} onChange={handleChange} />
-              </div>
-              <div className="form-field">
-                <label>사업자번호</label>
-                <input name="businessNumber" value={formData.businessNumber || ""} onChange={handleChange} />
-              </div>
-              <div className="form-field">
-                <label>대표자</label>
-                <input name="representative" value={formData.representative || ""} onChange={handleChange} />
-              </div>
-            </div>
+            ))}
           </div>
-          <div className="modal-footer">
+          <div style={footerStyle}>
             <Button type="submit">저장</Button>
             <Button variant="secondary" onClick={onClose}>취소</Button>
           </div>

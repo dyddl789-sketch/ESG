@@ -1,17 +1,16 @@
 package com.esg.platform.domain.company.mapper;
 
-import java.util.List;
-
+import com.esg.platform.domain.company.dto.FacilityDto;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-import com.esg.platform.domain.company.dto.FacilityDto;
+import java.util.List;
 
 @Mapper
 public interface FacilityMapper {
-    List<FacilityDto> findAllByCompanyId(Long companyId);
-    FacilityDto findById(Long id);
+    List<FacilityDto> findAllByCompanyId(@Param("companyId") Long companyId);
+    FacilityDto findById(@Param("id") Long id);
     void insert(@Param("companyId") Long companyId, @Param("dto") FacilityDto dto);
     void update(FacilityDto dto);
-    void delete(Long id);
+    void delete(@Param("id") Long id);
 }

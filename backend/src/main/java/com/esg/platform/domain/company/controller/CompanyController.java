@@ -47,7 +47,7 @@ public class CompanyController {
     @PutMapping("/me/facilities/{id}")
     @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'COMPANY_MANAGER')")
     public ResponseEntity<ApiResponse<FacilityDto>> updateFacility(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @RequestBody FacilityDto dto) {
         FacilityDto updated = companyService.updateFacility(id, dto);
         return ResponseEntity.ok(ApiResponse.ok(updated));
@@ -55,7 +55,7 @@ public class CompanyController {
 
     @DeleteMapping("/me/facilities/{id}")
     @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'COMPANY_MANAGER')")
-    public ResponseEntity<ApiResponse<Void>> deleteFacility(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> deleteFacility(@PathVariable("id") Long id) {
         companyService.deleteFacility(id);
         return ResponseEntity.ok(ApiResponse.ok(null));
     }

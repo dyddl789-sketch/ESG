@@ -6,7 +6,6 @@ import { useAuth } from "../../../app/providers/AuthProvider";
 import { ROLES } from "../../../app/config/roles";
 import companyApi from "../api/companyApi";
 import FacilityDetailModal from "../components/FacilityDetailModal";
-import CompanyEditModal from "../components/CompanyEditModal";
 import FacilityFormModal from "../components/FacilityFormModal";
 
 // TODO: Toast/Alert 컴포넌트 추가 필요
@@ -26,8 +25,6 @@ export default function CompanyProfilePage() {
 
   const [showFacilityDetailModal, setShowFacilityDetailModal] = useState(false);
   const [selectedFacility, setSelectedFacility] = useState(null);
-
-  const [showCompanyEditModal, setShowCompanyEditModal] = useState(false);
 
   const [showFacilityFormModal, setShowFacilityFormModal] = useState(false);
   const [editingFacility, setEditingFacility] = useState(null);
@@ -79,29 +76,13 @@ export default function CompanyProfilePage() {
     setSelectedFacility(null);
   };
 
-  const handleEditCompany = () => {
-    setShowCompanyEditModal(true);
-  };
-
-  const handleSaveCompany = async (updatedCompany) => {
-    try {
-      await companyApi.updateCompany(updatedCompany);
-      showToast("기업 정보가 성공적으로 수정되었습니다.", "success");
-      setShowCompanyEditModal(false);
-      fetchCompanyData(); // 데이터 새로고침
-    } catch (err) {
-      showToast("기업 정보 수정에 실패했습니다.", "error");
-      console.error("Failed to update company:", err);
-    }
-  };
-
   const handleAddFacility = () => {
     setEditingFacility(null);
     setShowFacilityFormModal(true);
   };
 
   const handleEditFacility = (facility) => {
-    setSelectedFacility(null); // 상세 모달 닫기
+    setSelectedFacility(null);
     setShowFacilityDetailModal(false);
     setEditingFacility(facility);
     setShowFacilityFormModal(true);
@@ -118,7 +99,7 @@ export default function CompanyProfilePage() {
       }
       setShowFacilityFormModal(false);
       setEditingFacility(null);
-      fetchFacilitiesData(); // 데이터 새로고침
+      fetchFacilitiesData();
     } catch (err) {
       showToast("사업장 정보 저장에 실패했습니다.", "error");
       console.error("Failed to save facility:", err);
@@ -132,7 +113,7 @@ export default function CompanyProfilePage() {
         showToast("사업장이 성공적으로 삭제되었습니다.", "success");
         setShowFacilityDetailModal(false);
         setSelectedFacility(null);
-        fetchFacilitiesData(); // 데이터 새로고침
+        fetchFacilitiesData();
       } catch (err) {
         showToast("사업장 삭제에 실패했습니다.", "error");
         console.error("Failed to delete facility:", err);
@@ -141,7 +122,7 @@ export default function CompanyProfilePage() {
   };
 
   if (loading) {
-    return <div className="page-stack">로딩 중...</div>; // TODO: 스피너 컴포넌트 사용
+    return <div className="page-stack">로딩 중...</div>;
   }
 
   if (error) {
@@ -154,7 +135,6 @@ export default function CompanyProfilePage() {
         breadcrumbs={["기업 설정", "기업·사업장 정보"]}
         title="기업·사업장 정보"
         description="ESG 데이터의 조직·사업장 기준정보를 관리합니다."
-        actions={canManage && <Button onClick={handleEditCompany}>정보 수정</Button>}
       />
       <div className="two-cols">
         <Card title="기업 기본정보">
@@ -175,7 +155,7 @@ export default function CompanyProfilePage() {
                 </div>
                 <div>
                   <span>사업자번호</span>
-                  <strong>{company.businessNumber}</strong>
+                  <strong>{company.business_number}</strong>
                 </div>
                 <div>
                   <span>대표자</span>
@@ -201,7 +181,6 @@ export default function CompanyProfilePage() {
                     <strong>{f.facility_name}</strong>
                     <small>{f.address}</small>
                   </div>
-                  {/* 상세 버튼은 카드 클릭으로 대체되므로 제거 */}
                 </article>
               ))
             ) : (
@@ -223,14 +202,6 @@ export default function CompanyProfilePage() {
           onEdit={handleEditFacility}
           onDelete={handleDeleteFacility}
           canEdit={canManage}
-        />
-      )}
-
-      {showCompanyEditModal && company && (
-        <CompanyEditModal
-          company={company}
-          onClose={() => setShowCompanyEditModal(false)}
-          onSave={handleSaveCompany}
         />
       )}
 
