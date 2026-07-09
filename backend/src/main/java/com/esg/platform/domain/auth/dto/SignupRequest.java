@@ -1,0 +1,33 @@
+package com.esg.platform.domain.auth.dto;
+
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
+public record SignupRequest(
+        @NotBlank(message = "이름을 입력해 주세요.")
+        @Size(max = 100, message = "이름은 100자 이하여야 합니다.")
+        String name,
+
+        @NotBlank(message = "이메일을 입력해 주세요.")
+        @Email(message = "올바른 이메일 형식이 아닙니다.")
+        @Size(max = 255, message = "이메일은 255자 이하여야 합니다.")
+        String email,
+
+        @NotBlank(message = "비밀번호를 입력해 주세요.")
+        @Size(min = 8, max = 64, message = "비밀번호는 8자 이상 64자 이하여야 합니다.")
+        @Pattern(
+                regexp = "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[!@#$%^&*()_+\\-=])[A-Za-z\\d!@#$%^&*()_+\\-=]+$",
+                message = "비밀번호는 영문, 숫자, 특수문자를 각각 하나 이상 포함해야 합니다."
+        )
+        String password,
+
+        @Pattern(regexp = "^$|^[0-9+\\-() ]{8,20}$", message = "전화번호 형식을 확인해 주세요.")
+        String phoneNumber,
+
+        @AssertTrue(message = "서비스 이용약관과 개인정보 처리방침에 동의해야 합니다.")
+        boolean termsAccepted
+) {
+}
