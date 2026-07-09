@@ -11,7 +11,6 @@ import FacilityFormModal from "../components/FacilityFormModal";
 // TODO: Toast/Alert 컴포넌트 추가 필요
 const showToast = (message, type) => {
   console.log(`Toast: ${type} - ${message}`);
-  // 실제 토스트 알림 구현 (예: react-toastify)
 };
 
 export default function CompanyProfilePage() {
@@ -136,6 +135,14 @@ export default function CompanyProfilePage() {
         title="기업·사업장 정보"
         description="ESG 데이터의 조직·사업장 기준정보를 관리합니다."
       />
+
+      <Card title="기업 ESG 정책">
+        <div className="public-copy">
+          <h2>지속가능한 모빌리티 공급망 구축</h2>
+          <p>에너지 효율 개선, 안전한 근로환경, 투명한 의사결정을 핵심 가치로 ESG 경영을 추진합니다.</p>
+        </div>
+      </Card>
+
       <div className="two-cols">
         <Card title="기업 기본정보">
           <div className="detail-grid">
