@@ -17,7 +17,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -37,8 +39,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(token) && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
                 Claims claims = tokenProvider.parseExpected(token, JwtTokenType.ACCESS);
-                if (!redisTokenService.isBlacklisted(tokenProvider.getJti(claims))) {
-                    EsgUserPrincipal principal = userDetailsService.loadById(tokenProvider.getUserId(claims));
+                String jti = tokenProvider.getJti(claims);
+                Long userId = tokenProvider.getUserId(claims);
+
+                if (redisTokenService.isBlacklisted(jti)) {
+                    log.debug("[JWT_FILTER] 블랙리스트 토큰 차단 userId={} jti={} path={}",
+                            userId, jti, request.getRequestURI());
+                } else {
+                    EsgUserPrincipal principal = userDetailsService.loadById(userId);
                     if (principal.getUser().getTokenVersion() == tokenProvider.getTokenVersion(claims)
                             && principal.isEnabled()) {
                         UsernamePasswordAuthenticationToken authentication =
@@ -51,10 +59,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 new WebAuthenticationDetailsSource().buildDetails(request)
                         );
                         SecurityContextHolder.getContext().setAuthentication(authentication);
+                        log.debug("[JWT_FILTER] 인증 성공 userId={} loginId={} role={} jti={} path={}",
+                                userId,
+                                principal.getUser().getLoginId(),
+                                principal.getUser().getRole(),
+                                jti,
+                                request.getRequestURI());
+                    } else {
+                        log.debug("[JWT_FILTER] 토큰 버전/계정 상태 불일치 userId={} jti={}", userId, jti);
                     }
                 }
-            } catch (BusinessException ignored) {
+            } catch (BusinessException exception) {
                 SecurityContextHolder.clearContext();
+                log.debug("[JWT_FILTER] 인증 실패 path={} reason={}",
+                        request.getRequestURI(), exception.getErrorCode().getCode());
             }
         }
 

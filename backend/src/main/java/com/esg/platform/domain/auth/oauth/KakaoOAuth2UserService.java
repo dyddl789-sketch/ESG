@@ -1,5 +1,6 @@
 package com.esg.platform.domain.auth.oauth;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -79,6 +80,8 @@ public class KakaoOAuth2UserService extends DefaultOAuth2UserService {
                     .socialProvider(SocialProvider.KAKAO)
                     .socialId(socialId)
                     .profileImageUrl(profileImageUrl)
+                    .emailVerified(verifiedEmail)
+                    .emailVerifiedAt(verifiedEmail ? OffsetDateTime.now() : null)
                     .active(true)
                     .tokenVersion(0)
                     .build();

@@ -9,11 +9,17 @@ import com.esg.platform.domain.member.entity.User;
 public interface UserMapper {
     User findById(@Param("id") Long id);
 
+    User findByLoginId(@Param("loginId") String loginId);
+
     User findByEmail(@Param("email") String email);
 
     User findBySocial(@Param("provider") String provider, @Param("socialId") String socialId);
 
+    int countByLoginId(@Param("loginId") String loginId);
+
     int countByEmail(@Param("email") String email);
+
+    int countByPhoneNumber(@Param("phoneNumber") String phoneNumber);
 
     int insertLocalUser(User user);
 

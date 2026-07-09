@@ -73,9 +73,16 @@ public class SecurityConfig {
                                 "/api/auth/signup",
                                 "/api/auth/refresh",
                                 "/api/auth/oauth/exchange",
+                                "/api/auth/email-verifications/send",
+                                "/api/auth/email-verifications/confirm",
                                 "/api/auth/logout"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/auth/config").permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/auth/config",
+                                "/api/auth/check-login-id",
+                                "/api/auth/check-email",
+                                "/api/auth/check-phone"
+                        ).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("SYSTEM_ADMIN")
                         .requestMatchers("/api/manager/**")
                                 .hasAnyRole("SYSTEM_ADMIN", "COMPANY_MANAGER")
