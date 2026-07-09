@@ -2,9 +2,9 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.esg.company.mapper.FacilityMapper">
+<mapper namespace="com.esg.platform.domain.company.mapper.FacilityMapper">
 
-    <resultMap id="FacilityResultMap" type="com.esg.company.dto.FacilityDto">
+    <resultMap id="FacilityResultMap" type="com.esg.platform.domain.company.dto.FacilityDto">
         <id property="id" column="id"/>
         <result property="facilityName" column="facility_name"/>
         <result property="facilityType" column="facility_type"/>
@@ -31,7 +31,7 @@
         VALUES (#{companyId}, #{dto.facilityName}, #{dto.facilityType}, #{dto.address}, #{dto.contractPowerKw}, NOW())
     </insert>
 
-    <update id="update" parameterType="com.esg.company.dto.FacilityDto">
+   <update id="update" parameterType="com.esg.platform.domain.company.dto.FacilityDto">
         UPDATE company_facilities
         SET facility_name    = #{facilityName},
             facility_type    = #{facilityType},

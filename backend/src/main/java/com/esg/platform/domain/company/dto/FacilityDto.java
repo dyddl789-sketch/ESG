@@ -2,7 +2,7 @@ package com.esg.platform.domain.company.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Data
 public class FacilityDto {
@@ -20,5 +20,5 @@ public class FacilityDto {
     private Double contractPowerKw;
 
     @JsonProperty("created_at")
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 }
