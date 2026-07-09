@@ -1,60 +1,224 @@
-import { useDemoData } from "../../../app/providers/DemoDataProvider";
-import { useAuth } from "../../../app/providers/AuthProvider";
-import { ROLES } from "../../../app/config/roles";
+import React, { useState, useEffect } from "react";
 import PageHeader from "../../../shared/components/PageHeader";
 import Card from "../../../shared/components/Card";
 import Button from "../../../shared/components/Button";
+import { useAuth } from "../../../app/providers/AuthProvider";
+import { ROLES } from "../../../app/config/roles";
+import companyApi from "../api/companyApi";
+import FacilityDetailModal from "../components/FacilityDetailModal";
+import FacilityFormModal from "../components/FacilityFormModal";
+
+// TODO: Toast/Alert 컴포넌트 추가 필요
+const showToast = (message, type) => {
+  console.log(`Toast: ${type} - ${message}`);
+};
 
 export default function CompanyProfilePage() {
   const { user } = useAuth();
-  const { db } = useDemoData();
-  const company = db.company;
-  const canManage = [ROLES.SYSTEM_ADMIN, ROLES.COMPANY_MANAGER].includes(user.role);
-  const actionLabel = user.role === ROLES.SYSTEM_ADMIN ? "기업 관리" : "정보 수정";
+  const currentUserRole = user?.role;
+
+  const [company, setCompany] = useState(null);
+  const [facilities, setFacilities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [showFacilityDetailModal, setShowFacilityDetailModal] = useState(false);
+  const [selectedFacility, setSelectedFacility] = useState(null);
+
+  const [showFacilityFormModal, setShowFacilityFormModal] = useState(false);
+  const [editingFacility, setEditingFacility] = useState(null);
+
+  const canManage = [ROLES.SYSTEM_ADMIN, ROLES.COMPANY_MANAGER].includes(currentUserRole);
+
+  const fetchCompanyData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const companyData = await companyApi.getCompany();
+      setCompany(companyData.data);
+    } catch (err) {
+      setError("기업 정보를 불러오는데 실패했습니다.");
+      showToast("기업 정보를 불러오는데 실패했습니다.", "error");
+      console.error("Failed to fetch company data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchFacilitiesData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const facilitiesData = await companyApi.getFacilities();
+      setFacilities(facilitiesData.data);
+    } catch (err) {
+      setError("사업장 목록을 불러오는데 실패했습니다.");
+      showToast("사업장 목록을 불러오는데 실패했습니다.", "error");
+      console.error("Failed to fetch facilities data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCompanyData();
+    fetchFacilitiesData();
+  }, []);
+
+  const handleFacilityClick = (facility) => {
+    setSelectedFacility(facility);
+    setShowFacilityDetailModal(true);
+  };
+
+  const handleCloseFacilityDetailModal = () => {
+    setShowFacilityDetailModal(false);
+    setSelectedFacility(null);
+  };
+
+  const handleAddFacility = () => {
+    setEditingFacility(null);
+    setShowFacilityFormModal(true);
+  };
+
+  const handleEditFacility = (facility) => {
+    setSelectedFacility(null);
+    setShowFacilityDetailModal(false);
+    setEditingFacility(facility);
+    setShowFacilityFormModal(true);
+  };
+
+  const handleSaveFacility = async (newFacilityData) => {
+    try {
+      if (editingFacility) {
+        await companyApi.updateFacility(editingFacility.id, newFacilityData);
+        showToast("사업장 정보가 성공적으로 수정되었습니다.", "success");
+      } else {
+        await companyApi.createFacility(newFacilityData);
+        showToast("사업장이 성공적으로 등록되었습니다.", "success");
+      }
+      setShowFacilityFormModal(false);
+      setEditingFacility(null);
+      fetchFacilitiesData();
+    } catch (err) {
+      showToast("사업장 정보 저장에 실패했습니다.", "error");
+      console.error("Failed to save facility:", err);
+    }
+  };
+
+  const handleDeleteFacility = async (facilityId) => {
+    if (window.confirm("정말로 이 사업장을 삭제하시겠습니까?")) {
+      try {
+        await companyApi.deleteFacility(facilityId);
+        showToast("사업장이 성공적으로 삭제되었습니다.", "success");
+        setShowFacilityDetailModal(false);
+        setSelectedFacility(null);
+        fetchFacilitiesData();
+      } catch (err) {
+        showToast("사업장 삭제에 실패했습니다.", "error");
+        console.error("Failed to delete facility:", err);
+      }
+    }
+  };
+
+  if (loading) {
+    return <div className="page-stack">로딩 중...</div>;
+  }
+
+  if (error) {
+    return <div className="page-stack error-message">오류: {error}</div>;
+  }
 
   return (
     <div className="page-stack">
       <PageHeader
-        breadcrumbs={[user.role === ROLES.SYSTEM_ADMIN ? "플랫폼 관리" : "기업 설정", "기업·사업장 정보"]}
+        breadcrumbs={["기업 설정", "기업·사업장 정보"]}
         title="기업·사업장 정보"
         description="ESG 데이터의 조직·사업장 기준정보를 관리합니다."
-        actions={canManage ? <Button>{actionLabel}</Button> : <span className="verified-role">조회 전용</span>}
       />
+
+      <Card title="기업 ESG 정책">
+        <div className="public-copy">
+          <h2>지속가능한 모빌리티 공급망 구축</h2>
+          <p>에너지 효율 개선, 안전한 근로환경, 투명한 의사결정을 핵심 가치로 ESG 경영을 추진합니다.</p>
+        </div>
+      </Card>
 
       <div className="two-cols">
         <Card title="기업 기본정보">
           <div className="detail-grid">
-            {[
-              ["기업명", company.name],
-              ["업종", company.industry],
-              ["기업규모", company.scale],
-              ["사업자번호", company.businessNumber],
-              ["대표자", company.representative],
-              ["운영 상태", "사용 중"],
-            ].map(([label, value]) => (
-              <div key={label}>
-                <span>{label}</span>
-                <strong>{value}</strong>
-              </div>
-            ))}
+            {company ? (
+              <>
+                <div>
+                  <span>기업명</span>
+                  <strong>{company.name}</strong>
+                </div>
+                <div>
+                  <span>업종</span>
+                  <strong>{company.industry}</strong>
+                </div>
+                <div>
+                  <span>기업규모</span>
+                  <strong>{company.scale}</strong>
+                </div>
+                <div>
+                  <span>사업자번호</span>
+                  <strong>{company.business_number}</strong>
+                </div>
+                <div>
+                  <span>대표자</span>
+                  <strong>{company.representative}</strong>
+                </div>
+                <div>
+                  <span>운영 상태</span>
+                  <strong>사용 중</strong>
+                </div>
+              </>
+            ) : (
+              <div>기업 정보가 없습니다.</div>
+            )}
           </div>
         </Card>
-
         <Card title="사업장">
           <div className="facility-list">
-            {db.facilities.map((facility) => (
-              <article key={facility.id}>
-                <span>{facility.id}</span>
-                <div>
-                  <strong>{facility.name}</strong>
-                  <small>{facility.address}</small>
-                </div>
-                <button type="button">상세</button>
-              </article>
-            ))}
+            {facilities.length > 0 ? (
+              facilities.map((f) => (
+                <article key={f.id} onClick={() => handleFacilityClick(f)} style={{ cursor: "pointer" }}>
+                  <span>{f.id}</span>
+                  <div>
+                    <strong>{f.facility_name}</strong>
+                    <small>{f.address}</small>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <div>등록된 사업장이 없습니다.</div>
+            )}
           </div>
+          {canManage && (
+            <div style={{ marginTop: "20px", textAlign: "right" }}>
+              <Button onClick={handleAddFacility}>사업장 등록</Button>
+            </div>
+          )}
         </Card>
       </div>
+
+      {showFacilityDetailModal && selectedFacility && (
+        <FacilityDetailModal
+          facility={selectedFacility}
+          onClose={handleCloseFacilityDetailModal}
+          onEdit={handleEditFacility}
+          onDelete={handleDeleteFacility}
+          canEdit={canManage}
+        />
+      )}
+
+      {showFacilityFormModal && (
+        <FacilityFormModal
+          facility={editingFacility}
+          onClose={() => setShowFacilityFormModal(false)}
+          onSave={handleSaveFacility}
+        />
+      )}
     </div>
   );
 }
