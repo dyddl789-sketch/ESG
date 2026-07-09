@@ -20,7 +20,17 @@ const refreshClient = axios.create({
 let refreshPromise = null;
 
 const isAuthEndpoint = (url = "") =>
-  ["/auth/login", "/auth/signup", "/auth/refresh", "/auth/oauth/exchange"].some((path) =>
+  [
+    "/auth/login",
+    "/auth/signup",
+    "/auth/refresh",
+    "/auth/oauth/exchange",
+    "/auth/check-login-id",
+    "/auth/check-email",
+    "/auth/check-phone",
+    "/auth/email-verifications/send",
+    "/auth/email-verifications/confirm",
+  ].some((path) =>
     url.includes(path),
   );
 

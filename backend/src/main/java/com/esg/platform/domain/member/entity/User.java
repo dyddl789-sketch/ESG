@@ -26,6 +26,8 @@ public class User {
     private SocialProvider socialProvider;
     private String socialId;
     private String profileImageUrl;
+    private boolean emailVerified;
+    private OffsetDateTime emailVerifiedAt;
     private boolean active;
     private int tokenVersion;
     private OffsetDateTime lastLoginAt;

@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { useAuth } from "../../../app/providers/AuthProvider";
+import { ROLES } from "../../../app/config/roles";
 import { useDemoData } from "../../../app/providers/DemoDataProvider";
 import PageHeader from "../../../shared/components/PageHeader";
 import Card from "../../../shared/components/Card";
@@ -12,6 +14,8 @@ const number = (value, digits = 0) => Number(value || 0).toLocaleString("ko-KR",
 });
 
 export default function GovernanceDataPage() {
+  const { user } = useAuth();
+  const canManage = user.role === ROLES.COMPANY_MANAGER;
   const {
     db,
     generateGovernanceSource,
@@ -72,8 +76,8 @@ export default function GovernanceDataPage() {
             <span>대시보드 캐시 <b>{collection.cacheStatus}</b></span>
           </div>
           <div className="ems-actions">
-            <Button variant="light" onClick={generateGovernanceSource} disabled={isProcessing}>거버넌스 원천 생성</Button>
-            <Button onClick={collectGovernanceData} disabled={isProcessing || !collection.sourceGenerated}>
+            <Button variant="light" onClick={generateGovernanceSource} disabled={!canManage || isProcessing}>거버넌스 원천 생성</Button>
+            <Button onClick={collectGovernanceData} disabled={!canManage || isProcessing || !collection.sourceGenerated}>
               {isProcessing ? `${collection.currentSource || "원천"} 수집 중` : "거버넌스 즉시 수집"}
             </Button>
           </div>
@@ -107,8 +111,8 @@ export default function GovernanceDataPage() {
               <div className="progress-track"><i style={{ width: `${collection.aiJob.progress}%` }} /></div>
             </div>
             <div className="card-actions">
-              <Button variant="outline" disabled={collection.aiJob.active || db.governanceDocument.analysisStatus === "COMPLETED"} onClick={analyzeGovernanceDocument}>AI 분석 실행</Button>
-              <Button disabled={!db.governanceDocument.extracted || db.governanceDocument.confirmed} onClick={confirmGovernanceAi}>담당자 확인·반영</Button>
+              <Button variant="outline" disabled={!canManage || collection.aiJob.active || db.governanceDocument.analysisStatus === "COMPLETED"} onClick={analyzeGovernanceDocument}>AI 분석 실행</Button>
+              <Button disabled={!canManage || !db.governanceDocument.extracted || db.governanceDocument.confirmed} onClick={confirmGovernanceAi}>담당자 확인·반영</Button>
             </div>
           </div>
         </Card>

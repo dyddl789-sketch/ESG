@@ -34,7 +34,7 @@ public class EsgUserPrincipal implements UserDetails {
 
     @Override
     public String getUsername() {
-        return user.getEmail();
+        return user.getLoginId();
     }
 
     @Override

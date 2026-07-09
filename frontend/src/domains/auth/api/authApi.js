@@ -10,6 +10,26 @@ export async function signupRequest(payload) {
   return dataOf(await apiClient.post("/auth/signup", payload));
 }
 
+export async function checkLoginId(loginId) {
+  return dataOf(await apiClient.get("/auth/check-login-id", { params: { loginId } }));
+}
+
+export async function checkEmail(email) {
+  return dataOf(await apiClient.get("/auth/check-email", { params: { email } }));
+}
+
+export async function checkPhone(phoneNumber) {
+  return dataOf(await apiClient.get("/auth/check-phone", { params: { phoneNumber } }));
+}
+
+export async function sendEmailVerification(email) {
+  return dataOf(await apiClient.post("/auth/email-verifications/send", { email }));
+}
+
+export async function confirmEmailVerification(email, code) {
+  return dataOf(await apiClient.post("/auth/email-verifications/confirm", { email, code }));
+}
+
 export async function getCurrentUser() {
   return dataOf(await apiClient.get("/auth/me"));
 }

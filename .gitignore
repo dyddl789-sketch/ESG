@@ -25,6 +25,8 @@ out/
 .factorypath
 .springBeans
 .sts4-cache/
+# STS 컴파일 결과물
+/backend/bin/
 
 # =========================
 # Java / Gradle
