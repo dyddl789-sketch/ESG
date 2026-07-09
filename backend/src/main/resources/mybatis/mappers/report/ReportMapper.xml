@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.esg.platform.domain.report.mapper.ReportMapper">
+
+    <select id="selectReportTemplateById" resultType="com.esg.platform.domain.report.entity.ReportTemplate">
+        SELECT id, company_id AS companyId, title, 
+               included_indicators::text AS includedIndicators, 
+               layout_settings::text AS layoutSettings, created_at AS createdAt
+        FROM report_templates
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insertGeneratedReport" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO generated_reports (
+            template_id, title, content, version, file_url, is_public, generated_by
+        ) VALUES (
+            #{templateId}, #{title}, #{content}, #{version}, #{fileUrl}, #{isPublic}, #{generatedBy}
+        )
+    </insert>
+
+    <select id="selectReportTemplates" resultType="com.esg.platform.domain.report.entity.ReportTemplate">
+        SELECT id, company_id AS companyId, title, 
+               included_indicators::text AS includedIndicators, 
+               layout_settings::text AS layoutSettings, created_at AS createdAt
+        FROM report_templates
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectGeneratedReportById" resultType="com.esg.platform.domain.report.entity.GeneratedReport">
+        SELECT id, template_id AS templateId, title, content, version,
+               file_url AS fileUrl, is_public AS isPublic,
+               generated_by AS generatedBy, created_at AS createdAt
+        FROM generated_reports
+        WHERE id = #{id}
+    </select>
+
+</mapper>
