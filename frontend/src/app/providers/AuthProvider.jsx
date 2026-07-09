@@ -1,46 +1,93 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState } from "react";
-import Cookies from "js-cookie";
-import { ROLE_HOME, ROLE_LABELS, ROLES } from "../config/roles";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { ROLE_HOME, ROLE_LABELS } from "../config/roles";
+import {
+  exchangeOAuthCode,
+  getCurrentUser,
+  loginRequest,
+  logoutRequest,
+  signupRequest,
+} from "../../domains/auth/api/authApi";
+import { tokenStorage } from "../../shared/auth/tokenStorage";
 
 const AuthContext = createContext(null);
 
-const DEMO_USERS = {
-  [ROLES.COMPANY_MANAGER]: { id: 2, name: "김ESG", email: "manager@ecoflow.co.kr", role: ROLES.COMPANY_MANAGER, department: "지속가능경영팀" },
-  [ROLES.SYSTEM_ADMIN]: { id: 1, name: "박시스템", email: "admin@ecoflow.co.kr", role: ROLES.SYSTEM_ADMIN, department: "플랫폼운영팀" },
-  [ROLES.EXTERNAL_USER]: { id: 3, name: "이투자", email: "external@example.com", role: ROLES.EXTERNAL_USER, department: "일반 사용자" },
-};
-
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    const savedRole = localStorage.getItem("esg-demo-role");
-    return savedRole ? DEMO_USERS[savedRole] : null;
-  });
+  const [user, setUser] = useState(null);
+  const [initializing, setInitializing] = useState(true);
 
-  const login = (role) => {
-    const nextUser = DEMO_USERS[role] ?? DEMO_USERS[ROLES.COMPANY_MANAGER];
-    localStorage.setItem("esg-demo-role", nextUser.role);
-    Cookies.set("demoRole", nextUser.role, { sameSite: "Lax" });
-    setUser(nextUser);
-    return ROLE_HOME[nextUser.role];
-  };
+  const applySession = useCallback((session) => {
+    tokenStorage.setAccessToken(session?.accessToken);
+    setUser(session?.user || null);
+    return session?.user ? ROLE_HOME[session.user.role] : "/login";
+  }, []);
 
-  const logout = () => {
-    localStorage.removeItem("esg-demo-role");
-    Cookies.remove("demoRole");
-    setUser(null);
-  };
+  useEffect(() => {
+    let mounted = true;
 
-  const switchRole = (role) => login(role);
+    const restore = async () => {
+      try {
+        const currentUser = await getCurrentUser();
+        if (mounted) setUser(currentUser);
+      } catch {
+        if (mounted) {
+          tokenStorage.clear();
+          setUser(null);
+        }
+      } finally {
+        if (mounted) setInitializing(false);
+      }
+    };
 
-  const value = {
-    user,
-    isAuthenticated: Boolean(user),
-    login,
-    logout,
-    switchRole,
-    roleLabel: user ? ROLE_LABELS[user.role] : "",
-  };
+    const handleExpired = () => {
+      tokenStorage.clear();
+      setUser(null);
+    };
+
+    const handleTokenRefreshed = (event) => {
+      if (event.detail?.user) setUser(event.detail.user);
+    };
+
+    window.addEventListener("auth:expired", handleExpired);
+    window.addEventListener("auth:token-refreshed", handleTokenRefreshed);
+    restore();
+
+    return () => {
+      mounted = false;
+      window.removeEventListener("auth:expired", handleExpired);
+      window.removeEventListener("auth:token-refreshed", handleTokenRefreshed);
+    };
+  }, []);
+
+  const login = useCallback(async (credentials) => applySession(await loginRequest(credentials)), [applySession]);
+  const signup = useCallback(async (payload) => applySession(await signupRequest(payload)), [applySession]);
+  const completeOAuthLogin = useCallback(
+    async (code) => applySession(await exchangeOAuthCode(code)),
+    [applySession],
+  );
+
+  const logout = useCallback(async () => {
+    try {
+      await logoutRequest();
+    } finally {
+      tokenStorage.clear();
+      setUser(null);
+    }
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      user,
+      initializing,
+      isAuthenticated: Boolean(user),
+      login,
+      signup,
+      completeOAuthLogin,
+      logout,
+      roleLabel: user ? ROLE_LABELS[user.role] : "",
+    }),
+    [user, initializing, login, signup, completeOAuthLogin, logout],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

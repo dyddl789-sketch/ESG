@@ -1,24 +1,25 @@
 package com.esg.platform.global.response;
 
-import lombok.Getter;
+import java.time.OffsetDateTime;
 
-@Getter
-public class ApiResponse<T> {
-	private final boolean success;
-	private final T data;
-	private final String error;
+public record ApiResponse<T>(
+        boolean success,
+        T data,
+        ApiError error,
+        OffsetDateTime timestamp
+) {
+    public static <T> ApiResponse<T> ok(T data) {
+        return new ApiResponse<>(true, data, null, OffsetDateTime.now());
+    }
 
-	private ApiResponse(boolean success, T data, String error) {
-		this.success = success;
-		this.data = data;
-		this.error = error;
-	}
+    public static ApiResponse<Void> ok() {
+        return new ApiResponse<>(true, null, null, OffsetDateTime.now());
+    }
 
-	public static <T> ApiResponse<T> success(T data) {
-		return new ApiResponse<>(true, data, null);
-	}
+    public static ApiResponse<Void> error(String code, String message) {
+        return new ApiResponse<>(false, null, new ApiError(code, message), OffsetDateTime.now());
+    }
 
-	public static <T> ApiResponse<T> error(String message) {
-		return new ApiResponse<>(false, null, message);
-	}
+    public record ApiError(String code, String message) {
+    }
 }
