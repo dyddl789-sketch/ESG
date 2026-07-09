@@ -19,7 +19,9 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class JwtTokenProvider {
 
@@ -66,10 +68,12 @@ public class JwtTokenProvider {
     private String createToken(User user, JwtTokenType type, Duration ttl) {
         Instant issuedAt = Instant.now();
         Instant expiresAt = issuedAt.plus(ttl);
+        String jti = UUID.randomUUID().toString();
 
-        return Jwts.builder()
-                .id(UUID.randomUUID().toString())
+        String token = Jwts.builder()
+                .id(jti)
                 .subject(String.valueOf(user.getId()))
+                .claim("loginId", user.getLoginId())
                 .claim("email", user.getEmail())
                 .claim(CLAIM_ROLE, user.getRole().name())
                 .claim(CLAIM_TOKEN_TYPE, type.name())
@@ -78,6 +82,10 @@ public class JwtTokenProvider {
                 .expiration(Date.from(expiresAt))
                 .signWith(secretKey)
                 .compact();
+
+        log.debug("[JWT] 발급 type={} userId={} loginId={} role={} jti={} expiresAt={} token={}",
+                type, user.getId(), user.getLoginId(), user.getRole(), jti, expiresAt, maskToken(token));
+        return token;
     }
 
     public Claims parse(String token) {
@@ -88,6 +96,7 @@ public class JwtTokenProvider {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (JwtException | IllegalArgumentException exception) {
+            log.debug("[JWT] 검증 실패 token={}", maskToken(token));
             throw new BusinessException(ErrorCode.TOKEN_INVALID);
         }
     }
@@ -96,6 +105,8 @@ public class JwtTokenProvider {
         Claims claims = parse(token);
         String actualType = claims.get(CLAIM_TOKEN_TYPE, String.class);
         if (!expectedType.name().equals(actualType)) {
+            log.debug("[JWT] 토큰 종류 불일치 expected={} actual={} jti={}",
+                    expectedType, actualType, claims.getId());
             throw new BusinessException(ErrorCode.TOKEN_INVALID);
         }
         return claims;
@@ -125,5 +136,12 @@ public class JwtTokenProvider {
 
     public Duration getRefreshTtl() {
         return refreshTtl;
+    }
+
+    private String maskToken(String token) {
+        if (token == null || token.length() < 24) {
+            return "***";
+        }
+        return token.substring(0, 12) + "..." + token.substring(token.length() - 8);
     }
 }

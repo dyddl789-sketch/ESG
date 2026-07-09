@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { useAuth } from "../../../app/providers/AuthProvider";
+import { ROLES } from "../../../app/config/roles";
 import { useDemoData } from "../../../app/providers/DemoDataProvider";
 import PageHeader from "../../../shared/components/PageHeader";
 import Card from "../../../shared/components/Card";
@@ -12,6 +14,8 @@ const number = (value, digits = 0) => Number(value || 0).toLocaleString("ko-KR",
 });
 
 export default function IntegrationPage() {
+  const { user } = useAuth();
+  const canManage = user.role === ROLES.COMPANY_MANAGER;
   const {
     db,
     generateEmsSource,
@@ -55,7 +59,7 @@ export default function IntegrationPage() {
         <Button
           variant="outline"
           size="sm"
-          disabled={!collection.sourceGenerated || isProcessing}
+          disabled={!canManage || !collection.sourceGenerated || isProcessing}
           onClick={(event) => {
             event.stopPropagation();
             retryEmsWorkplace(value);
@@ -86,7 +90,7 @@ export default function IntegrationPage() {
         eyebrow="MANUFACTURING ESG DATA PIPELINE"
         title="EMS 월간 자동 수집"
         description="실제 운영은 매월 자동 실행되며, 시연에서는 동일한 수집 서비스를 즉시 실행합니다."
-        actions={<Button variant="outline" onClick={resetDemo} disabled={isProcessing}>시연 초기화</Button>}
+        actions={canManage ? <Button variant="outline" onClick={resetDemo} disabled={isProcessing}>시연 초기화</Button> : <span className="verified-role">조회 전용</span>}
       />
 
       <section className="ems-control-panel">
@@ -100,10 +104,10 @@ export default function IntegrationPage() {
             <span>대상 사업장 <b>{db.emsWorkplaces.length}개</b></span>
           </div>
           <div className="ems-actions">
-            <Button variant="light" onClick={generateEmsSource} disabled={isProcessing}>
+            <Button variant="light" onClick={generateEmsSource} disabled={!canManage || isProcessing}>
               {collection.sourceGenerated ? "원천 데이터 다시 생성" : "시연용 원천 데이터 생성"}
             </Button>
-            <Button onClick={collectAllEms} disabled={isProcessing || !collection.sourceGenerated}>
+            <Button onClick={collectAllEms} disabled={!canManage || isProcessing || !collection.sourceGenerated}>
               {isProcessing ? `${collection.currentWorkplace || "사업장"} 수집 중` : "자동 수집 즉시 실행"}
             </Button>
           </div>
@@ -150,7 +154,7 @@ export default function IntegrationPage() {
             <div><span>전력 원단위</span><strong>{number(intensity, 1)} kWh/ton</strong></div>
             <div><span>공식 확정 여부</span><strong className={collectionRate === 100 ? "ready-text" : "warning-text"}>{collectionRate === 100 ? "관리자 검토 가능" : "확정 불가"}</strong></div>
           </div>
-          <p className="provisional-note">일반 사용자는 이 잠정값을 볼 수 없으며, 최종 승인된 데이터만 공개 대시보드에 반영됩니다.</p>
+          <p className="provisional-note">현재 화면은 권한별 조회 화면이며, 최종 승인된 데이터만 공식 보고서와 외부 공개 자료에 반영됩니다.</p>
         </Card>
         <Card title="수집 기술 구성" description="EMS 수집 자체와 Redis의 역할을 분리했습니다.">
           <div className="tech-flow">

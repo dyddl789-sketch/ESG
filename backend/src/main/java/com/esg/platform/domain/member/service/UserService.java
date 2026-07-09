@@ -1,5 +1,6 @@
 package com.esg.platform.domain.member.service;
 
+import java.time.OffsetDateTime;
 import java.util.Locale;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -16,7 +17,9 @@ import com.esg.platform.global.exception.BusinessException;
 import com.esg.platform.global.exception.ErrorCode;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -40,21 +43,36 @@ public class UserService {
         return user;
     }
 
+    public boolean isLoginIdAvailable(String loginId) {
+        return userMapper.countByLoginId(normalizeLoginId(loginId)) == 0;
+    }
+
+    public boolean isEmailAvailable(String email) {
+        return userMapper.countByEmail(normalizeEmail(email)) == 0;
+    }
+
+    public boolean isPhoneAvailable(String phoneNumber) {
+        return userMapper.countByPhoneNumber(normalizePhone(phoneNumber)) == 0;
+    }
+
     @Transactional
     public User signup(SignupRequest request) {
+        String loginId = normalizeLoginId(request.loginId());
         String email = normalizeEmail(request.email());
-        if (userMapper.countByEmail(email) > 0) {
-            throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
-        }
+        String phoneNumber = normalizePhone(request.phoneNumber());
+
+        assertAvailable(loginId, email, phoneNumber);
 
         User user = User.builder()
-                .loginId(email)
+                .loginId(loginId)
                 .email(email)
                 .passwordHash(passwordEncoder.encode(request.password()))
                 .name(request.name().trim())
                 .role(UserRole.EXTERNAL_USER)
-                .phoneNumber(normalizeBlank(request.phoneNumber()))
+                .phoneNumber(phoneNumber)
                 .socialProvider(SocialProvider.LOCAL)
+                .emailVerified(true)
+                .emailVerifiedAt(OffsetDateTime.now())
                 .active(true)
                 .tokenVersion(0)
                 .build();
@@ -62,21 +80,52 @@ public class UserService {
         try {
             userMapper.insertLocalUser(user);
         } catch (DataIntegrityViolationException exception) {
-            // 사전 중복 검사와 INSERT 사이의 경쟁 조건도 DB UNIQUE 제약으로 최종 차단합니다.
-            throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
+            log.warn("[MEMBER] 회원가입 DB 중복 제약 발생 loginId={} email={} phone={}",
+                    loginId, maskEmail(email), maskPhone(phoneNumber));
+            assertAvailable(loginId, email, phoneNumber);
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
         return getRequiredById(user.getId());
     }
 
     public void updateLastLogin(Long userId) {
         userMapper.updateLastLogin(userId);
+        log.debug("[MEMBER] 마지막 로그인 시각 갱신 userId={}", userId);
+    }
+
+    private void assertAvailable(String loginId, String email, String phoneNumber) {
+        if (userMapper.countByLoginId(loginId) > 0) {
+            throw new BusinessException(ErrorCode.LOGIN_ID_ALREADY_EXISTS);
+        }
+        if (userMapper.countByEmail(email) > 0) {
+            throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
+        }
+        if (userMapper.countByPhoneNumber(phoneNumber) > 0) {
+            throw new BusinessException(ErrorCode.PHONE_ALREADY_EXISTS);
+        }
+    }
+
+    private String normalizeLoginId(String loginId) {
+        return loginId.trim().toLowerCase(Locale.ROOT);
     }
 
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
     }
 
-    private String normalizeBlank(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
+    private String normalizePhone(String phoneNumber) {
+        return phoneNumber.replaceAll("[^0-9]", "");
+    }
+
+    private String maskEmail(String email) {
+        int at = email.indexOf('@');
+        return at <= 1 ? "***" : email.substring(0, 2) + "***" + email.substring(at);
+    }
+
+    private String maskPhone(String phone) {
+        if (phone.length() < 7) {
+            return "***";
+        }
+        return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4);
     }
 }

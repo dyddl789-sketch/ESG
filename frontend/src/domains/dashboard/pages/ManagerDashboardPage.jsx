@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import { Line } from "react-chartjs-2";
 import { useDemoData } from "../../../app/providers/DemoDataProvider";
+import { useAuth } from "../../../app/providers/AuthProvider";
+import { ROLES } from "../../../app/config/roles";
 import { getDashboardSummary } from "../api/dashboardApi";
 import PageHeader from "../../../shared/components/PageHeader";
 import Card from "../../../shared/components/Card";
@@ -13,7 +15,9 @@ const latestMetric = (metrics, code) => [...metrics].reverse().find((item) => it
 const number = (value, digits = 0) => Number(value || 0).toLocaleString("ko-KR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
 export default function ManagerDashboardPage() {
+  const { user } = useAuth();
   const { db } = useDemoData();
+  const canManage = user.role === ROLES.COMPANY_MANAGER;
   const summary = getDashboardSummary(db);
   const scope2 = latestMetric(db.metrics, "E-SCOPE2-002");
   const injury = latestMetric(db.metrics, "S-SAFE-001");
@@ -51,7 +55,7 @@ export default function ManagerDashboardPage() {
             <p>{item.label}</p>
             <div className="mini-progress"><i style={{ width: `${item.rate}%` }} /></div>
             <div className="domain-overview-meta"><span>수집률 {item.rate}%</span><span>캐시 {item.cache}</span></div>
-            <Link to={item.to}>관리 화면 열기 →</Link>
+            <Link to={item.to}>{canManage ? "관리 화면 열기 →" : "상세 화면 보기 →"}</Link>
           </article>
         ))}
       </section>
@@ -77,7 +81,7 @@ export default function ManagerDashboardPage() {
         </Card>
       </div>
 
-      <Card title="외부 시스템 수집 상태" action={<Link className="text-link" to="/manager/integrations">환경 수집 관리 →</Link>}>
+      <Card title="외부 시스템 수집 상태" action={<Link className="text-link" to="/manager/integrations">{canManage ? "환경 수집 관리 →" : "환경 수집 현황 보기 →"}</Link>}>
         <CollectionCards sources={db.integrations} />
       </Card>
     </div>

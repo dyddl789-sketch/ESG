@@ -25,6 +25,8 @@ out/
 .factorypath
 .springBeans
 .sts4-cache/
+bin/
+backend/bin/
 
 # =========================
 # Java / Gradle

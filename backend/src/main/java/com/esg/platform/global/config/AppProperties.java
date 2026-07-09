@@ -27,7 +27,11 @@ public record AppProperties(
             int loginMaxFailures,
             Duration loginFailureWindow,
             Duration loginLockDuration,
-            Duration oauthCodeExpiration
+            Duration oauthCodeExpiration,
+            Duration emailVerificationCodeExpiration,
+            Duration emailVerificationResultExpiration,
+            Duration emailVerificationResendCooldown,
+            boolean emailVerificationDevLogEnabled
     ) {
     }
 }

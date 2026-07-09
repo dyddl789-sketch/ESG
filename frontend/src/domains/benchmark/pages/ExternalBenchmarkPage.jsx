@@ -1,4 +1,6 @@
 import { Bar } from "react-chartjs-2";
+import { useAuth } from "../../../app/providers/AuthProvider";
+import { ROLES } from "../../../app/config/roles";
 import { useDemoData } from "../../../app/providers/DemoDataProvider";
 import PageHeader from "../../../shared/components/PageHeader";
 import Card from "../../../shared/components/Card";
@@ -11,6 +13,8 @@ const number = (value, digits = 0) => Number(value).toLocaleString("ko-KR", {
 });
 
 export default function ExternalBenchmarkPage() {
+  const { user } = useAuth();
+  const canManage = user.role === ROLES.COMPANY_MANAGER;
   const { db, syncExternalBenchmark } = useDemoData();
   const { electricity, greenhouseGas, lastSyncedAt, status } = db.externalBenchmarks;
   const electricityGap = ((electricity.ourIntensity - electricity.industryIntensity) / electricity.industryIntensity) * 100;
@@ -43,7 +47,7 @@ export default function ExternalBenchmarkPage() {
         eyebrow="PUBLIC DATA BENCHMARK"
         title="외부 공공데이터 비교"
         description="가상 EMS 실적을 공공데이터의 동일 업종 기준과 비교해 수치의 의미를 해석합니다."
-        actions={<Button onClick={syncExternalBenchmark}>외부 데이터 동기화</Button>}
+        actions={canManage ? <Button onClick={syncExternalBenchmark}>외부 데이터 동기화</Button> : <span className="verified-role">조회 전용</span>}
       />
 
       <div className="benchmark-source-strip">

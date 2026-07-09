@@ -9,7 +9,9 @@ import com.esg.platform.global.exception.BusinessException;
 import com.esg.platform.global.exception.ErrorCode;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RedisTokenService {
@@ -25,18 +27,23 @@ public class RedisTokenService {
                 TokenHashUtil.sha256(rawToken),
                 ttl
         );
+        log.debug("[REDIS_AUTH] Refresh Token 저장 userId={} jti={} ttl={}s",
+                userId, tokenId, ttl.toSeconds());
     }
 
     public void verifyRefreshToken(Long userId, String tokenId, String rawToken) {
         String savedHash = redisTemplate.opsForValue().get(refreshKey(userId, tokenId));
         String presentedHash = TokenHashUtil.sha256(rawToken);
         if (savedHash == null || !TokenHashUtil.constantTimeEquals(savedHash, presentedHash)) {
+            log.warn("[REDIS_AUTH] Refresh Token 검증 실패 userId={} jti={}", userId, tokenId);
             throw new BusinessException(ErrorCode.REFRESH_TOKEN_REUSED);
         }
+        log.debug("[REDIS_AUTH] Refresh Token 검증 성공 userId={} jti={}", userId, tokenId);
     }
 
     public void deleteRefreshToken(Long userId, String tokenId) {
         redisTemplate.delete(refreshKey(userId, tokenId));
+        log.debug("[REDIS_AUTH] Refresh Token 삭제 userId={} jti={}", userId, tokenId);
     }
 
     public void blacklistAccessToken(String tokenId, Duration ttl) {
@@ -44,6 +51,8 @@ public class RedisTokenService {
             return;
         }
         redisTemplate.opsForValue().set(BLACKLIST_PREFIX + tokenId, "logout", ttl);
+        log.debug("[REDIS_AUTH] Access Token 블랙리스트 등록 jti={} ttl={}s",
+                tokenId, ttl.toSeconds());
     }
 
     public boolean isBlacklisted(String tokenId) {

@@ -18,6 +18,8 @@
         <result property="socialProvider" column="social_provider" javaType="com.esg.platform.domain.member.entity.SocialProvider"/>
         <result property="socialId" column="social_id"/>
         <result property="profileImageUrl" column="profile_image_url"/>
+        <result property="emailVerified" column="email_verified"/>
+        <result property="emailVerifiedAt" column="email_verified_at"/>
         <result property="active" column="is_active"/>
         <result property="tokenVersion" column="token_version"/>
         <result property="lastLoginAt" column="last_login_at"/>
@@ -38,6 +40,8 @@
         social_provider,
         social_id,
         profile_image_url,
+        email_verified,
+        email_verified_at,
         is_active,
         token_version,
         last_login_at,
@@ -49,6 +53,13 @@
         SELECT <include refid="userColumns"/>
           FROM users
          WHERE id = #{id}
+    </select>
+
+    <select id="findByLoginId" parameterType="string" resultMap="userResultMap">
+        SELECT <include refid="userColumns"/>
+          FROM users
+         WHERE LOWER(login_id) = LOWER(#{loginId})
+         LIMIT 1
     </select>
 
     <select id="findByEmail" parameterType="string" resultMap="userResultMap">
@@ -66,10 +77,22 @@
          LIMIT 1
     </select>
 
+    <select id="countByLoginId" parameterType="string" resultType="int">
+        SELECT COUNT(*)
+          FROM users
+         WHERE LOWER(login_id) = LOWER(#{loginId})
+    </select>
+
     <select id="countByEmail" parameterType="string" resultType="int">
         SELECT COUNT(*)
           FROM users
          WHERE LOWER(email) = LOWER(#{email})
+    </select>
+
+    <select id="countByPhoneNumber" parameterType="string" resultType="int">
+        SELECT COUNT(*)
+          FROM users
+         WHERE phone_number = #{phoneNumber}
     </select>
 
     <insert id="insertLocalUser"
@@ -89,6 +112,8 @@
             social_provider,
             social_id,
             profile_image_url,
+            email_verified,
+            email_verified_at,
             is_active,
             token_version
         ) VALUES (
@@ -103,6 +128,8 @@
             #{socialProvider,typeHandler=org.apache.ibatis.type.EnumTypeHandler},
             #{socialId},
             #{profileImageUrl},
+            #{emailVerified},
+            #{emailVerifiedAt},
             #{active},
             #{tokenVersion}
         )
@@ -125,6 +152,8 @@
             social_provider,
             social_id,
             profile_image_url,
+            email_verified,
+            email_verified_at,
             is_active,
             token_version
         ) VALUES (
@@ -139,6 +168,8 @@
             #{socialProvider,typeHandler=org.apache.ibatis.type.EnumTypeHandler},
             #{socialId},
             #{profileImageUrl},
+            #{emailVerified},
+            #{emailVerifiedAt},
             #{active},
             #{tokenVersion}
         )
@@ -149,6 +180,8 @@
            SET social_provider = #{provider},
                social_id = #{socialId},
                profile_image_url = COALESCE(#{profileImageUrl}, profile_image_url),
+               email_verified = TRUE,
+               email_verified_at = COALESCE(email_verified_at, CURRENT_TIMESTAMP),
                updated_at = CURRENT_TIMESTAMP
          WHERE id = #{userId}
     </update>

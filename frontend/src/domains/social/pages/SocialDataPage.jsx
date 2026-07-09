@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { useAuth } from "../../../app/providers/AuthProvider";
+import { ROLES } from "../../../app/config/roles";
 import { useDemoData } from "../../../app/providers/DemoDataProvider";
 import PageHeader from "../../../shared/components/PageHeader";
 import Card from "../../../shared/components/Card";
@@ -12,6 +14,8 @@ const number = (value, digits = 0) => Number(value || 0).toLocaleString("ko-KR",
 });
 
 export default function SocialDataPage() {
+  const { user } = useAuth();
+  const canManage = user.role === ROLES.COMPANY_MANAGER;
   const {
     db,
     generateSocialSource,
@@ -67,9 +71,9 @@ export default function SocialDataPage() {
       label: "관리",
       render: (value, row) => (
         <div className="table-actions">
-          <Button variant="outline" size="sm" disabled={collection.aiJob.active || row.analysisStatus === "COMPLETED"} onClick={() => analyzeRisk(value)}>AI 분석</Button>
-          <Button variant="light" size="sm" disabled={row.analysisStatus !== "COMPLETED" || row.confirmed} onClick={() => confirmRiskAnalysis(value)}>담당자 확정</Button>
-          <Button size="sm" disabled={!row.confirmed || row.actionStatus === "COMPLETED"} onClick={() => completeRiskAction(value)}>조치 완료</Button>
+          <Button variant="outline" size="sm" disabled={!canManage || collection.aiJob.active || row.analysisStatus === "COMPLETED"} onClick={() => analyzeRisk(value)}>AI 분석</Button>
+          <Button variant="light" size="sm" disabled={!canManage || row.analysisStatus !== "COMPLETED" || row.confirmed} onClick={() => confirmRiskAnalysis(value)}>담당자 확정</Button>
+          <Button size="sm" disabled={!canManage || !row.confirmed || row.actionStatus === "COMPLETED"} onClick={() => completeRiskAction(value)}>조치 완료</Button>
         </div>
       ),
     },
@@ -95,8 +99,8 @@ export default function SocialDataPage() {
             <span>대시보드 캐시 <b>{collection.cacheStatus}</b></span>
           </div>
           <div className="ems-actions">
-            <Button variant="light" onClick={generateSocialSource} disabled={isProcessing}>사회 원천 데이터 생성</Button>
-            <Button onClick={collectSocialData} disabled={isProcessing || !collection.sourceGenerated}>
+            <Button variant="light" onClick={generateSocialSource} disabled={!canManage || isProcessing}>사회 원천 데이터 생성</Button>
+            <Button onClick={collectSocialData} disabled={!canManage || isProcessing || !collection.sourceGenerated}>
               {isProcessing ? `${collection.currentWorkplace || "사업장"} 수집 중` : "사회 데이터 즉시 수집"}
             </Button>
           </div>
