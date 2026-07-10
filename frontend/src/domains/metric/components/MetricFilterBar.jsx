@@ -1,21 +1,20 @@
 import React from "react";
-import { Search } from "lucide-react";
-
+// 아이콘 대신 텍스트로 대체하여 React Hook 충돌을 원천 차단
 export default function MetricFilterBar({ filters, onChange }) {
   return (
     <div className="filter-bar">
       <div className="search-input">
-        <Search size={16} />
+        <span style={{ marginRight: '8px' }}>🔍</span>
         <input
           type="text"
           placeholder="지표명 또는 코드 검색..."
-          value={filters.search || ""}
+          value={filters?.search || ""}
           onChange={(e) => onChange({ ...filters, search: e.target.value })}
         />
       </div>
       <div className="filter-group">
         <select
-          value={filters.category || "ALL"}
+          value={filters?.category || "ALL"}
           onChange={(e) => onChange({ ...filters, category: e.target.value })}
         >
           <option value="ALL">모든 카테고리</option>
@@ -24,9 +23,8 @@ export default function MetricFilterBar({ filters, onChange }) {
           <option value="GOVERNANCE">거버넌스 (G)</option>
         </select>
         
-        {/* 상태 필터는 이미 상단 Tabs에서 관리 중일 수 있으나, 필요시 추가 유지 */}
         <select
-          value={filters.status || "ALL"}
+          value={filters?.status || "ALL"}
           onChange={(e) => onChange({ ...filters, status: e.target.value })}
         >
           <option value="ALL">모든 상태</option>
