@@ -111,8 +111,10 @@ export default function ReportBuilderPage() {
       <div style={{ display: "flex", gap: "24px", flex: 1, marginTop: "16px", minHeight: 0 }}>
         
         {/* [좌측] 실시간 뷰 영역 */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%" }}>
-          <Card title="실시간 미리보기" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        {/* 콘솔 로그: 좌측 실시간 뷰 패널 렌더링 확인 */}
+        {console.log("좌측 실시간 뷰 패널 렌더링 바인딩")}
+        <div className="equal-height-card-wrapper">
+          <Card title="실시간 미리보기">
             <div 
               className="report-builder-scroll" 
               ref={previewRef}
@@ -132,8 +134,10 @@ export default function ReportBuilderPage() {
         </div>
 
         {/* [우측] 에디터 단독 뷰 영역 */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%" }}>
-          <Card title="본문 편집 (Editor)" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        {/* 콘솔 로그: 우측 본문 편집기 패널 렌더링 확인 */}
+        {console.log("우측 에디터 패널 렌더링 바인딩")}
+        <div className="equal-height-card-wrapper">
+          <Card title="본문 편집">
             <div className="no-border-editor" style={{ flex: 1, paddingBottom: "10px" }}>
               <ReactQuill theme="snow" value={content} onChange={setContent} modules={modules} style={{ height: "100%" }} placeholder="보고서의 세부 내용을 작성해주세요..." />
             </div>
