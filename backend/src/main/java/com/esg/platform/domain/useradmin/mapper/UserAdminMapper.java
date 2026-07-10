@@ -1,5 +1,6 @@
 package com.esg.platform.domain.useradmin.mapper;
 
+import com.esg.platform.domain.useradmin.dto.DepartmentDto;
 import com.esg.platform.domain.useradmin.dto.UserAdminDto;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -14,4 +15,5 @@ public interface UserAdminMapper {
     void updateActive(@Param("id") Long id, @Param("isActive") Boolean isActive);
     void delete(@Param("id") Long id);
     void insert(UserAdminDto dto);
+    List<DepartmentDto> findAllDepartments();
 }

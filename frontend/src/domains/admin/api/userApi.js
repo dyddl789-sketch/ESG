@@ -21,6 +21,11 @@ const userApi = {
     const response = await axios.delete(`/admin/users/${id}`);
     return response.data;
   },
+
+  getDepartments: async () => {
+  const response = await axios.get("/admin/users/departments");
+  return response.data;
+  },
 };
 
 export default userApi;

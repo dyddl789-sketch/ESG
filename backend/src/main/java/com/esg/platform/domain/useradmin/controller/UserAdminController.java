@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.esg.platform.domain.useradmin.dto.DepartmentDto;
 import com.esg.platform.domain.useradmin.dto.UserAdminDto;
 import com.esg.platform.domain.useradmin.service.UserAdminService;
 import com.esg.platform.global.response.ApiResponse;
@@ -62,5 +63,11 @@ public class UserAdminController {
         response.put("user", result.user());
         response.put("temp_password", result.tempPassword());
         return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+    
+    @GetMapping("/departments")
+    public ResponseEntity<ApiResponse<List<DepartmentDto>>> getDepartments() {
+        List<DepartmentDto> departments = userAdminService.getDepartments();
+        return ResponseEntity.ok(ApiResponse.ok(departments));
     }
 }

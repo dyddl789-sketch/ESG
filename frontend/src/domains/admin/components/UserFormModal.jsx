@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Button from "../../../shared/components/Button";
 import { ROLES, ROLE_LABELS } from "../../../app/config/roles";
+import userApi from "../api/userApi";
 import {
   overlayStyle,
   contentStyle,
@@ -15,17 +16,37 @@ import {
 } from "../../company/components/modalStyles";
 
 export default function UserFormModal({ onClose, onSave }) {
+  const [departments, setDepartments] = useState([]);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     login_id: "",
     role: ROLES.EXTERNAL_USER,
     phone_number: "",
+    department_id: "",
   });
+
+  const canHaveDepartment = formData.role !== ROLES.EXTERNAL_USER;
+
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const res = await userApi.getDepartments();
+        setDepartments(res.data);
+      } catch (err) {
+        console.error("Failed to fetch departments:", err);
+      }
+    };
+    fetchDepartments();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === "role" && value === ROLES.EXTERNAL_USER ? { department_id: "" } : {}),
+    }));
   };
 
   const handleSubmit = (e) => {
@@ -61,11 +82,31 @@ export default function UserFormModal({ onClose, onSave }) {
             <div style={fieldStyle}>
               <label style={labelStyle}>권한</label>
               <select name="role" value={formData.role} onChange={handleChange} style={inputStyle}>
-                {Object.values(ROLES).map((r) => (
-                  <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                {Object.values(ROLES)
+                .filter((r) => r !== ROLES.SYSTEM_ADMIN)
+                .map((r) => (
+                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                 ))}
               </select>
             </div>
+            {canHaveDepartment && (
+              <div style={fieldStyle}>
+                <label style={labelStyle}>소속</label>
+                <select
+                  name="department_id"
+                  value={formData.department_id}
+                  onChange={handleChange}
+                  style={inputStyle}
+                >
+                  <option value="">선택 안 함</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.facility_name} - {d.dept_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           <div style={footerStyle}>
             <Button type="submit">등록</Button>

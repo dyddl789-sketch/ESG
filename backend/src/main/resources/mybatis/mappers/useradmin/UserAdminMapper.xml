@@ -59,5 +59,21 @@
 	    INSERT INTO users (company_id, department_id, login_id, email, name, role, phone_number, password_hash, is_active)
 	    VALUES (#{companyId}, #{departmentId}, #{loginId}, #{email}, #{name}, #{role}::user_role_enum, #{phoneNumber}, #{passwordHash}, true)
 	</insert>
+	
+	<resultMap id="DepartmentResultMap" type="com.esg.platform.domain.useradmin.dto.DepartmentDto">
+    <id property="id" column="id"/>
+    <result property="deptName" column="dept_name"/>
+    <result property="facilityName" column="facility_name"/>
+	</resultMap>
+
+	<select id="findAllDepartments" resultMap="DepartmentResultMap">
+	    SELECT
+	        d.id,
+	        d.dept_name,
+	        f.facility_name
+	    FROM departments d
+	    JOIN company_facilities f ON d.facility_id = f.id
+	    ORDER BY f.facility_name, d.dept_name
+	</select>
 
 </mapper>

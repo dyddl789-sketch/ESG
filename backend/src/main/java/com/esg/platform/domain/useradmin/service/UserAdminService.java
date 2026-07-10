@@ -1,5 +1,6 @@
 package com.esg.platform.domain.useradmin.service;
 
+import com.esg.platform.domain.useradmin.dto.DepartmentDto;
 import com.esg.platform.domain.useradmin.dto.UserAdminDto;
 import com.esg.platform.domain.useradmin.mapper.UserAdminMapper;
 import lombok.RequiredArgsConstructor;
@@ -55,6 +56,10 @@ public class UserAdminService {
             sb.append(PASSWORD_CHARS.charAt(RANDOM.nextInt(PASSWORD_CHARS.length())));
         }
         return sb.toString();
+    }
+    
+    public List<DepartmentDto> getDepartments() {
+        return userAdminMapper.findAllDepartments();
     }
 
     public record UserCreationResult(UserAdminDto user, String tempPassword) {}

@@ -36,7 +36,7 @@ export default function UserAdminPage() {
     fetchUsers();
   }, []);
 
-  const handleRowClick = (user) => {
+  const openDetail = (user) => {
     setSelectedUser(user);
     setShowDetailModal(true);
   };
@@ -86,15 +86,15 @@ export default function UserAdminPage() {
   };
 
   const handleSaveNewUser = async (formData) => {
-  try {
-    const res = await userApi.createUser(formData);
-    await fetchUsers();
-    setShowFormModal(false);
-    alert(`사용자가 등록되었습니다.\n임시 비밀번호: ${res.data.temp_password}\n(사용자에게 안전하게 전달해주세요)`);
-  } catch (err) {
-    console.error("Failed to create user:", err);
-  }
-};
+    try {
+      const res = await userApi.createUser(formData);
+      await fetchUsers();
+      setShowFormModal(false);
+      alert(`사용자가 등록되었습니다.\n임시 비밀번호: ${res.data.temp_password}\n(사용자에게 안전하게 전달해주세요)`);
+    } catch (err) {
+      console.error("Failed to create user:", err);
+    }
+  };
 
   if (loading) return <div className="page-stack">로딩 중...</div>;
   if (error) return <div className="page-stack error-message">오류: {error}</div>;
@@ -110,11 +110,12 @@ export default function UserAdminPage() {
       <Card>
         <DataTable
           rows={users}
-          onRowClick={handleRowClick}
+          onRowClick={openDetail}
           columns={[
             { key: "name", label: "이름" },
             { key: "email", label: "이메일" },
             { key: "department_name", label: "소속" },
+            { key: "phone_number", label: "전화번호", render: (v) => v || "-" },
             { key: "role", label: "권한", render: (v) => ROLE_LABELS[v] ?? v },
             {
               key: "is_active",
@@ -123,6 +124,22 @@ export default function UserAdminPage() {
                 <span className={v ? "success-text" : "danger-text"}>
                   {v ? "사용 중" : "비활성"}
                 </span>
+              ),
+            },
+            {
+              key: "id",
+              label: "상세",
+              render: (_, row) => (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openDetail(row);
+                  }}
+                >
+                  상세
+                </Button>
               ),
             },
           ]}
