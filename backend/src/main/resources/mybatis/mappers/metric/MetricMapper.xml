@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+ <mapper namespace="com.esg.platform.domain.metric.mapper.MetricMapper">
+ <!-- ESG 데이터 리스트 조회 (필터 포함 ) -->
+    <select id="findMetricsByFilters" resultType="com.esg.platform.domain.metric.dto.MetricResponse">
+        SELECT 
+            m.id,
+            i.category,
+            i.sub_category AS subCategory,
+            i.indicator_code AS indicatorCode,
+            i.title,
+            COALESCE(f.facility_name, '전체') AS facility,
+            m.reporting_year AS year,
+            CONCAT(m.reporting_year, '-', LPAD(CAST(m.period_value AS TEXT), 2, '0')) AS period,
+            m.numerical_value AS value,
+            i.unit,
+            m.data_source_type AS source,
+            'API/MANUAL' AS method, -- 스키마에 따라 고정 또는 로직 처리
+            m.status,
+            m.evidence_file_url AS evidence,
+            CASE 
+                WHEN m.status = 'REJECTED' THEN '위험'
+                ELSE '정상'
+            END AS risk,
+            m.reject_reason AS aiFinding,
+            u.name AS assignee
+        FROM esg_metric_data m
+        JOIN esg_indicators i ON m.indicator_id = i.id
+        LEFT JOIN company_facilities f ON m.facility_id = f.id
+        LEFT JOIN users u ON m.input_user_id = u.id
+        <where>
+            <if test="category != null and category != ''">
+                AND i.category = #{category}::esg_category_enum
+            </if>
+            <if test="year != null">
+                AND m.reporting_year = #{year}
+            </if>
+            <if test="status != null">
+                AND m.status = #{status}::data_status_enum
+            </if>
+        </where>
+        ORDER BY m.reporting_year DESC, m.period_value DESC
+    </select>
+
+    <!-- 상세 조회 -->
+    <select id="findById" resultType="com.esg.platform.domain.metric.entity.EsgMetricData">
+        SELECT * FROM esg_metric_data WHERE id = #{id}
+    </select>
+
+    <!-- 최근 5개월간의 수치 변화 조회 -->
+    <select id="findRecentValues" resultType="java.math.BigDecimal">
+        SELECT numerical_value
+        FROM esg_metric_data
+        WHERE indicator_id = #{indicatorId}
+          AND (facility_id = #{facilityId} OR (facility_id IS NULL AND #{facilityId} IS NULL))
+        ORDER BY reporting_year DESC, period_value DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 데이터 수정 -->
+    <update id="updateMetricData">
+        UPDATE esg_metric_data
+        SET 
+            numerical_value = #{numericalValue},
+            evidence_file_url = #{evidenceFileUrl},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <!-- 상태 변경 (승인/반려 등) -->
+    <update id="updateStatus">
+        UPDATE esg_metric_data
+        SET 
+            status = #{status}::data_status_enum,
+            approver_user_id = #{approverId},
+            reject_reason = #{rejectReason},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+</mapper>
