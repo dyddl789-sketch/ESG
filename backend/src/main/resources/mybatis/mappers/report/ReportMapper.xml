@@ -3,7 +3,7 @@
 <mapper namespace="com.esg.platform.domain.report.mapper.ReportMapper">
 
     <select id="selectReportTemplateById" resultType="com.esg.platform.domain.report.entity.ReportTemplate">
-        SELECT id, company_id AS companyId, title, 
+        SELECT id, company_id AS companyId, title, content, 
                included_indicators::text AS includedIndicators, 
                layout_settings::text AS layoutSettings, created_at AS createdAt
         FROM report_templates
@@ -12,18 +12,19 @@
 
     <insert id="insertGeneratedReport" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO generated_reports (
-            template_id, title, content, version, file_url, is_public, generated_by
+            company_id, template_id, target_year, scope, title, content, version, file_url, is_public, generated_by
         ) VALUES (
-            #{templateId}, #{title}, #{content}, #{version}, #{fileUrl}, #{isPublic}, #{generatedBy}
+            #{companyId}, #{templateId}, #{targetYear}, #{scope}, #{title}, #{content}, #{version}, #{fileUrl}, #{isPublic}, #{generatedBy}
         )
     </insert>
 
+    <!-- [핵심 추가] 전체 목록을 가져올 때 content도 함께 가져옵니다. -->
     <select id="selectReportTemplates" resultType="com.esg.platform.domain.report.entity.ReportTemplate">
-        SELECT id, company_id AS companyId, title, 
+        SELECT id, company_id AS companyId, title, content, 
                included_indicators::text AS includedIndicators, 
                layout_settings::text AS layoutSettings, created_at AS createdAt
         FROM report_templates
-        ORDER BY created_at DESC
+        ORDER BY id ASC
     </select>
 
     <select id="selectGeneratedReportById" resultType="com.esg.platform.domain.report.entity.GeneratedReport">

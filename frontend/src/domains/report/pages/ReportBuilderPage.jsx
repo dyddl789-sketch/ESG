@@ -6,14 +6,12 @@ import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css"; 
 import "./ReportBuilderPage.css"; 
 import html2pdf from "html2pdf.js";
-import { useDemoData } from "../../../app/providers/DemoDataProvider";
 import { reportApi } from "../api/reportApi";
 import PageHeader from "../../../shared/components/PageHeader";
 import Card from "../../../shared/components/Card";
 import Button from "../../../shared/components/Button";
 
 export default function ReportBuilderPage() {
-  const { db } = useDemoData();
   const previewRef = useRef(null); 
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -156,7 +154,7 @@ export default function ReportBuilderPage() {
               </h1>
               {/* 에디터와 동일한 CSS 환경(ql-snow)을 부여하고, 빈 줄바꿈 유지를 위해 preview-editor 클래스를 추가합니다. */}
               <div className="ql-snow">
-                <div className="ql-editor preview-editor" style={{ padding: 0, fontSize: "16px", color: "#334155", lineHeight: "1.8" }} dangerouslySetInnerHTML={{ __html: content }} />
+                <div className="ql-editor preview-editor" style={{ padding: 0, fontSize: "16px", color: "#334155" }} dangerouslySetInnerHTML={{ __html: content }} />
               </div>
             </div>
           </Card>
@@ -175,6 +173,9 @@ export default function ReportBuilderPage() {
 
       </div>
 
+      // 파일 위치: src/domains/report/pages/ReportBuilderPage.jsx
+// 버전: v2.0.2
+// 기능 요약: 템플릿 드롭다운 목록에서 이름이 정상적으로 노출되도록 JSON 필드 참조 변수를 template.name에서 백엔드 DTO 규격인 template.title로 변경합니다.
       {/* 기본 설정 모달창 */}
       {isModalOpen && (
         <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
@@ -187,7 +188,7 @@ export default function ReportBuilderPage() {
                   <option value="" disabled>템플릿을 선택하세요</option>
                   {templates.map(template => (
                     <option key={template.id} value={template.id}>
-                      {template.name || `템플릿 #${template.id}`}
+                      {template.title || `템플릿 #${template.id}`}
                     </option>
                   ))}
                 </select>

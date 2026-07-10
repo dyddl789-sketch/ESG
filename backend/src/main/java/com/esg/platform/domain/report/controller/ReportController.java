@@ -2,9 +2,13 @@ package com.esg.platform.domain.report.controller;
 
 import com.esg.platform.domain.report.dto.request.ReportCreateRequest;
 import com.esg.platform.domain.report.dto.response.ReportResponse;
+import com.esg.platform.domain.report.dto.response.ReportTemplateResponse;
 import com.esg.platform.domain.report.service.ReportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,5 +27,10 @@ public class ReportController {
         
         ReportResponse response = reportService.createReport(request, currentUserId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+    
+    @GetMapping("/templates")
+    public ResponseEntity<List<ReportTemplateResponse>> getTemplates() {
+        return ResponseEntity.ok(reportService.getTemplates());
     }
 }

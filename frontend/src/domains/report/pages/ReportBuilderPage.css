@@ -61,3 +61,22 @@
   display: flex;
   flex-direction: column;
 }
+
+.preview-editor p,
+.preview-editor h1,
+.preview-editor h2,
+.preview-editor h3,
+.preview-editor h4,
+.preview-editor h5,
+.preview-editor h6,
+.preview-editor ul,
+.preview-editor ol {
+    margin-bottom: 0 !important;
+    margin-top: 0 !important;
+    line-height: 1.6 !important;
+}
+
+/* 실제 우측 에디터 내부의 줄간격도 동일하게 고정 */
+.no-border-editor .ql-editor {
+    line-height: 1.6 !important;
+}
