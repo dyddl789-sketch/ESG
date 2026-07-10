@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.esg.platform.domain.useradmin.mapper.UserAdminMapper">
+
+    <resultMap id="UserAdminResultMap" type="com.esg.platform.domain.useradmin.dto.UserAdminDto">
+        <id property="id" column="id"/>
+        <result property="companyId" column="company_id"/>
+        <result property="departmentId" column="department_id"/>
+        <result property="departmentName" column="department_name"/>
+        <result property="loginId" column="login_id"/>
+        <result property="email" column="email"/>
+        <result property="name" column="name"/>
+        <result property="role" column="role"/>
+        <result property="phoneNumber" column="phone_number"/>
+        <result property="isActive" column="is_active"/>
+        <result property="lastLoginAt" column="last_login_at"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <select id="findAll" resultMap="UserAdminResultMap">
+        SELECT
+            u.id, u.company_id, u.department_id,
+            d.dept_name AS department_name,
+            u.login_id, u.email, u.name, u.role,
+            u.phone_number, u.is_active, u.last_login_at, u.created_at
+        FROM users u
+        LEFT JOIN departments d ON u.department_id = d.id
+        ORDER BY u.id
+    </select>
+
+    <select id="findById" resultMap="UserAdminResultMap">
+        SELECT
+            u.id, u.company_id, u.department_id,
+            d.dept_name AS department_name,
+            u.login_id, u.email, u.name, u.role,
+            u.phone_number, u.is_active, u.last_login_at, u.created_at
+        FROM users u
+        LEFT JOIN departments d ON u.department_id = d.id
+        WHERE u.id = #{id}
+    </select>
+
+    <update id="updateRole">
+        UPDATE users
+        SET role = #{role}::user_role_enum
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateActive">
+        UPDATE users
+        SET is_active = #{isActive}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM users WHERE id = #{id}
+    </delete>
+	
+	<insert id="insert" useGeneratedKeys="true" keyProperty="id">
+	    INSERT INTO users (company_id, department_id, login_id, email, name, role, phone_number, password_hash, is_active)
+	    VALUES (#{companyId}, #{departmentId}, #{loginId}, #{email}, #{name}, #{role}::user_role_enum, #{phoneNumber}, #{passwordHash}, true)
+	</insert>
+	
+	<resultMap id="DepartmentResultMap" type="com.esg.platform.domain.useradmin.dto.DepartmentDto">
+    <id property="id" column="id"/>
+    <result property="deptName" column="dept_name"/>
+    <result property="facilityName" column="facility_name"/>
+	</resultMap>
+
+	<select id="findAllDepartments" resultMap="DepartmentResultMap">
+	    SELECT
+	        d.id,
+	        d.dept_name,
+	        f.facility_name
+	    FROM departments d
+	    JOIN company_facilities f ON d.facility_id = f.id
+	    ORDER BY f.facility_name, d.dept_name
+	</select>
+
+</mapper>
