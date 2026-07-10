@@ -21,4 +21,7 @@ public class FacilityDto {
 
     @JsonProperty("created_at")
     private OffsetDateTime createdAt;
+    
+    private Double latitude;
+    private Double longitude;
 }

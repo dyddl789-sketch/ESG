@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Button from "../../../shared/components/Button";
 import { COLORS, FONT_SIZE, RADIUS } from "./companyStyles";
 import { CustomInput, CustomSelect } from "./CompanyUI";
+import AddressSearchField from "./AddressSearchField";
 
 const overlayStyle = {
   position: "fixed",
@@ -79,6 +80,8 @@ export default function FacilityFormModal({ facility, onClose, onSave }) {
       facility_type: "공장",
       address: "",
       contract_power_kw: 0,
+      latitude: null,
+      longitude: null,
     }
   );
 
@@ -145,16 +148,15 @@ export default function FacilityFormModal({ facility, onClose, onSave }) {
               required
             />
 
-            <div style={{ gridColumn: "span 2" }}>
-              <CustomInput
-                label="주소"
-                name="address"
-                value={formData.address || ""}
-                onChange={handleChange}
-                placeholder="사업장 소재지 주소를 입력하세요"
-                required
-              />
-            </div>
+           <div style={{ gridColumn: "span 2" }}>
+            <AddressSearchField
+              address={formData.address}
+              required
+              onChange={({ address, latitude, longitude }) => {
+                setFormData((prev) => ({ ...prev, address, latitude, longitude }));
+              }}
+            />
+          </div>
           </div>
 
           <div style={{ padding: "0 24px 24px", fontSize: FONT_SIZE.xs, color: COLORS.textSecondary }}>
