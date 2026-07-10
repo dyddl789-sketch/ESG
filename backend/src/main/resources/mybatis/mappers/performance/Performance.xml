@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.esg.platform.domain.performance.mapper.PerformanceMapper">
+
+    <select id="selectPerformanceList" resultType="map">
+        SELECT 
+            i.indicator_code AS indicatorCode,
+            i.title AS title,
+            i.category AS category,
+            i.unit AS unit,
+            m.period_value AS periodValue,
+            m.numerical_value AS numericalValue,
+            m.data_source_type AS dataSourceType,
+            m.status AS status
+        FROM esg_indicators i
+        LEFT JOIN esg_metric_data m 
+               ON i.id = m.indicator_id 
+              AND m.company_id = #{companyId} 
+              AND m.reporting_year = #{year}
+              AND m.period_type = 'MONTHLY'
+        WHERE i.is_active = true
+        ORDER BY i.indicator_code ASC, m.period_value ASC
+    </select>
+
+</mapper>
