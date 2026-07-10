@@ -7,6 +7,7 @@ import userApi from "../api/userApi";
 import { ROLE_LABELS } from "../../../app/config/roles";
 import UserDetailModal from "../components/UserDetailModal";
 import UserFormModal from "../components/UserFormModal";
+import { AdminBadge, AdminTableContainer } from "../components/AdminUI";
 
 export default function UserAdminPage() {
   const [users, setUsers] = useState([]);
@@ -105,45 +106,74 @@ export default function UserAdminPage() {
         breadcrumbs={["플랫폼 관리", "사용자·권한 관리"]}
         title="사용자·권한 관리"
         description="3개 역할과 계정 활성 상태를 관리합니다."
-        actions={<Button onClick={handleRegister}>사용자 등록</Button>}
+        actions={
+          <Button 
+            onClick={handleRegister}
+            style={{ backgroundColor: '#2a7d55', borderColor: '#2a7d55' }}
+          >
+            사용자 등록
+          </Button>
+        }
       />
-      <Card>
-        <DataTable
-          rows={users}
-          onRowClick={openDetail}
-          columns={[
-            { key: "name", label: "이름" },
-            { key: "email", label: "이메일" },
-            { key: "department_name", label: "소속" },
-            { key: "phone_number", label: "전화번호", render: (v) => v || "-" },
-            { key: "role", label: "권한", render: (v) => ROLE_LABELS[v] ?? v },
-            {
-              key: "is_active",
-              label: "상태",
-              render: (v) => (
-                <span className={v ? "success-text" : "danger-text"}>
-                  {v ? "사용 중" : "비활성"}
-                </span>
-              ),
-            },
-            {
-              key: "id",
-              label: "상세",
-              render: (_, row) => (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openDetail(row);
-                  }}
-                >
-                  상세
-                </Button>
-              ),
-            },
-          ]}
-        />
+      <Card style={{ padding: 0, overflow: 'hidden', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+        <AdminTableContainer>
+          <DataTable
+            rows={users}
+            onRowClick={openDetail}
+            columns={[
+              { 
+                key: "name", 
+                label: "이름",
+                render: (v) => <span style={{ fontWeight: '600', color: '#1a1a1a' }}>{v}</span>
+              },
+              { key: "email", label: "이메일" },
+              { key: "department_name", label: "소속" },
+              { key: "phone_number", label: "전화번호", render: (v) => v || "-" },
+              { 
+                key: "role", 
+                label: "권한", 
+                render: (v) => (
+                  <span style={{ 
+                    display: 'inline-block', 
+                    padding: '2px 8px', 
+                    backgroundColor: '#f0f0f0', 
+                    borderRadius: '4px', 
+                    fontSize: '0.85rem',
+                    color: '#555'
+                  }}>
+                    {ROLE_LABELS[v] ?? v}
+                  </span>
+                )
+              },
+              {
+                key: "is_active",
+                label: "상태",
+                render: (v) => (
+                  <AdminBadge type={v ? "success" : "danger"}>
+                    {v ? "사용 중" : "비활성"}
+                  </AdminBadge>
+                ),
+              },
+              {
+                key: "id",
+                label: "상세",
+                render: (_, row) => (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDetail(row);
+                    }}
+                    style={{ borderRadius: '6px', fontSize: '0.85rem' }}
+                  >
+                    상세보기
+                  </Button>
+                ),
+              },
+            ]}
+          />
+        </AdminTableContainer>
       </Card>
 
       {showDetailModal && selectedUser && (
