@@ -13,4 +13,5 @@ public interface UserAdminMapper {
     void updateRole(@Param("id") Long id, @Param("role") String role);
     void updateActive(@Param("id") Long id, @Param("isActive") Boolean isActive);
     void delete(@Param("id") Long id);
+    void insert(UserAdminDto dto);
 }

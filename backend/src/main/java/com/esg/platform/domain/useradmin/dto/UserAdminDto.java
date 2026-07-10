@@ -35,4 +35,7 @@ public class UserAdminDto {
 
     @JsonProperty("created_at")
     private OffsetDateTime createdAt;
+    
+    @JsonProperty("password_hash")
+    private String passwordHash; // insert 시에만 사용, 응답에는 포함 안 되도록 처리 필요
 }

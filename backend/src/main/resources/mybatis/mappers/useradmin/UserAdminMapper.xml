@@ -54,5 +54,10 @@
     <delete id="delete">
         DELETE FROM users WHERE id = #{id}
     </delete>
+	
+	<insert id="insert" useGeneratedKeys="true" keyProperty="id">
+	    INSERT INTO users (company_id, department_id, login_id, email, name, role, phone_number, password_hash, is_active)
+	    VALUES (#{companyId}, #{departmentId}, #{loginId}, #{email}, #{name}, #{role}::user_role_enum, #{phoneNumber}, #{passwordHash}, true)
+	</insert>
 
 </mapper>

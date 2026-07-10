@@ -1,5 +1,6 @@
 package com.esg.platform.domain.useradmin.controller;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -7,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -51,5 +53,14 @@ public class UserAdminController {
     public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable("id") Long id) {
         userAdminService.deleteUser(id);
         return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+    
+    @PostMapping
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createUser(@RequestBody UserAdminDto dto) {
+        UserAdminService.UserCreationResult result = userAdminService.createUser(dto);
+        Map<String, Object> response = new HashMap<>();
+        response.put("user", result.user());
+        response.put("temp_password", result.tempPassword());
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 }

@@ -9,8 +9,12 @@ const userApi = {
     const response = await axios.post("/admin/users", data);
     return response.data;
   },
-  updateUser: async (id, data) => {
-    const response = await axios.put(`/admin/users/${id}`, data);
+  updateRole: async (id, role) => {
+    const response = await axios.put(`/admin/users/${id}/role`, { role });
+    return response.data;
+  },
+  updateActive: async (id, isActive) => {
+    const response = await axios.put(`/admin/users/${id}/active`, { isActive });
     return response.data;
   },
   deleteUser: async (id) => {
