@@ -1,7 +1,7 @@
 // 파일 위치: src/domains/report/pages/ReportBuilderPage.jsx
-// 버전: v1.5.0
-// 기능 요약: 보고서 설정 모달 분리, 최종 저장과 PDF 다운로드 버튼 분리, html2pdf 높이 초과(2페이지) 방지 로직 적용
-import React, { useState, useRef } from "react";
+// 버전: v2.0.0
+// 기능 요약: DB 템플릿 연동을 위해 useEffect를 임포트하고, 템플릿 목록(templates)과 선택된 템플릿 ID(selectedTemplateId) 상태를 추가합니다.
+import React, { useState, useRef, useEffect } from "react";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css"; 
 import "./ReportBuilderPage.css"; 
@@ -25,6 +25,8 @@ export default function ReportBuilderPage() {
   );
   
   const [isSaving, setIsSaving] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
 
   const modules = {
     toolbar: [
@@ -35,6 +37,32 @@ export default function ReportBuilderPage() {
       [{ 'list': 'ordered'}, { 'list': 'bullet' }],
       ['clean']
     ],
+  };
+
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      try {
+        const response = await reportApi.getTemplates();
+        const data = response.data?.data || response.data;
+        setTemplates(data);
+        if (data && data.length > 0) {
+          setSelectedTemplateId(data[0].id);
+        }
+      } catch (error) {
+        console.error("템플릿 목록을 불러오는 데 실패했습니다.", error);
+      }
+    };
+    fetchTemplates();
+  }, []);
+
+  const handleTemplateChange = (e) => {
+    const newTemplateId = e.target.value;
+    setSelectedTemplateId(newTemplateId);
+    
+    const selectedTemplate = templates.find(t => t.id === parseInt(newTemplateId));
+    if (selectedTemplate && selectedTemplate.content) {
+      setContent(selectedTemplate.content);
+    }
   };
 
   const generateAiDraft = () => {
@@ -64,13 +92,14 @@ export default function ReportBuilderPage() {
       const dummyFileUrl = "https://example.com/downloads/generated-report.pdf";
 
       const requestData = {
-        title: title,               // 필수값: 보고서 제목
-        content: content,           // 필수값: 에디터 본문 내용
-        targetYear: parseInt(year), // 필수값: 보고 연도 (정수형)
-        scope: scope,               // 필수값: 보고 범위
-        version: "v1.0",            // 필수값: 보고서 버전
-        fileUrl: dummyFileUrl,      // 필수값: PDF 접속 URL
-        isPublic: false             // 필수값: 공개 여부
+        templateId: parseInt(selectedTemplateId), 
+        title: title,               
+        content: content,           
+        targetYear: parseInt(year), 
+        scope: scope,               
+        version: "v1.0",            
+        fileUrl: dummyFileUrl,      
+        isPublic: false             
       };
 
       console.log("백엔드로 전송하는 데이터 패킷:", requestData);
@@ -152,6 +181,18 @@ export default function ReportBuilderPage() {
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h3 style={{ marginTop: 0, marginBottom: "20px" }}>보고서 기본 설정</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <span style={{ fontWeight: "600", fontSize: "14px" }}>적용할 템플릿</span>
+                <select value={selectedTemplateId} onChange={handleTemplateChange} style={{ padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px" }}>
+                  <option value="" disabled>템플릿을 선택하세요</option>
+                  {templates.map(template => (
+                    <option key={template.id} value={template.id}>
+                      {template.name || `템플릿 #${template.id}`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              
               <label style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 <span style={{ fontWeight: "600", fontSize: "14px" }}>보고서 제목</span>
                 <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} style={{ padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px" }} />

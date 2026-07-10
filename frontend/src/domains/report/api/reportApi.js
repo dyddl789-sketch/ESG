@@ -1,10 +1,9 @@
+// 파일 위치: src/domains/report/api/reportApi.js
+// 버전: v1.1.0
+// 기능 요약: 백엔드 DB의 템플릿 목록을 조회하는 getTemplates 메서드를 추가합니다.
 import apiClient from "../../../shared/api/apiClient";
 
 export const reportApi = {
-  // 작성된 보고서 목록 조회
-  list: () => apiClient.get("/reports"),
-  
-  // 최종 보고서 메타데이터(제목, 본문 HTML, PDF URL 등) 저장
-  // (Spring Boot 백엔드의 POST /api/reports 에 대응됨)
-  generate: (data) => apiClient.post("/reports", data)
+  generate: (data) => apiClient.post("/api/reports", data),
+  getTemplates: () => apiClient.get("/api/reports/templates"),
 };
