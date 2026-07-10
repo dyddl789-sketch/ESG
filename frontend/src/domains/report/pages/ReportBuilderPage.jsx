@@ -1,6 +1,6 @@
 // 파일 위치: src/domains/report/pages/ReportBuilderPage.jsx
-// 버전: v2.0.0
-// 기능 요약: DB 템플릿 연동을 위해 useEffect를 임포트하고, 템플릿 목록(templates)과 선택된 템플릿 ID(selectedTemplateId) 상태를 추가합니다.
+// 버전: v3.0.0
+// 기능 요약: 좌측 실시간 뷰를 HTML 렌더링이 아닌 '읽기 전용 에디터(ReactQuill)'로 교체하여 작업뷰와의 100% 렌더링 일치를 보장합니다.
 import React, { useState, useRef, useEffect } from "react";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css"; 
@@ -18,9 +18,7 @@ export default function ReportBuilderPage() {
   const [title, setTitle] = useState("에코모빌리티 파츠 ESG 보고서");
   const [year, setYear] = useState("2026");
   const [scope, setScope] = useState("전체 사업장");
-  const [content, setContent] = useState(
-    "<h2>Executive Summary</h2><p>2026년 상반기 온실가스 배출량은 전년 동기 대비 <strong>12.6% 감소</strong>했습니다.</p>"
-  );
+  const [content, setContent] = useState("");
   
   const [isSaving, setIsSaving] = useState(false);
   const [templates, setTemplates] = useState([]);
@@ -45,6 +43,7 @@ export default function ReportBuilderPage() {
         setTemplates(data);
         if (data && data.length > 0) {
           setSelectedTemplateId(data[0].id);
+          setContent(data[0].content);
         }
       } catch (error) {
         console.error("템플릿 목록을 불러오는 데 실패했습니다.", error);
@@ -64,13 +63,11 @@ export default function ReportBuilderPage() {
   };
 
   const generateAiDraft = () => {
-    setContent(content + "<br/><p><strong>AI 분석 결과</strong>: 울산공장의 전력 사용량 증가 원인은 추가 확인이 필요합니다.</p>");
+    setContent(content + "<p><br></p><p><strong>AI 분석 결과</strong>: 울산공장의 전력 사용량 증가 원인은 추가 확인이 필요합니다.</p>");
   };
 
-  // 1. PDF 출력 로직 단독 분리
   const handleDownloadPdf = () => {
     const element = previewRef.current;
-    
     const opt = {
       margin:       15,
       filename:     `${year}_${title}.pdf`,
@@ -78,17 +75,13 @@ export default function ReportBuilderPage() {
       html2canvas:  { scale: 2, useCORS: true, scrollY: 0 },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
-    
     html2pdf().set(opt).from(element).save();
   };
 
-  // 2. 최종 내용 백엔드 저장 로직
   const handleSaveReport = async () => {
     setIsSaving(true);
     try {
-      // 더미 URL이지만 백엔드 유효성 검사 통과를 위해 필수적인 값입니다.
       const dummyFileUrl = "https://example.com/downloads/generated-report.pdf";
-
       const requestData = {
         templateId: parseInt(selectedTemplateId), 
         title: title,               
@@ -99,18 +92,11 @@ export default function ReportBuilderPage() {
         fileUrl: dummyFileUrl,      
         isPublic: false             
       };
-
-      console.log("백엔드로 전송하는 데이터 패킷:", requestData);
-      
       await reportApi.generate(requestData);
-      
       alert("보고서가 서버에 성공적으로 저장되었습니다.");
     } catch (error) {
       console.error("보고서 저장 실패:", error);
-      if (error.response && error.response.data) {
-        console.error("400 에러 상세 원인:", error.response.data);
-      }
-      alert("보고서 저장 실패: 필수 항목이 누락되었거나 데이터 형식이 맞지 않습니다. (콘솔 확인 요망)");
+      alert("보고서 저장 실패: 관리자에게 문의하세요.");
     } finally {
       setIsSaving(false);
     }
@@ -138,31 +124,34 @@ export default function ReportBuilderPage() {
       <div style={{ display: "flex", gap: "24px", flex: 1, marginTop: "16px", minHeight: 0 }}>
         
         {/* [좌측] 실시간 뷰 영역 */}
-        {/* 콘솔 로그: 좌측 실시간 뷰 패널 렌더링 확인 */}
-        {console.log("좌측 실시간 뷰 패널 렌더링 바인딩")}
         <div className="equal-height-card-wrapper">
           <Card title="실시간 미리보기">
             <div 
               className="report-builder-scroll" 
               ref={previewRef}
               style={{ flex: 1, overflowY: "auto", padding: "10px", boxSizing: "border-box" }}>
-              <span style={{ color: "#166534", fontWeight: "bold", fontSize: "14px", letterSpacing: "1px" }}>
+              <span style={{ color: "#166534", fontWeight: "bold", fontSize: "14px", letterSpacing: "1px", marginLeft: "15px" }}>
                 {year} SUSTAINABILITY REPORT
               </span>
-              <h1 style={{ borderBottom: "3px solid #166534", paddingBottom: "15px", marginTop: "12px", marginBottom: "24px", fontSize: "28px", color: "#0f172a" }}>
+              <h1 style={{ borderBottom: "3px solid #166534", paddingBottom: "15px", marginTop: "12px", marginBottom: "24px", fontSize: "28px", color: "#0f172a", marginLeft: "15px", marginRight: "15px" }}>
                 {title || "보고서 제목을 입력해주세요"}
               </h1>
-              {/* 에디터와 동일한 CSS 환경(ql-snow)을 부여하고, 빈 줄바꿈 유지를 위해 preview-editor 클래스를 추가합니다. */}
-              <div className="ql-snow">
-                <div className="ql-editor preview-editor" style={{ padding: 0, fontSize: "16px", color: "#334155" }} dangerouslySetInnerHTML={{ __html: content }} />
+              
+              {/* [핵심 해결] 실시간 뷰를 작업뷰와 똑같은 에디터로 처리하되 수정만 불가능(readOnly)하게 하여 100% 동일한 렌더링을 보장합니다. */}
+              <div className="readonly-editor">
+                <ReactQuill 
+                  theme="snow" 
+                  value={content} 
+                  readOnly={true} 
+                  modules={{ toolbar: false }} 
+                />
               </div>
+
             </div>
           </Card>
         </div>
 
         {/* [우측] 에디터 단독 뷰 영역 */}
-        {/* 콘솔 로그: 우측 본문 편집기 패널 렌더링 확인 */}
-        {console.log("우측 에디터 패널 렌더링 바인딩")}
         <div className="equal-height-card-wrapper">
           <Card title="본문 편집">
             <div className="no-border-editor" style={{ flex: 1, paddingBottom: "10px" }}>
@@ -173,9 +162,6 @@ export default function ReportBuilderPage() {
 
       </div>
 
-      // 파일 위치: src/domains/report/pages/ReportBuilderPage.jsx
-// 버전: v2.0.2
-// 기능 요약: 템플릿 드롭다운 목록에서 이름이 정상적으로 노출되도록 JSON 필드 참조 변수를 template.name에서 백엔드 DTO 규격인 template.title로 변경합니다.
       {/* 기본 설정 모달창 */}
       {isModalOpen && (
         <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
