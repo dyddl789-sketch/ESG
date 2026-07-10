@@ -4,14 +4,14 @@
 
     <select id="selectPerformanceList" resultType="map">
         SELECT 
-            i.indicator_code AS indicatorCode,
-            i.title AS title,
-            i.category AS category,
-            i.unit AS unit,
-            m.period_value AS periodValue,
-            m.numerical_value AS numericalValue,
-            m.data_source_type AS dataSourceType,
-            m.status AS status
+            i.indicator_code AS "indicatorCode",
+            i.title AS "title",
+            i.category AS "category",
+            i.unit AS "unit",
+            m.period_value AS "periodValue",
+            m.numerical_value AS "numericalValue",
+            m.data_source_type AS "dataSourceType",
+            m.status AS "status"
         FROM esg_indicators i
         LEFT JOIN esg_metric_data m 
                ON i.id = m.indicator_id 
