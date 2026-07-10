@@ -1,4 +1,51 @@
-import Card from "../../../shared/components/Card";
-import StatusBadge from "../../../shared/components/StatusBadge";
-import { formatNumber } from "../../../shared/utils/format";
-export default function MetricDetailPanel({metric}){ return <div className="detail-main"><Card title="원천 데이터"><div className="detail-grid">{[["지표 코드",metric.indicatorCode],["수집 시스템",metric.source],["수집 방식",metric.method],["기준기간",metric.period],["사업장",metric.facility],["담당자",metric.assignee]].map(([l,v])=><div key={l}><span>{l}</span><strong>{v}</strong></div>)}</div></Card><Card title="ESG 실적"><div className="value-panel"><div><span>원천값</span><strong>{formatNumber(metric.value)} {metric.unit}</strong></div><div><span>AI 검토</span><StatusBadge status={metric.risk==="정상"?"NORMAL":"DELAYED"}/></div></div><div className={`ai-box ${metric.risk==="정상"?"":"warning"}`}><b>AI 사전 검토</b><p>{metric.aiFinding}</p><small>AI 분석은 참고정보이며 최종 판단은 담당자가 수행합니다.</small></div></Card><Card title="증빙자료"><div className="file-row"><span>PDF</span><div><strong>{metric.evidence||"등록된 증빙자료 없음"}</strong><small>PDF·Excel 원문 및 AI 추출 정보</small></div><button disabled={!metric.evidence}>원문 보기</button></div></Card><Card title="처리 이력"><div className="timeline">{metric.history.map((h,i)=><div key={i}><i/><section><strong>{h.action}</strong><span>{h.user} · {h.at}</span>{h.comment&&<p>{h.comment}</p>}</section></div>)}</div></Card></div>; }
+import React from "react";
+
+export default function MetricDetailPanel({ metric }) {
+  if (!metric) return null;
+
+  return (
+    <div className="detail-panel">
+      <section>
+        <h4>기본 정보</h4>
+        <div className="info-grid">
+          <div className="item"><span>지표 코드</span><strong>{metric.indicatorCode}</strong></div>
+          <div className="item"><span>카테고리</span><strong>{metric.category} / {metric.subCategory}</strong></div>
+          <div className="item"><span>보고 주기</span><strong>{metric.year}년 {metric.period}</strong></div>
+          <div className="item"><span>단위</span><strong>{metric.unit}</strong></div>
+        </div>
+      </section>
+
+      <section>
+        <h4>측정 데이터</h4>
+        <div className="value-display">
+          <span className="label">실제 측정값</span>
+          <strong className="value">{metric.value?.toLocaleString()} {metric.unit}</strong>
+        </div>
+        <div className="source-info">
+          <p>데이터 출처: <span>{metric.source}</span></p>
+          <p>수집 방법: <span>{metric.method}</span></p>
+        </div>
+      </section>
+
+      <section>
+        <h4>증빙 및 참고자료</h4>
+        {metric.evidence ? (
+          <a href={metric.evidence} target="_blank" rel="noreferrer" className="evidence-link">
+            📄 첨부파일 확인하기
+          </a>
+        ) : (
+          <p className="no-data">등록된 증빙 자료가 없습니다.</p>
+        )}
+      </section>
+
+      {metric.status === "REJECTED" && (
+        <section className="reject-section">
+          <h4>반려 사유</h4>
+          <div className="reject-box">
+            <p>{metric.aiFinding || "사유가 등록되지 않았습니다."}</p>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}

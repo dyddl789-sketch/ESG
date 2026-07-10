@@ -44,8 +44,19 @@ public class MetricService {
         EsgMetricData data = metricMapper.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("데이터가 존재하지 않습니다."));
         
+        // 1. 기존 정량 데이터 수치 업데이트 (유지)
         data.setNumericalValue(request.value());
+        
+        // 2. [보완] 누락되었던 정성 데이터(텍스트형) 업데이트 반영
+        data.setTextValue(request.textValue()); 
+        
+        // 3. 기존 증빙파일 URL 업데이트 (유지)
         data.setEvidenceFileUrl(request.evidenceFileUrl());
+        
+        // 4. [보완] 반려 사유나 의견(comment)이 유입되었을 경우 rejectReason에 바인딩
+        if (request.comment() != null) {
+            data.setRejectReason(request.comment());
+        }
         
         metricMapper.updateMetricData(data);
     }

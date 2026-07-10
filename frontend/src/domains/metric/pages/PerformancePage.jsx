@@ -1,64 +1,58 @@
-import { useMemo, useState } from "react";
-import { Line } from "react-chartjs-2";
-import { useDemoData } from "../../../app/providers/DemoDataProvider";
+import React from "react";
+// [정정] 파일 위치(domains/metric/pages/)에서 providers 폴더로 가기 위한 정확한 상대 경로 적용
+import { useEsgData } from "../../../app/providers/EsgDataProvider";
 import PageHeader from "../../../shared/components/PageHeader";
 import Card from "../../../shared/components/Card";
-import Tabs from "../../../shared/components/Tabs";
-import DataTable from "../../../shared/components/DataTable";
-import StatusBadge from "../../../shared/components/StatusBadge";
-
-const configs = {
-  ENVIRONMENT: { label: "환경(E)", codes: ["E-POWER-001", "E-SCOPE2-002"] },
-  SOCIAL: { label: "사회(S)", codes: ["S-SAFE-001", "S-TRAIN-002", "S-RISK-003", "S-TURN-004"] },
-  GOVERNANCE: { label: "거버넌스(G)", codes: ["G-BOARD-001", "G-OUTSIDE-002", "G-ETHICS-003"] },
-};
-
-const latestByCode = (metrics, codes) => codes.map((code) => [...metrics].reverse().find((item) => item.indicatorCode === code)).filter(Boolean);
-const formatValue = (metric) => `${Number(metric.value || 0).toLocaleString("ko-KR", { maximumFractionDigits: 2 })} ${metric.unit}`;
+// [참고] 하위 컴포넌트들이 domains/metric/components에 있다면 아래 경로가 맞습니다.
+import PerformanceStats from "../components/PerformanceStats";
+import PerformanceCharts from "../components/PerformanceCharts";
+import PerformanceTable from "../components/PerformanceTable";
 
 export default function PerformancePage() {
-  const { db } = useDemoData();
-  const [tab, setTab] = useState("ENVIRONMENT");
-  const latest = useMemo(() => latestByCode(db.metrics, configs[tab].codes), [db.metrics, tab]);
-  const selected = latest[0];
-  const rows = db.metrics.filter((item) => item.category === tab).slice().reverse();
-  const chart = selected ? {
-    labels: selected.months.map((_, index) => `${index + 1}월`),
-    datasets: [{ label: `${selected.title} (${selected.unit})`, data: selected.months, borderColor: "#2a7d55", backgroundColor: "rgba(42,125,85,.12)", fill: true, tension: .3 }],
-  } : null;
+  // 실제 서버 데이터를 관리하는 useEsgData 호출
+  const { db, loading } = useEsgData();
+  
+  // 데이터 로딩 중일 때 처리 (사용자 경험 개선)
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+        <span className="ml-3 text-gray-500">퍼포먼스 데이터를 분석 중입니다...</span>
+      </div>
+    );
+  }
+
+  // db.metrics가 없을 경우를 대비한 방어 코드
+  const metrics = db?.metrics || [];
 
   return (
     <div className="page-stack">
-      <PageHeader
-        breadcrumbs={["성과·보고", "ESG 실적 조회"]}
-        title="ESG 실적 조회"
-        description="내부 화면에는 최신 잠정값까지 즉시 반영하고, 상태를 구분해 승인 여부를 확인합니다."
+      <PageHeader 
+        breadcrumbs={["성과 분석", "ESG 퍼포먼스"]} 
+        title="ESG 퍼포먼스 대시보드" 
+        description="전사 및 사업장별 ESG 지표 달성 현황과 추이를 분석합니다."
+        actions={
+          <select className="year-select">
+            <option>2026년</option>
+            <option>2025년</option>
+          </select>
+        }
       />
-      <Tabs value={tab} onChange={setTab} items={Object.entries(configs).map(([value, config]) => ({ value, label: config.label }))} />
 
-      <div className={`performance-cards performance-${tab.toLowerCase()}`}>
-        {latest.map((metric) => (
-          <article key={metric.indicatorCode}>
-            <div className="performance-card-head"><span>{metric.title}</span><StatusBadge status={metric.status} /></div>
-            <strong>{formatValue(metric)}</strong>
-            <small>{metric.period} · {metric.status === "APPROVED" ? "공식 확정값" : "내부 잠정값"}</small>
-          </article>
-        ))}
+      {/* 실제 DB 데이터를 기반으로 통계 계산 */}
+      <PerformanceStats metrics={metrics} />
+
+      <div className="grid-layout col-2">
+        <Card title="카테고리별 달성률">
+          <PerformanceCharts type="radar" metrics={metrics} />
+        </Card>
+        <Card title="월별 배출량 추이">
+          <PerformanceCharts type="line" metrics={metrics} />
+        </Card>
       </div>
 
-      <Card title={selected ? `${selected.title} 추이` : "핵심 지표 추이"} description="수집 완료 시 해당 기간의 최신 값이 차트 마지막 구간에 추가됩니다.">
-        <div className="chart-box">{chart ? <Line data={chart} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }} /> : <p>수집된 데이터가 없습니다.</p>}</div>
-      </Card>
-
-      <Card title="지표별 잠정·승인 데이터" description="승인 완료 데이터만 외부 사용자 대시보드와 공식 보고서에 반영됩니다.">
-        <DataTable rows={rows} columns={[
-          { key: "indicatorCode", label: "지표코드" },
-          { key: "title", label: "지표명" },
-          { key: "period", label: "기준기간" },
-          { key: "source", label: "원천 시스템" },
-          { key: "value", label: "실적", render: (_, row) => formatValue(row) },
-          { key: "status", label: "상태", render: (value) => <StatusBadge status={value} /> },
-        ]} />
+      <Card title="지표별 상세 성과">
+        <PerformanceTable metrics={metrics} />
       </Card>
     </div>
   );

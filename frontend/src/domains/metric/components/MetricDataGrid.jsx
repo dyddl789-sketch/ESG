@@ -1,3 +1,42 @@
+import React from "react";
 import StatusBadge from "../../../shared/components/StatusBadge";
-import { categoryLabel, formatNumber } from "../../../shared/utils/format";
-export default function MetricDataGrid({ rows, onRowClick }){ return <div className="table-scroll"><table className="data-table metric-grid"><thead><tr><th>No</th><th>ESG 영역</th><th>지표 구분</th><th>지표명</th><th>사업장</th><th>출처</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>상태</th></tr></thead><tbody>{rows.map((row,i)=><tr key={row.id} onClick={()=>onRowClick(row)}><td>{i+1}</td><td><span className={`category category-${row.category.toLowerCase()}`}>{categoryLabel(row.category)}</span></td><td>{row.subCategory}</td><td><strong>{row.title}</strong><small className="cell-sub">{row.indicatorCode}</small></td><td>{row.facility}</td><td>{row.source}</td>{row.months.map((v,idx)=><td key={idx}><span className="month-value">{formatNumber(v,1)}</span></td>)}<td><StatusBadge status={row.status}/></td></tr>)}</tbody></table></div>; }
+
+export default function MetricDataGrid({ rows = [], onRowClick }) {
+  return (
+    <div className="data-grid-wrapper">
+      <table className="data-grid">
+        <thead>
+          <tr>
+            <th>분류</th>
+            <th>코드</th>
+            <th>지표명</th>
+            <th>시설/사업장</th>
+            <th>기간</th>
+            <th className="text-right">측정값</th>
+            <th>단위</th>
+            <th>상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id} onClick={() => onRowClick(row)} className="clickable">
+              <td className="dim">{row.category}</td>
+              <td><code>{row.indicatorCode}</code></td>
+              <td className="font-medium">{row.title}</td>
+              <td>{row.facility}</td>
+              <td className="dim">{row.year} / {row.period}</td>
+              <td className="text-right font-bold">{row.value?.toLocaleString()}</td>
+              <td className="dim text-sm">{row.unit}</td>
+              <td><StatusBadge status={row.status} /></td>
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr>
+              <td colSpan="8" className="empty">조회된 데이터가 없습니다.</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}

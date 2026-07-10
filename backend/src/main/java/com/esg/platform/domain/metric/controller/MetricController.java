@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/esg/metrics" )
+@RequestMapping("/api/esg/metrics") // [수정] 앞에 /api를 추가
 @RequiredArgsConstructor
 public class MetricController {
 
@@ -72,9 +72,14 @@ public class MetricController {
     @PatchMapping("/{id}/decide")
     public ResponseEntity<Void> decideApproval(
             @PathVariable Long id,
-            @RequestParam DataStatus decision,
-            @RequestParam(required = false) String comment,
-            @RequestParam Integer approverId) {
+            @RequestParam("decision") DataStatus decision, // 1. 바인딩 명시 보완
+            @RequestParam(value = "comment", required = false) String comment,
+            @RequestParam("approverId") Integer approverId) {
+        
+        // 2. 잘못된 결재 상태(DRAFT 등)가 요청으로 들어오는 것을 방어
+        if (decision == DataStatus.DRAFT || decision == DataStatus.PENDING) {
+            throw new IllegalArgumentException("결정 상태는 APPROVED(승인) 또는 REJECTED(반려)만 가능합니다.");
+        }
         
         metricService.decideApproval(id, decision, comment, approverId);
         return ResponseEntity.noContent().build();
