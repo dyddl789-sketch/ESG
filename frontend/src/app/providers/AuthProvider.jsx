@@ -12,36 +12,36 @@ import { tokenStorage } from "../../shared/auth/tokenStorage";
 
 const AuthContext = createContext(null);
 
+// React StrictMode가 개발 환경에서 Provider를 다시 마운트해도
+// 같은 /auth/me 복구 요청을 중복 실행하지 않도록 공유한다.
+let restoreSessionPromise = null;
+
+function restoreCurrentUser() {
+  if (!restoreSessionPromise) {
+    restoreSessionPromise = getCurrentUser().finally(() => {
+      restoreSessionPromise = null;
+    });
+  }
+  return restoreSessionPromise;
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [initializing, setInitializing] = useState(true);
+  const [initializing, setInitializing] = useState(() => window.location.pathname !== "/oauth/callback");
 
   const applySession = useCallback((session) => {
     tokenStorage.setAccessToken(session?.accessToken);
     setUser(session?.user || null);
+    setInitializing(false);
     return session?.user ? ROLE_HOME[session.user.role] : "/login";
   }, []);
 
   useEffect(() => {
     let mounted = true;
-
-    const restore = async () => {
-      try {
-        const currentUser = await getCurrentUser();
-        if (mounted) setUser(currentUser);
-      } catch {
-        if (mounted) {
-          tokenStorage.clear();
-          setUser(null);
-        }
-      } finally {
-        if (mounted) setInitializing(false);
-      }
-    };
-
     const handleExpired = () => {
       tokenStorage.clear();
       setUser(null);
+      setInitializing(false);
     };
 
     const handleTokenRefreshed = (event) => {
@@ -50,7 +50,24 @@ export function AuthProvider({ children }) {
 
     window.addEventListener("auth:expired", handleExpired);
     window.addEventListener("auth:token-refreshed", handleTokenRefreshed);
-    restore();
+
+    // OAuth 콜백에서는 아직 JWT 교환 전이므로 /auth/me와 /auth/refresh를
+    // 먼저 호출하지 않는다. OAuthCallbackPage의 exchange 완료를 기다린다.
+    if (window.location.pathname !== "/oauth/callback") {
+      restoreCurrentUser()
+        .then((currentUser) => {
+          if (mounted) setUser(currentUser);
+        })
+        .catch(() => {
+          if (mounted) {
+            tokenStorage.clear();
+            setUser(null);
+          }
+        })
+        .finally(() => {
+          if (mounted) setInitializing(false);
+        });
+    }
 
     return () => {
       mounted = false;
@@ -72,6 +89,7 @@ export function AuthProvider({ children }) {
     } finally {
       tokenStorage.clear();
       setUser(null);
+      setInitializing(false);
     }
   }, []);
 
