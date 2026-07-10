@@ -6,38 +6,56 @@ export default function AddressSearchField({ address, onChange, required }) {
   const [searching, setSearching] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
+  const saveAddressWithCoordinates = async (fullAddress) => {
+    try {
+      const kakao = await loadKakaoMap();
+      const geocoder = new kakao.maps.services.Geocoder();
+
+      geocoder.addressSearch(fullAddress, (result, status) => {
+        if (status === kakao.maps.services.Status.OK && result.length > 0) {
+          const { y: latitude, x: longitude } = result[0];
+          onChange({
+            address: fullAddress,
+            latitude: Number.parseFloat(latitude),
+            longitude: Number.parseFloat(longitude),
+          });
+        } else {
+          onChange({ address: fullAddress, latitude: null, longitude: null });
+        }
+        setSearching(false);
+      });
+    } catch (error) {
+      // 지도 API 키가 없거나 좌표 변환 SDK를 불러오지 못해도 주소 등록은 진행한다.
+      console.warn("Address selected without coordinates:", error);
+      onChange({ address: fullAddress, latitude: null, longitude: null });
+      setSearching(false);
+    }
+  };
+
   const handleSearch = async () => {
     setSearching(true);
+
     try {
       const daum = await loadDaumPostcode();
-      const kakao = await loadKakaoMap();
 
       new daum.Postcode({
         oncomplete: (data) => {
-          const fullAddress = data.roadAddress || data.jibunAddress;
+          const fullAddress = data.roadAddress || data.jibunAddress || data.autoRoadAddress || data.autoJibunAddress;
 
-          const geocoder = new kakao.maps.services.Geocoder();
-          geocoder.addressSearch(fullAddress, (result, status) => {
-            if (status === kakao.maps.services.Status.OK) {
-              const { y: latitude, x: longitude } = result[0];
-              onChange({
-                address: fullAddress,
-                latitude: parseFloat(latitude),
-                longitude: parseFloat(longitude),
-              });
-            } else {
-              onChange({ address: fullAddress, latitude: null, longitude: null });
-              alert("좌표 변환에 실패했습니다. 주소를 다시 확인해주세요.");
-            }
+          if (!fullAddress) {
             setSearching(false);
-          });
+            alert("선택한 주소를 확인할 수 없습니다. 다시 검색해주세요.");
+            return;
+          }
+
+          saveAddressWithCoordinates(fullAddress);
         },
         onclose: () => setSearching(false),
       }).open();
-    } catch (err) {
-      console.error("Failed to load address search:", err);
+    } catch (error) {
+      console.error("Failed to load address search:", error);
       setSearching(false);
-      alert("주소 검색 기능을 불러오는데 실패했습니다.");
+      alert("주소 검색 기능을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
     }
   };
 
