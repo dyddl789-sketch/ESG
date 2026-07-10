@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.esg.platform.domain.esgscore.mapper.ScoreMapper">
+
+    <resultMap id="ScoreResultMap" type="com.esg.platform.domain.esgscore.dto.ScoreDto">
+        <id property="id" column="id"/>
+        <result property="reportingYear" column="reporting_year"/>
+        <result property="reportingPeriod" column="reporting_period"/>
+        <result property="periodValue" column="period_value"/>
+        <result property="totalScore" column="total_score"/>
+        <result property="eScore" column="e_score"/>
+        <result property="sScore" column="s_score"/>
+        <result property="gScore" column="g_score"/>
+    </resultMap>
+
+    <select id="findByPeriod" resultMap="ScoreResultMap">
+        SELECT id, reporting_year, reporting_period, period_value, total_score, e_score, s_score, g_score
+        FROM esg_scores
+        WHERE company_id = 1
+          AND reporting_period = #{reportingPeriod}::period_type_enum
+        ORDER BY reporting_year ASC
+    </select>
+
+</mapper>
