@@ -169,19 +169,25 @@ export default function PerformancePage() {
 
   return (
     <div className="page-stack">
-      {/* 엑셀 액션 버튼이 제거된 깔끔한 헤더 */}
+      {/* 기능 요약: 페이지 상단 경로(Breadcrumbs), 제목, 설명을 렌더링합니다. */}
+      {/* 콘솔 로그: PageHeader 컴포넌트 렌더링을 확인합니다. */}
+      {console.log("[Render] PageHeader 영역 렌더링 완료")}
       <PageHeader
         breadcrumbs={["성과·보고", "ESG 실적 조회"]}
         title="ESG 실적 조회"
         description="내부 화면에는 최신 잠정값까지 즉시 반영하고, 상태를 구분해 승인 여부를 확인합니다."
       />
       
-      {/* 🌟 탭 & 엑셀 버튼 & 연도 선택기: 동일한 라인에 수평 배치 (Flexbox) */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+      {/* 기능 요약: 탭 컴포넌트와 우측 액션 버튼(연도 선택, 엑셀 다운로드)을 한 줄에 배치하고, 하단의 실적 카드와 동일한 간격(24px)을 갖도록 배치합니다. */}
+      {/* 콘솔 로그: 탭 및 액션 버튼 컨테이너 렌더링을 확인합니다. */}
+      {console.log("[Render] 탭 및 액션 버튼 컨테이너 렌더링 - 개별 여백 제거 및 공통 간격 동기화")}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Tabs value={tab} onChange={setTab} items={Object.entries(configs).map(([value, config]) => ({ value, label: config.label }))} />
         
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          {/* 조회 연도 동적 선택기 */}
+          {/* 기능 요약: 조회할 실적 연도를 변경할 수 있는 선택 폼(Select)입니다. */}
+          {/* 콘솔 로그: 현재 선택된 연도 상태값을 출력합니다. */}
+          {console.log(`[State] 현재 설정된 조회 연도: ${year}년`)}
           <select 
             value={year} 
             onChange={(e) => setYear(Number(e.target.value))}
@@ -192,7 +198,7 @@ export default function PerformancePage() {
             <option value={2024}>2024년 실적</option>
           </select>
 
-          {/* 엑셀 다운로드 */}
+          {/* 기능 요약: 화면에 렌더링된 데이터를 기반으로 엑셀(CSV) 파일을 생성하여 다운로드하는 버튼입니다. */}
           <button 
             onClick={handleExportExcel} 
             style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", backgroundColor: "#166534", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}
