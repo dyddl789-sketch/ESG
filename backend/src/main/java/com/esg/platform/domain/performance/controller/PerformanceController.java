@@ -23,7 +23,7 @@ public class PerformanceController {
     public ResponseEntity<Map<String, Object>> getPerformanceList(
             @RequestParam(name = "year", defaultValue = "2026") int year) {
         
-        // 향후 JWT / SecurityContext에서 현재 로그인한 회원의 companyId 추출 연동 예정
+        // 향후 JWT/SecurityContext에서 현재 로그인한 회원의 companyId 추출 연동 예정
         Long companyId = 1L; 
         
         List<PerformanceResponse> data = performanceService.getPerformanceList(companyId, year);

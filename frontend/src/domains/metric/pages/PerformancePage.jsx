@@ -11,7 +11,7 @@ const configs = {
   ENVIRONMENT: { label: "환경(E)", codes: ["IND_E_ELEC", "IND_E_SCOPE2"] },
   SOCIAL: { label: "사회(S)", codes: ["IND_S_INJURY_RATE", "IND_S_SAFETY_EDU", "IND_S_RISK_ACTION", "IND_S_TURNOVER"] },
   GOVERNANCE: { label: "거버넌스(G)", codes: ["IND_G_ATTENDANCE", "IND_G_OUTSIDE", "IND_G_ETHICS_EDU"] },
-};
+}; 
 
 const latestByCode = (metrics, codes) => 
   codes.map((code) => metrics.find((item) => item.indicatorCode === code)).filter(Boolean);
