@@ -1,139 +1,111 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Swal from "sweetalert2";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { ROLES } from "../../../app/config/roles";
-import { useDemoData } from "../../../app/providers/DemoDataProvider";
 import PageHeader from "../../../shared/components/PageHeader";
 import Card from "../../../shared/components/Card";
 import Button from "../../../shared/components/Button";
 import DataTable from "../../../shared/components/DataTable";
 import StatusBadge from "../../../shared/components/StatusBadge";
+import esgDataApi from "../../integration/api/esgDataApi";
+import { apiErrorMessage, formatDateTime, formatNumber, periodOf } from "../../../shared/utils/esgFormat";
 
-const number = (value, digits = 0) => Number(value || 0).toLocaleString("ko-KR", {
-  minimumFractionDigits: digits,
-  maximumFractionDigits: digits,
-});
+const initialFilters = { year: 2026, month: 6, reflectionStatus: "", approvalStatus: "" };
 
 export default function GovernanceDataPage() {
   const { user } = useAuth();
-  const canManage = user.role === ROLES.COMPANY_MANAGER;
-  const {
-    db,
-    generateGovernanceSource,
-    collectGovernanceData,
-    analyzeGovernanceDocument,
-    confirmGovernanceAi,
-  } = useDemoData();
+  const canManage = [ROLES.COMPANY_MANAGER, ROLES.SYSTEM_ADMIN].includes(user?.role);
+  const [filters, setFilters] = useState(initialFilters);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [reflecting, setReflecting] = useState(false);
+  const period = periodOf(filters.year, filters.month);
 
-  const collection = db.governanceCollection;
-  const isProcessing = collection.jobStatus === "PROCESSING";
-  const completed = db.governanceSources.filter((item) => item.collectionStatus === "SUCCESS");
-  const collectionRate = Math.round((completed.length / db.governanceSources.length) * 100);
-  const values = useMemo(() => {
-    const totalSeats = db.boardMeetings.reduce((sum, item) => sum + item.totalDirectors, 0);
-    const attended = db.boardMeetings.reduce((sum, item) => sum + item.attendedDirectors, 0);
-    return {
-      attendanceRate: totalSeats ? (attended / totalSeats) * 100 : 0,
-      outsideRate: (db.governanceSummary.outsideDirectors / db.governanceSummary.totalDirectors) * 100,
-      ethicsRate: (db.governanceSummary.ethicsCompleted / db.governanceSummary.ethicsTarget) * 100,
-    };
-  }, [db.boardMeetings, db.governanceSummary]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setRows(await esgDataApi.getGovernance({
+        period,
+        ...(filters.reflectionStatus ? { reflectionStatus: filters.reflectionStatus } : {}),
+        ...(filters.approvalStatus ? { approvalStatus: filters.approvalStatus } : {}),
+      }) || []);
+    } catch (error) {
+      Swal.fire("조회 실패", apiErrorMessage(error), "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [filters.approvalStatus, filters.reflectionStatus, period]);
 
-  const sourceColumns = [
-    { key: "name", label: "수집 항목" },
-    { key: "sourceSystem", label: "원천 시스템" },
-    { key: "recordCount", label: "원천 건수", render: (value) => number(value) },
-    { key: "sourceStatus", label: "원천 데이터", render: (value) => <StatusBadge status={value} label={value === "READY" ? "생성 완료" : "미생성"} /> },
-    { key: "collectionStatus", label: "수집 상태", render: (value) => <StatusBadge status={value} /> },
-    { key: "collectedAt", label: "수집 시각" },
-  ];
+  useEffect(() => { load(); }, [load]);
 
-  const meetingColumns = [
-    { key: "date", label: "회의일" },
-    { key: "evidence", label: "회의록" },
-    { key: "totalDirectors", label: "전체 이사", render: (value) => `${value}명` },
-    { key: "attendedDirectors", label: "참석 이사", render: (value) => `${value}명` },
-    { key: "agendaCount", label: "안건", render: (value) => `${value}건` },
-    { key: "id", label: "회의별 참석률", render: (_, row) => `${number((row.attendedDirectors / row.totalDirectors) * 100, 1)}%` },
+  const current = rows[0];
+  const summary = useMemo(() => ({
+    meetingCount: current?.boardMeetingCount || 0,
+    attendance: current?.boardAttendanceRate,
+    outside: current?.outsideDirectorRate,
+    ethics: current?.ethicsCompletionRate,
+  }), [current]);
+
+  const reflect = async () => {
+    const result = await Swal.fire({
+      title: `${period} 거버넌스 데이터 ESG 반영`,
+      text: "본사·기업 기준 거버넌스 실제값을 ESG 지표로 저장합니다.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "ESG 반영",
+      cancelButtonText: "취소",
+    });
+    if (!result.isConfirmed) return;
+
+    setReflecting(true);
+    try {
+      const response = await esgDataApi.reflect("GOVERNANCE", period);
+      await Swal.fire("반영 완료", `${response?.reflectedMetricCount || 0}개 거버넌스 지표가 생성되었습니다.`, "success");
+      await load();
+    } catch (error) {
+      Swal.fire("반영 실패", apiErrorMessage(error), "error");
+    } finally {
+      setReflecting(false);
+    }
+  };
+
+  const columns = [
+    { key: "headquartersName", label: "관리 기준", render: (value) => <div><strong>{value || "기업·본사"}</strong><small className="cell-sub">기업 단위 집계</small></div> },
+    { key: "boardMeetingStatus", label: "이사회", render: (value, row) => <div><StatusBadge status={value} /><small className="cell-sub">개최 {formatNumber(row.boardMeetingCount)}회</small></div> },
+    { key: "boardAttendanceRate", label: "이사회 참석률", render: (value, row) => row.boardMeetingStatus === "NOT_HELD" ? "해당 월 미개최" : `${formatNumber(value, 1)}%` },
+    { key: "outsideDirectorRate", label: "사외이사 비율", render: (value, row) => <div><strong>{formatNumber(value, 1)}%</strong><small className="cell-sub">{row.outsideDirectors}/{row.totalDirectors}명</small></div> },
+    { key: "ethicsCompletionRate", label: "윤리교육 이수율", render: (value, row) => <div><strong>{formatNumber(value, 1)}%</strong><small className="cell-sub">{row.ethicsCompletedCount}/{row.ethicsTargetCount}명</small></div> },
+    { key: "validationStatus", label: "검증", render: (value) => <StatusBadge status={value} /> },
+    { key: "reflectionStatus", label: "ESG 반영", render: (value) => <StatusBadge status={value} /> },
+    { key: "approvalStatus", label: "승인", render: (value) => <StatusBadge status={value} /> },
+    { key: "collectedAt", label: "최근 수집", render: (value) => formatDateTime(value) },
   ];
 
   return (
-    <div className="page-stack">
-      <PageHeader
-        breadcrumbs={["데이터 관리", "거버넌스 데이터"]}
-        eyebrow="GOVERNANCE DATA PIPELINE"
-        title="거버넌스 데이터·이사회 AI 분석"
-        description="그룹웨어와 교육 시스템 데이터를 수집하고 회의록 AI 분석 결과를 담당자가 검증합니다."
-      />
+    <div className="page-stack esg-domain-page">
+      <PageHeader breadcrumbs={["데이터 관리", "거버넌스"]} eyebrow="GOVERNANCE DATA" title="거버넌스 데이터" description="본사·기업 기준으로 월별 이사회와 윤리·컴플라이언스 실제값을 관리합니다." actions={canManage ? <Button disabled={reflecting || rows.length === 0 || rows.every((row) => row.reflectionStatus === "REFLECTED")} onClick={reflect}>{reflecting ? "반영 중..." : "ESG 반영"}</Button> : null} />
 
-      <section className="domain-control-panel governance-panel">
-        <div>
-          <span className="control-kicker">{collection.basePeriod} 거버넌스</span>
-          <h2>본사 중심의 이사회·윤리 데이터를 관리합니다.</h2>
-          <p>이사회 참석률, 사외이사 비율, 윤리교육 이수율을 검증·승인 흐름으로 연결합니다.</p>
-          <div className="schedule-pills">
-            <span>자동 실행 <b>{collection.schedule}</b></span>
-            <span>수집 항목 <b>{db.governanceSources.length}개</b></span>
-            <span>대시보드 캐시 <b>{collection.cacheStatus}</b></span>
-          </div>
-          <div className="ems-actions">
-            <Button variant="light" onClick={generateGovernanceSource} disabled={!canManage || isProcessing}>거버넌스 원천 생성</Button>
-            <Button onClick={collectGovernanceData} disabled={!canManage || isProcessing || !collection.sourceGenerated}>
-              {isProcessing ? `${collection.currentSource || "원천"} 수집 중` : "거버넌스 즉시 수집"}
-            </Button>
-          </div>
+      <section className="workflow-strip"><span>그룹웨어·윤리교육</span><i>→</i><strong>기업 단위 실제값 확인</strong><i>→</i><span>ESG 반영</span><i>→</i><span>AI 분석·승인</span><i>→</i><span>대시보드 확정</span></section>
+
+      <Card className="filter-card" title="조회 조건" description="이사회 미개최 월은 참석률 0%가 아니라 미개최로 구분합니다.">
+        <div className="esg-filter-grid compact">
+          <label><span>기준연도</span><select value={filters.year} onChange={(e) => setFilters({ ...filters, year: Number(e.target.value) })}><option value={2026}>2026년</option><option value={2025}>2025년</option></select></label>
+          <label><span>기준월</span><select value={filters.month} onChange={(e) => setFilters({ ...filters, month: Number(e.target.value) })}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}월</option>)}</select></label>
+          <label><span>반영 상태</span><select value={filters.reflectionStatus} onChange={(e) => setFilters({ ...filters, reflectionStatus: e.target.value })}><option value="">전체</option><option value="NOT_REFLECTED">미반영</option><option value="REFLECTED">반영 완료</option></select></label>
+          <label><span>승인 상태</span><select value={filters.approvalStatus} onChange={(e) => setFilters({ ...filters, approvalStatus: e.target.value })}><option value="">전체</option><option value="DRAFT">검토 중</option><option value="PENDING">승인 대기</option><option value="APPROVED">승인 완료</option><option value="REJECTED">반려</option></select></label>
+          <div className="filter-actions"><Button variant="outline" onClick={() => setFilters(initialFilters)}>초기화</Button><Button onClick={load}>검색</Button></div>
         </div>
-        <div className="redis-lock-card">
-          <div className="redis-lock-head"><span className={`lock-dot ${collection.redisLock.active ? "active" : ""}`} /><div><b>Redis 수집 락</b><small>그룹웨어 수집 중복 실행 방지</small></div></div>
-          <code>{collection.redisLock.key}</code>
-          <div className="lock-meta"><span>상태</span><b>{collection.redisLock.active ? "LOCKED" : "UNLOCKED"}</b></div>
-          <div className="lock-meta"><span>진행률</span><b>{collection.progress}%</b></div>
-          <div className="lock-meta"><span>수집률</span><b>{collectionRate}%</b></div>
-        </div>
-      </section>
-
-      <div className="summary-grid three">
-        <article className="collection-stat"><span>이사회 참석률</span><strong>{number(values.attendanceRate, 1)}%</strong><small>전체 참석 가능 인원 기준</small></article>
-        <article className="collection-stat"><span>사외이사 비율</span><strong>{number(values.outsideRate, 1)}%</strong><small>{db.governanceSummary.outsideDirectors}/{db.governanceSummary.totalDirectors}명</small></article>
-        <article className="collection-stat"><span>윤리교육 이수율</span><strong>{number(values.ethicsRate, 1)}%</strong><small>{db.governanceSummary.ethicsCompleted}/{db.governanceSummary.ethicsTarget}명</small></article>
-      </div>
-
-      <Card title="거버넌스 원천 수집 현황" description="거버넌스는 모든 사업장이 아니라 본사 그룹웨어·임원·교육 데이터를 중심으로 수집합니다." action={<StatusBadge status={collectionRate === 100 ? "COMPLETED" : "INCOMPLETE"} />}>
-        <DataTable rows={db.governanceSources} columns={sourceColumns} />
       </Card>
 
-      <div className="two-cols governance-ai-layout">
-        <Card title="이사회 회의록 AI 분석" description="회의 일자·참석자·안건을 추출하되 담당자가 확인해야 지표에 반영됩니다.">
-          <div className="document-ai-card">
-            <div className="document-file"><span>PDF</span><div><b>{db.governanceDocument.filename}</b><small>분석 상태: {db.governanceDocument.analysisStatus}</small></div></div>
-            <div className="ai-job-box compact">
-              <div><span className={`lock-dot ${collection.aiJob.active ? "active" : ""}`} /><b>{collection.aiJob.message}</b></div>
-              <code>{collection.aiJob.key}</code>
-              <div className="progress-track"><i style={{ width: `${collection.aiJob.progress}%` }} /></div>
-            </div>
-            <div className="card-actions">
-              <Button variant="outline" disabled={!canManage || collection.aiJob.active || db.governanceDocument.analysisStatus === "COMPLETED"} onClick={analyzeGovernanceDocument}>AI 분석 실행</Button>
-              <Button disabled={!canManage || !db.governanceDocument.extracted || db.governanceDocument.confirmed} onClick={confirmGovernanceAi}>담당자 확인·반영</Button>
-            </div>
-          </div>
-        </Card>
-        <Card title="AI 추출 결과" description="Redis에는 진행 상태만 저장하고 확정 결과는 PostgreSQL에 보관합니다.">
-          {!db.governanceDocument.extracted ? (
-            <div className="empty-state"><strong>분석 대기</strong><p>회의록 AI 분석을 실행하면 추출값이 표시됩니다.</p></div>
-          ) : (
-            <div className="detail-grid three">
-              <div><span>회의일</span><strong>{db.governanceDocument.extracted.meetingDate}</strong></div>
-              <div><span>전체 이사</span><strong>{db.governanceDocument.extracted.totalDirectors}명</strong></div>
-              <div><span>참석 이사</span><strong>{db.governanceDocument.extracted.attendedDirectors}명</strong></div>
-              <div><span>안건 수</span><strong>{db.governanceDocument.extracted.agendaCount}건</strong></div>
-              <div><span>회의 참석률</span><strong>{db.governanceDocument.extracted.attendanceRate}%</strong></div>
-              <div><span>AI 신뢰도</span><strong>{db.governanceDocument.extracted.confidence}%</strong></div>
-            </div>
-          )}
-        </Card>
+      <div className="summary-card-grid four">
+        <article><span>이사회 개최</span><strong>{summary.meetingCount}회</strong><small>{period} 기준</small></article>
+        <article><span>이사회 참석률</span><strong>{current?.boardMeetingStatus === "NOT_HELD" ? "미개최" : `${formatNumber(summary.attendance, 1)}%`}</strong><small>개최 좌석 기준</small></article>
+        <article><span>사외이사 비율</span><strong>{formatNumber(summary.outside, 1)}%</strong><small>이사회 구성</small></article>
+        <article><span>윤리교육 이수율</span><strong>{formatNumber(summary.ethics, 1)}%</strong><small>교육 대상자 대비</small></article>
       </div>
 
-      <Card title="분기 이사회 현황" description="회의별 참석 정보를 합산해 분기 이사회 참석률을 계산합니다.">
-        <DataTable rows={db.boardMeetings} columns={meetingColumns} />
+      <Card title={`${period} 거버넌스 실제값`} description="지표 평가는 기업·본사 단위로 관리되며 최종 승인 후 대시보드에 확정 반영됩니다.">
+        {loading ? <div className="data-loading">거버넌스 데이터를 불러오는 중입니다.</div> : <DataTable rows={rows} columns={columns} emptyText="조건에 맞는 거버넌스 데이터가 없습니다." />}
       </Card>
     </div>
   );

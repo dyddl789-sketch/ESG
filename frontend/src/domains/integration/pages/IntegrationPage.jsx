@@ -1,173 +1,136 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Swal from "sweetalert2";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { ROLES } from "../../../app/config/roles";
-import { useDemoData } from "../../../app/providers/DemoDataProvider";
 import PageHeader from "../../../shared/components/PageHeader";
 import Card from "../../../shared/components/Card";
 import Button from "../../../shared/components/Button";
 import DataTable from "../../../shared/components/DataTable";
 import StatusBadge from "../../../shared/components/StatusBadge";
+import companyApi from "../../company/api/companyApi";
+import esgDataApi from "../api/esgDataApi";
+import { apiErrorMessage, formatDateTime, formatNumber, periodOf } from "../../../shared/utils/esgFormat";
 
-const number = (value, digits = 0) => Number(value || 0).toLocaleString("ko-KR", {
-  minimumFractionDigits: digits,
-  maximumFractionDigits: digits,
-});
+const initialFilters = { year: 2026, month: 6, facilityId: "", reflectionStatus: "", approvalStatus: "", search: "" };
 
 export default function IntegrationPage() {
   const { user } = useAuth();
-  const canManage = user.role === ROLES.COMPANY_MANAGER;
-  const {
-    db,
-    generateEmsSource,
-    collectAllEms,
-    retryEmsWorkplace,
-    resetDemo,
-  } = useDemoData();
+  const canManage = [ROLES.COMPANY_MANAGER, ROLES.SYSTEM_ADMIN].includes(user?.role);
+  const [filters, setFilters] = useState(initialFilters);
+  const [facilities, setFacilities] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [reflecting, setReflecting] = useState(false);
+  const period = periodOf(filters.year, filters.month);
 
-  const collection = db.emsCollection;
-  const isProcessing = collection.jobStatus === "PROCESSING";
-  const completed = db.emsWorkplaces.filter((item) => item.collectionStatus === "SUCCESS");
-  const sourceReady = db.emsWorkplaces.filter((item) => item.sourceStatus === "READY").length;
-  const collectionRate = Math.round((completed.length / db.emsWorkplaces.length) * 100);
-  const totalUsage = completed.reduce((sum, item) => sum + item.usage, 0);
-  const totalEmission = completed.reduce((sum, item) => sum + item.emission, 0);
-  const totalProduction = completed.reduce((sum, item) => sum + item.production, 0);
-  const intensity = totalProduction ? totalUsage / totalProduction : 0;
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [facilityResponse, data] = await Promise.all([
+        companyApi.getFacilities(),
+        esgDataApi.getEnvironment({
+          period,
+          ...(filters.facilityId ? { facilityId: filters.facilityId } : {}),
+          ...(filters.search ? { search: filters.search.trim() } : {}),
+          ...(filters.reflectionStatus ? { reflectionStatus: filters.reflectionStatus } : {}),
+          ...(filters.approvalStatus ? { approvalStatus: filters.approvalStatus } : {}),
+        }),
+      ]);
+      setFacilities(facilityResponse?.data || []);
+      setRows(data || []);
+    } catch (error) {
+      Swal.fire("조회 실패", apiErrorMessage(error), "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [filters.approvalStatus, filters.facilityId, filters.reflectionStatus, filters.search, period]);
 
-  const steps = useMemo(() => [
-    { label: "원천 데이터 확인", done: collection.sourceGenerated },
-    { label: "Redis 중복 실행 잠금", done: isProcessing || collection.jobStatus === "COMPLETED" },
-    { label: "사업장 코드·단위 검증", done: collection.progress >= 25 },
-    { label: "ESG 공통 형식 변환", done: collection.progress >= 50 },
-    { label: "Scope 2 계산", done: collection.progress >= 75 },
-    { label: "잠정 집계 갱신", done: collection.progress === 100 },
-  ], [collection.jobStatus, collection.progress, collection.sourceGenerated, isProcessing]);
+  useEffect(() => { load(); }, [load]);
 
-  const workplaceColumns = [
-    { key: "facilityName", label: "사업장", render: (value, row) => <><strong>{value}</strong><small className="cell-sub">{row.sourceRecordId}</small></> },
-    { key: "usage", label: "EMS 전력 사용량", render: (value) => `${number(value)} kWh` },
-    { key: "production", label: "생산량", render: (value) => `${number(value)} ton` },
-    { key: "intensity", label: "전력 원단위", render: (value) => `${number(value, 1)} kWh/ton` },
-    { key: "sourceStatus", label: "원천 데이터", render: (value) => <StatusBadge status={value} label={value === "READY" ? "생성 완료" : "미생성"} /> },
-    { key: "collectionStatus", label: "수집 상태", render: (value) => <StatusBadge status={value} /> },
-    { key: "emission", label: "Scope 2 잠정값", render: (value, row) => row.collectionStatus === "SUCCESS" ? `${number(value, 2)} tCO₂eq` : "-" },
-    { key: "collectedAt", label: "수집 시각" },
-    {
-      key: "id",
-      label: "관리",
-      render: (value, row) => (
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={!canManage || !collection.sourceGenerated || isProcessing}
-          onClick={(event) => {
-            event.stopPropagation();
-            retryEmsWorkplace(value);
-          }}
-        >
-          {row.collectionStatus === "SUCCESS" ? "개별 재수집" : "개별 수집"}
-        </Button>
-      ),
-    },
-  ];
+  const summary = useMemo(() => ({
+    total: rows.length,
+    collected: rows.filter((row) => row.collectionStatus === "COLLECTED").length,
+    reflected: rows.filter((row) => row.reflectionStatus === "REFLECTED").length,
+    scope2: rows.reduce((sum, row) => sum + Number(row.scope2Tco2eq || 0), 0),
+  }), [rows]);
 
-  const historyColumns = [
-    { key: "id", label: "실행 번호" },
-    { key: "basePeriod", label: "기준월" },
-    { key: "triggerType", label: "실행 유형", render: (value) => value === "SCHEDULED" ? "자동 스케줄러" : "수동 즉시 실행" },
-    { key: "startedAt", label: "시작 시각" },
-    { key: "completedAt", label: "완료 시각" },
-    { key: "total", label: "전체" },
-    { key: "success", label: "성공" },
-    { key: "error", label: "오류" },
-    { key: "status", label: "결과", render: (value) => <StatusBadge status={value} /> },
+  const reflect = async (facilityId = filters.facilityId || null) => {
+    const targetName = facilityId
+      ? facilities.find((facility) => String(facility.id) === String(facilityId))?.facility_name || "선택 사업장"
+      : "조회된 전체 사업장";
+    const confirmation = await Swal.fire({
+      title: `${period} 환경 데이터 ESG 반영`,
+      text: `${targetName}의 수집 완료 데이터를 ESG 지표로 계산·저장합니다.`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "ESG 반영",
+      cancelButtonText: "취소",
+    });
+    if (!confirmation.isConfirmed) return;
+
+    setReflecting(true);
+    try {
+      const result = await esgDataApi.reflect("ENVIRONMENT", period, facilityId || undefined);
+      await Swal.fire("반영 완료", `${result?.reflectedMetricCount || 0}개 환경 지표가 검토 대상으로 생성되었습니다.`, "success");
+      await load();
+    } catch (error) {
+      Swal.fire("반영 실패", apiErrorMessage(error), "error");
+    } finally {
+      setReflecting(false);
+    }
+  };
+
+  const columns = [
+    { key: "facilityName", label: "사업장", render: (value, row) => <div><strong>{value}</strong><small className="cell-sub">{row.facilityType === "HQ" ? "본사" : "공장"}</small></div> },
+    { key: "electricityUsageKwh", label: "전력 사용량", render: (value) => `${formatNumber(value)} kWh` },
+    { key: "productionTon", label: "생산량", render: (value) => `${formatNumber(value)} ton` },
+    { key: "intensityKwhPerTon", label: "전력 원단위", render: (value) => `${formatNumber(value, 1)} kWh/ton` },
+    { key: "scope2Tco2eq", label: "Scope 2", render: (value) => `${formatNumber(value, 2)} tCO₂eq` },
+    { key: "validationStatus", label: "검증", render: (value) => <StatusBadge status={value} /> },
+    { key: "collectionStatus", label: "수집", render: (value) => <StatusBadge status={value} /> },
+    { key: "reflectionStatus", label: "ESG 반영", render: (value) => <StatusBadge status={value} /> },
+    { key: "approvalStatus", label: "승인", render: (value) => <StatusBadge status={value} /> },
+    { key: "collectedAt", label: "최근 수집", render: (value) => formatDateTime(value) },
+    ...(canManage ? [{ key: "action", label: "처리", render: (_, row) => (
+      <Button size="sm" variant="outline" disabled={row.reflectionStatus === "REFLECTED" || reflecting} onClick={(event) => { event.stopPropagation(); reflect(row.facilityId); }}>
+        {row.reflectionStatus === "REFLECTED" ? "반영 완료" : "ESG 반영"}
+      </Button>
+    ) }] : []),
   ];
 
   return (
-    <div className="page-stack">
+    <div className="page-stack esg-domain-page">
       <PageHeader
-        breadcrumbs={["데이터 관리", "EMS 월간 수집"]}
-        eyebrow="MANUFACTURING ESG DATA PIPELINE"
-        title="EMS 월간 자동 수집"
-        description="실제 운영은 매월 자동 실행되며, 시연에서는 동일한 수집 서비스를 즉시 실행합니다."
-        actions={canManage ? <Button variant="outline" onClick={resetDemo} disabled={isProcessing}>시연 초기화</Button> : <span className="verified-role">조회 전용</span>}
+        breadcrumbs={["데이터 관리", "환경"]}
+        eyebrow="ENVIRONMENT DATA"
+        title="환경 데이터"
+        description="EMS에서 자동 수집된 월별 실제값을 확인하고 ESG 지표로 반영합니다."
+        actions={canManage ? <Button disabled={reflecting || rows.every((row) => row.reflectionStatus === "REFLECTED")} onClick={() => reflect()}>{reflecting ? "반영 중..." : "조회 결과 ESG 반영"}</Button> : null}
       />
 
-      <section className="ems-control-panel">
-        <div className="ems-control-copy">
-          <span className="control-kicker">{collection.basePeriod} 월간 수집</span>
-          <h2>전체 사업장 EMS 데이터를 한 번에 수집합니다.</h2>
-          <p>본사·부산공장·울산공장·창원공장의 전력 데이터를 검증하고 Scope 2 잠정값까지 계산합니다.</p>
-          <div className="schedule-pills">
-            <span>자동 실행 <b>{collection.schedule}</b></span>
-            <span>다음 실행 <b>{collection.nextScheduledRun}</b></span>
-            <span>대상 사업장 <b>{db.emsWorkplaces.length}개</b></span>
-          </div>
-          <div className="ems-actions">
-            <Button variant="light" onClick={generateEmsSource} disabled={!canManage || isProcessing}>
-              {collection.sourceGenerated ? "원천 데이터 다시 생성" : "시연용 원천 데이터 생성"}
-            </Button>
-            <Button onClick={collectAllEms} disabled={!canManage || isProcessing || !collection.sourceGenerated}>
-              {isProcessing ? `${collection.currentWorkplace || "사업장"} 수집 중` : "자동 수집 즉시 실행"}
-            </Button>
-          </div>
-        </div>
-        <div className="redis-lock-card">
-          <div className="redis-lock-head">
-            <span className={`lock-dot ${collection.redisLock.active ? "active" : ""}`} />
-            <div><b>Redis 분산 락</b><small>{collection.redisLock.active ? "수집 작업 보호 중" : "실행 대기"}</small></div>
-          </div>
-          <code>{collection.redisLock.key}</code>
-          <div className="lock-meta"><span>상태</span><b>{collection.redisLock.active ? "LOCKED" : "UNLOCKED"}</b></div>
-          <div className="lock-meta"><span>TTL</span><b>{collection.redisLock.active ? `${collection.redisLock.ttl}초` : "-"}</b></div>
-          <p>반복 클릭과 다중 서버의 월간 수집 중복 실행을 차단합니다.</p>
-        </div>
-      </section>
+      <section className="workflow-strip"><span>외부 EMS 수집</span><i>→</i><strong>월별 실제값 확인</strong><i>→</i><span>ESG 반영</span><i>→</i><span>AI 분석·승인</span><i>→</i><span>대시보드 확정</span></section>
 
-      <div className="summary-grid four">
-        <article className="collection-stat"><span>원천 데이터 준비</span><strong>{sourceReady}/{db.emsWorkplaces.length}</strong><small>{collection.sourceGeneratedAt || "아직 생성되지 않음"}</small></article>
-        <article className="collection-stat"><span>사업장 수집률</span><strong>{collectionRate}%</strong><small>{completed.length}개 사업장 수집 완료</small></article>
-        <article className="collection-stat"><span>월간 잠정 전력</span><strong>{number(totalUsage / 1000, 1)}</strong><small>MWh · 수집 완료 사업장 기준</small></article>
-        <article className="collection-stat"><span>Scope 2 잠정값</span><strong>{number(totalEmission, 2)}</strong><small>tCO₂eq · 승인 전 내부값</small></article>
-      </div>
-
-      <Card title="수집 처리 단계" description="백엔드는 전체 작업을 처리하고, 화면은 사업장별 결과와 단계 진행률을 시각화합니다.">
-        <div className="integration-progress">
-          <div className="progress-track"><i style={{ width: `${collection.progress}%` }} /></div>
-          <div className="progress-label"><b>{collection.progress}%</b><span>{isProcessing ? `${collection.currentWorkplace} 데이터를 처리하고 있습니다.` : collection.jobStatus === "COMPLETED" ? "전체 수집과 잠정 집계가 완료되었습니다." : "원천 데이터를 생성한 뒤 자동 수집을 실행하세요."}</span></div>
-          <div className="step-grid">{steps.map((step, index) => <article key={step.label} className={step.done ? "done" : ""}><span>{step.done ? "✓" : index + 1}</span><b>{step.label}</b></article>)}</div>
+      <Card className="filter-card" title="조회 조건" description="필요한 기간과 사업장을 선택하거나 사업장명으로 검색할 수 있습니다.">
+        <div className="esg-filter-grid">
+          <label><span>기준연도</span><select value={filters.year} onChange={(e) => setFilters({ ...filters, year: Number(e.target.value) })}><option value={2026}>2026년</option><option value={2025}>2025년</option></select></label>
+          <label><span>기준월</span><select value={filters.month} onChange={(e) => setFilters({ ...filters, month: Number(e.target.value) })}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}월</option>)}</select></label>
+          <label><span>사업장</span><select value={filters.facilityId} onChange={(e) => setFilters({ ...filters, facilityId: e.target.value })}><option value="">전체 사업장</option>{facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.facility_name}</option>)}</select></label>
+          <label><span>반영 상태</span><select value={filters.reflectionStatus} onChange={(e) => setFilters({ ...filters, reflectionStatus: e.target.value })}><option value="">전체</option><option value="NOT_REFLECTED">미반영</option><option value="REFLECTED">반영 완료</option></select></label>
+          <label><span>승인 상태</span><select value={filters.approvalStatus} onChange={(e) => setFilters({ ...filters, approvalStatus: e.target.value })}><option value="">전체</option><option value="DRAFT">검토 중</option><option value="PENDING">승인 대기</option><option value="APPROVED">승인 완료</option><option value="REJECTED">반려</option></select></label>
+          <label className="filter-search"><span>검색</span><input value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} placeholder="사업장명 검색" /></label>
+          <div className="filter-actions"><Button variant="outline" onClick={() => setFilters(initialFilters)}>초기화</Button><Button onClick={load}>검색</Button></div>
         </div>
       </Card>
 
-      <Card
-        title="사업장별 EMS 수집 현황"
-        description="같은 기준월의 사업장 데이터를 독립적으로 관리하고, 모두 수집되면 월간 검토가 가능합니다."
-        action={<StatusBadge status={collectionRate === 100 ? "COMPLETED" : "INCOMPLETE"} />}
-      >
-        <DataTable rows={db.emsWorkplaces} columns={workplaceColumns} />
-      </Card>
-
-      <div className="two-cols ems-result-layout">
-        <Card title="기업 전체 잠정 집계" description="사업장 데이터가 들어올 때마다 내부 관리자 화면에서 즉시 갱신됩니다.">
-          <div className="provisional-result">
-            <div><span>수집 범위</span><strong>{completed.length}/{db.emsWorkplaces.length} 사업장</strong></div>
-            <div><span>전력 원단위</span><strong>{number(intensity, 1)} kWh/ton</strong></div>
-            <div><span>공식 확정 여부</span><strong className={collectionRate === 100 ? "ready-text" : "warning-text"}>{collectionRate === 100 ? "관리자 검토 가능" : "확정 불가"}</strong></div>
-          </div>
-          <p className="provisional-note">현재 화면은 권한별 조회 화면이며, 최종 승인된 데이터만 공식 보고서와 외부 공개 자료에 반영됩니다.</p>
-        </Card>
-        <Card title="수집 기술 구성" description="EMS 수집 자체와 Redis의 역할을 분리했습니다.">
-          <div className="tech-flow">
-            <article><b>Spring Scheduler</b><span>매월 자동 실행</span></article><i>→</i>
-            <article><b>Spring Boot</b><span>검증·정규화·계산</span></article><i>→</i>
-            <article><b>PostgreSQL</b><span>원본·결과·이력 저장</span></article><i>+</i>
-            <article><b>Redis</b><span>락·캐시 보조</span></article>
-          </div>
-        </Card>
+      <div className="summary-card-grid four">
+        <article><span>조회 사업장</span><strong>{summary.total}</strong><small>{period} 기준</small></article>
+        <article><span>수집 완료</span><strong>{summary.collected}</strong><small>외부 EMS 수집</small></article>
+        <article><span>ESG 반영 완료</span><strong>{summary.reflected}</strong><small>검토 지표 생성</small></article>
+        <article><span>월간 Scope 2</span><strong>{formatNumber(summary.scope2, 2)}</strong><small>tCO₂eq</small></article>
       </div>
 
-      <Card title="EMS 연동 실행 이력" description="자동 실행과 시연용 수동 실행을 구분해 기록합니다.">
-        <DataTable rows={db.integrationRuns} columns={historyColumns} />
+      <Card title={`${period} 환경 실제값`} description="표시되는 수치는 DB에 저장된 월별 실제 수집 데이터입니다.">
+        {loading ? <div className="data-loading">환경 데이터를 불러오는 중입니다.</div> : <DataTable rows={rows} columns={columns} emptyText="조건에 맞는 환경 데이터가 없습니다." />}
       </Card>
     </div>
   );

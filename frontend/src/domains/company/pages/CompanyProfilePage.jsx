@@ -1,302 +1,179 @@
-import React, { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Swal from "sweetalert2";
 import PageHeader from "../../../shared/components/PageHeader";
 import Card from "../../../shared/components/Card";
 import Button from "../../../shared/components/Button";
+import StatusBadge from "../../../shared/components/StatusBadge";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { ROLES } from "../../../app/config/roles";
 import companyApi from "../api/companyApi";
 import FacilityDetailModal from "../components/FacilityDetailModal";
 import FacilityFormModal from "../components/FacilityFormModal";
-import { COLORS, FONT_SIZE, RADIUS } from "../components/companyStyles";
-import { AdminBadge, InfoBox } from "../components/CompanyUI";
+import { normalizeFacility } from "../utils/facilityData";
+import { apiErrorMessage, formatNumber, periodOf } from "../../../shared/utils/esgFormat";
 
-// TODO: Toast/Alert 컴포넌트 추가 필요
-const showToast = (message, type) => {
-  console.log(`Toast: ${type} - ${message}`);
-};
+const companyValue = (company, camelKey, snakeKey) => company?.[camelKey] ?? company?.[snakeKey] ?? "-";
+const initialFilters = { year: 2026, month: 6, type: "", status: "", search: "" };
 
 export default function CompanyProfilePage() {
   const { user } = useAuth();
-  const currentUserRole = user?.role;
-
+  const canManage = [ROLES.SYSTEM_ADMIN, ROLES.COMPANY_MANAGER].includes(user?.role);
   const [company, setCompany] = useState(null);
   const [facilities, setFacilities] = useState([]);
+  const [facilityDetails, setFacilityDetails] = useState({});
+  const [filters, setFilters] = useState(initialFilters);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const [showFacilityDetailModal, setShowFacilityDetailModal] = useState(false);
   const [selectedFacility, setSelectedFacility] = useState(null);
-
-  const [showFacilityFormModal, setShowFacilityFormModal] = useState(false);
+  const [selectedDetail, setSelectedDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [editingFacility, setEditingFacility] = useState(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const period = periodOf(filters.year, filters.month);
 
-  const canManage = [ROLES.SYSTEM_ADMIN, ROLES.COMPANY_MANAGER].includes(currentUserRole);
-
-  const fetchCompanyData = async () => {
+  const loadProfile = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
-      const companyData = await companyApi.getCompany();
-      setCompany(companyData.data);
-    } catch (err) {
-      setError("기업 정보를 불러오는데 실패했습니다.");
-      showToast("기업 정보를 불러오는데 실패했습니다.", "error");
-      console.error("Failed to fetch company data:", err);
+      const [companyResponse, facilityResponse] = await Promise.all([companyApi.getCompany(), companyApi.getFacilities()]);
+      const normalized = (facilityResponse?.data || []).map((facility, index) => normalizeFacility(facility, index));
+      setCompany(companyResponse?.data || null);
+      setFacilities(normalized);
+      const details = await Promise.all(normalized.map(async (facility) => {
+        try { return [facility.id, (await companyApi.getFacilityEsgDetail(facility.id, period))?.data]; }
+        catch { return [facility.id, null]; }
+      }));
+      setFacilityDetails(Object.fromEntries(details));
+    } catch (error) {
+      Swal.fire("조회 실패", apiErrorMessage(error, "기업·사업장 정보를 불러오지 못했습니다."), "error");
     } finally {
       setLoading(false);
     }
-  };
+  }, [period]);
 
-  const fetchFacilitiesData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const facilitiesData = await companyApi.getFacilities();
-      setFacilities(facilitiesData.data);
-    } catch (err) {
-      setError("사업장 목록을 불러오는데 실패했습니다.");
-      showToast("사업장 목록을 불러오는데 실패했습니다.", "error");
-      console.error("Failed to fetch facilities data:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => { loadProfile(); }, [loadProfile]);
 
-  useEffect(() => {
-    fetchCompanyData();
-    fetchFacilitiesData();
-  }, []);
+  const filteredFacilities = useMemo(() => facilities.filter((facility) => {
+    const detail = facilityDetails[facility.id];
+    const status = detail?.environment?.approvalStatus || detail?.social?.approvalStatus || "DRAFT";
+    const keyword = filters.search.trim().toLowerCase();
+    return (!filters.type || facility.facilityType === filters.type)
+      && (!filters.status || status === filters.status)
+      && (!keyword || `${facility.facilityName} ${facility.address}`.toLowerCase().includes(keyword));
+  }), [facilities, facilityDetails, filters.search, filters.status, filters.type]);
 
-  const handleFacilityClick = (facility) => {
+  const summary = useMemo(() => ({
+    total: facilities.length,
+    collected: facilities.filter((facility) => facilityDetails[facility.id]?.environment?.collectionStatus === "COLLECTED" && facilityDetails[facility.id]?.social?.collectionStatus === "COLLECTED").length,
+    reflected: facilities.filter((facility) => facilityDetails[facility.id]?.environment?.reflectionStatus === "REFLECTED" && facilityDetails[facility.id]?.social?.reflectionStatus === "REFLECTED").length,
+    approved: facilities.filter((facility) => facilityDetails[facility.id]?.environment?.approvalStatus === "APPROVED" && facilityDetails[facility.id]?.social?.approvalStatus === "APPROVED").length,
+  }), [facilities, facilityDetails]);
+
+  const openFacility = async (facility, nextPeriod = period) => {
     setSelectedFacility(facility);
-    setShowFacilityDetailModal(true);
-  };
-
-  const handleCloseFacilityDetailModal = () => {
-    setShowFacilityDetailModal(false);
-    setSelectedFacility(null);
-  };
-
-  const handleAddFacility = () => {
-    setEditingFacility(null);
-    setShowFacilityFormModal(true);
-  };
-
-  const handleEditFacility = (facility) => {
-    setSelectedFacility(null);
-    setShowFacilityDetailModal(false);
-    setEditingFacility(facility);
-    setShowFacilityFormModal(true);
-  };
-
-  const handleSaveFacility = async (newFacilityData) => {
+    setSelectedDetail(facilityDetails[facility.id] || null);
+    setDetailLoading(true);
     try {
-      if (editingFacility) {
-        await companyApi.updateFacility(editingFacility.id, newFacilityData);
-        showToast("사업장 정보가 성공적으로 수정되었습니다.", "success");
-      } else {
-        await companyApi.createFacility(newFacilityData);
-        showToast("사업장이 성공적으로 등록되었습니다.", "success");
-      }
-      setShowFacilityFormModal(false);
+      const response = await companyApi.getFacilityEsgDetail(facility.id, nextPeriod);
+      setSelectedDetail(response?.data || null);
+      setFacilityDetails((current) => ({ ...current, [facility.id]: response?.data || null }));
+    } catch (error) {
+      Swal.fire("상세조회 실패", apiErrorMessage(error), "error");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const saveFacility = async (formData) => {
+    try {
+      if (editingFacility) await companyApi.updateFacility(editingFacility.id, formData);
+      else await companyApi.createFacility(formData);
+      setFormOpen(false);
       setEditingFacility(null);
-      fetchFacilitiesData();
-    } catch (err) {
-      showToast("사업장 정보 저장에 실패했습니다.", "error");
-      console.error("Failed to save facility:", err);
-    }
+      await loadProfile();
+      Swal.fire("저장 완료", "사업장 기본정보가 저장되었습니다.", "success");
+    } catch (error) { Swal.fire("저장 실패", apiErrorMessage(error), "error"); }
   };
 
-  const handleDeleteFacility = async (facilityId) => {
-    if (window.confirm("정말로 이 사업장을 삭제하시겠습니까?")) {
-      try {
-        await companyApi.deleteFacility(facilityId);
-        showToast("사업장이 성공적으로 삭제되었습니다.", "success");
-        setShowFacilityDetailModal(false);
-        setSelectedFacility(null);
-        fetchFacilitiesData();
-      } catch (err) {
-        showToast("사업장 삭제에 실패했습니다.", "error");
-        console.error("Failed to delete facility:", err);
-      }
-    }
+  const deleteFacility = async (facilityId) => {
+    const result = await Swal.fire({ title: "사업장을 삭제할까요?", text: "연결된 월별 데이터도 함께 삭제될 수 있습니다.", icon: "warning", showCancelButton: true, confirmButtonText: "삭제", cancelButtonText: "취소" });
+    if (!result.isConfirmed) return;
+    try {
+      await companyApi.deleteFacility(facilityId);
+      setSelectedFacility(null);
+      setSelectedDetail(null);
+      await loadProfile();
+      Swal.fire("삭제 완료", "사업장을 삭제했습니다.", "success");
+    } catch (error) { Swal.fire("삭제 실패", apiErrorMessage(error), "error"); }
   };
 
-  if (loading) {
-    return (
-      <div className="page-stack" style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "200px", color: COLORS.textSecondary }}>
-        로딩 중...
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="page-stack" style={{ padding: "40px", textAlign: "center", color: COLORS.danger }}>
-        오류: {error}
-      </div>
-    );
-  }
+  if (loading) return <div className="page-loading">기업·사업장 실제 데이터를 불러오는 중입니다.</div>;
 
   return (
-    <div className="page-stack" style={{ gap: "32px", maxWidth: "1400px", margin: "0 auto" }}>
-      <PageHeader
-        breadcrumbs={["기업 설정", "기업·사업장 정보"]}
-        title="기업·사업장 정보"
-        description="ESG 데이터의 조직·사업장 기준정보를 관리합니다."
-      />
+    <div className="page-stack company-profile-page">
+      <PageHeader breadcrumbs={["기업 설정", "기업·사업장 정보"]} eyebrow="COMPANY & FACILITY" title="기업·사업장 정보" description="기업 기준정보와 사업장별 월간 수집·ESG 반영·승인 상태를 확인합니다." actions={canManage ? <Button onClick={() => { setEditingFacility(null); setFormOpen(true); }}>신규 사업장 등록</Button> : <span className="verified-role">조회 전용</span>} />
 
-      <Card>
-        <div style={{ margin: "-20px" }}>
-          <InfoBox title="지속 가능한 모빌리티 공급망 구축">
-            에너지 효율 개선, 안전한 근로환경, 투명한 의사결정을 핵심 가치로 ESG 경영을 추진합니다.
-          </InfoBox>
+      <Card title="기업 기본정보" description="ESG 보고와 평가의 소속 기준입니다.">
+        <div className="company-master-grid">
+          <div><span>기업명</span><strong>{companyValue(company, "name", "name")}</strong></div>
+          <div><span>업종</span><strong>{companyValue(company, "industry", "industry")}</strong></div>
+          <div><span>기업 규모</span><strong>{companyValue(company, "scale", "company_scale")}</strong></div>
+          <div><span>사업자등록번호</span><strong>{companyValue(company, "businessNumber", "business_number")}</strong></div>
+          <div><span>대표자</span><strong>{companyValue(company, "representative", "representative_name")}</strong></div>
+          <div><span>운영 상태</span><StatusBadge status="NORMAL" label="사용 중" /></div>
         </div>
       </Card>
 
-      {/* 기업 기본정보 섹션 - 전체 화면 대응을 위해 2열 그리드 및 스타일 개선 */}
-      <Card title="기업 기본정보">
-        <div style={{ 
-          display: "grid", 
-          gridTemplateColumns: "repeat(2, 1fr)", 
-          gap: "24px 48px",
-          padding: "8px 0"
-        }}>
-          {company ? (
-            <>
-              {[
-                { label: "기업명", value: company.name },
-                { label: "업종", value: company.industry },
-                { label: "기업규모", value: company.scale },
-                { label: "사업자번호", value: company.business_number },
-                { label: "대표자", value: company.representative },
-              ].map((item) => (
-                <div key={item.label} style={{ 
-                  display: "flex", 
-                  flexDirection: "column", 
-                  gap: "8px",
-                  borderBottom: `1px solid ${COLORS.bgHover}`,
-                  paddingBottom: "12px"
-                }}>
-                  <span style={{ fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, fontWeight: "600", textTransform: "uppercase" }}>{item.label}</span>
-                  <strong style={{ fontSize: "16px", color: COLORS.textPrimary }}>{item.value}</strong>
-                </div>
-              ))}
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", paddingBottom: "12px" }}>
-                <span style={{ fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, fontWeight: "600", textTransform: "uppercase" }}>운영 상태</span>
-                <div>
-                  <AdminBadge type="success" style={{ fontSize: FONT_SIZE.sm, padding: "4px 12px" }}>사용 중</AdminBadge>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div style={{ gridColumn: "span 2", textAlign: "center", padding: "20px", color: COLORS.textSecondary }}>기업 정보가 없습니다.</div>
-          )}
+      <Card title="사업장 조회 조건" description="기간·유형·승인 상태·사업장명으로 검색할 수 있습니다.">
+        <div className="esg-filter-grid">
+          <label><span>기준연도</span><select value={filters.year} onChange={(event) => setFilters({ ...filters, year: Number(event.target.value) })}><option value={2026}>2026년</option><option value={2025}>2025년</option></select></label>
+          <label><span>기준월</span><select value={filters.month} onChange={(event) => setFilters({ ...filters, month: Number(event.target.value) })}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}월</option>)}</select></label>
+          <label><span>사업장 유형</span><select value={filters.type} onChange={(event) => setFilters({ ...filters, type: event.target.value })}><option value="">전체</option><option value="HQ">본사</option><option value="FACTORY">공장</option></select></label>
+          <label><span>승인 상태</span><select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}><option value="">전체</option><option value="DRAFT">검토 중</option><option value="PENDING">승인 대기</option><option value="APPROVED">승인 완료</option><option value="REJECTED">반려</option></select></label>
+          <label className="filter-search"><span>검색</span><input value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="사업장명 또는 주소" /></label>
+          <div className="filter-actions"><Button variant="outline" onClick={() => setFilters(initialFilters)}>초기화</Button><Button onClick={loadProfile}>검색</Button></div>
         </div>
       </Card>
 
-      {/* 사업장 목록 섹션 - 등록 버튼 복구 및 상세 버튼 추가 */}
-<Card title="사업장 관리">
-  <div style={{ 
-    display: "flex", 
-    justifyContent: "flex-end", 
-    marginBottom: "1px" 
-  }}>
-    {canManage && (
-      <Button onClick={handleAddFacility} style={{ backgroundColor: COLORS.primary, fontWeight: "600" }}>
-        + 신규 사업장 등록
-      </Button>
-    )}
-  </div>
-  <div className="facility-list" style={{ marginTop: "8px" }}>
-          {facilities.length > 0 ? (
-            <div style={{ border: `1px solid ${COLORS.border}`, borderRadius: RADIUS.md, overflow: "hidden" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-                <thead>
-                  <tr style={{ backgroundColor: COLORS.bgHover, borderBottom: `1px solid ${COLORS.border}` }}>
-                    <th style={{ padding: "16px", fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, fontWeight: "700", width: "80px" }}>ID</th>
-                    <th style={{ padding: "16px", fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, fontWeight: "700" }}>사업장명</th>
-                    <th style={{ padding: "16px", fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, fontWeight: "700" }}>주소</th>
-                    <th style={{ padding: "16px", fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, fontWeight: "700", width: "120px", textAlign: "center" }}>액션</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {facilities.map((f) => (
-                    <tr 
-                      key={f.id} 
-                      onClick={() => handleFacilityClick(f)} 
-                      style={{ 
-                        cursor: "pointer", 
-                        borderBottom: `1px solid ${COLORS.border}`,
-                        transition: "background-color 0.2s"
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = COLORS.bgHover}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                    >
-                      <td style={{ padding: "16px", fontSize: FONT_SIZE.sm, color: COLORS.textSecondary }}>#{f.id}</td>
-                      <td style={{ padding: "16px" }}>
-                        <div style={{ fontWeight: "700", color: COLORS.textPrimary, fontSize: FONT_SIZE.md }}>{f.facility_name}</div>
-                      </td>
-                      <td style={{ padding: "16px", fontSize: FONT_SIZE.sm, color: COLORS.textSecondary }}>{f.address}</td>
-                      <td style={{ padding: "16px", textAlign: "center" }}>
-                        <button 
-                          style={{ 
-                            padding: "6px 12px", 
-                            borderRadius: RADIUS.sm, 
-                            border: `1px solid ${COLORS.primary}`, 
-                            backgroundColor: "transparent", 
-                            color: COLORS.primary,
-                            fontSize: FONT_SIZE.xs,
-                            fontWeight: "600",
-                            cursor: "pointer",
-                            transition: "all 0.2s"
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = COLORS.primary;
-                            e.currentTarget.style.color = COLORS.white;
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = "transparent";
-                            e.currentTarget.style.color = COLORS.primary;
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleFacilityClick(f);
-                          }}
-                        >
-                          상세보기
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div style={{ textAlign: "center", padding: "60px", color: COLORS.textSecondary, border: `1px dashed ${COLORS.border}`, borderRadius: RADIUS.md, backgroundColor: COLORS.bgHover }}>
-              등록된 사업장이 없습니다. 상단의 버튼을 통해 새로운 사업장을 등록해 주세요.
-            </div>
-          )}
+      <div className="facility-summary-grid">
+        <article><span>등록 사업장</span><strong>{summary.total}</strong><small>본사·공장 포함</small></article>
+        <article><span>월 마감·수집 완료</span><strong>{summary.collected}</strong><small>{period} 기준</small></article>
+        <article><span>ESG 반영 완료</span><strong>{summary.reflected}</strong><small>환경·사회 모두</small></article>
+        <article><span>최종 승인 완료</span><strong>{summary.approved}</strong><small>대시보드 확정 가능</small></article>
+      </div>
+
+      <Card title="사업장 목록" description="상세정보에서 지도, 환경·사회 실제값, 1~6월 수집현황을 확인합니다.">
+        <div className="facility-management-table-wrap">
+          <table className="data-table facility-management-table is-clickable">
+            <thead><tr><th>사업장</th><th>유형</th><th>주소</th><th>계약전력</th><th>월 마감</th><th>ESG 반영</th><th>승인</th><th>관리</th></tr></thead>
+            <tbody>
+              {filteredFacilities.map((facility) => {
+                const detail = facilityDetails[facility.id];
+                const environment = detail?.environment;
+                const social = detail?.social;
+                const collection = environment?.collectionStatus === "COLLECTED" && social?.collectionStatus === "COLLECTED" ? "COLLECTED" : environment?.collectionStatus || social?.collectionStatus || "NOT_COLLECTED";
+                const reflection = environment?.reflectionStatus === "REFLECTED" && social?.reflectionStatus === "REFLECTED" ? "REFLECTED" : "NOT_REFLECTED";
+                const approval = environment?.approvalStatus === "APPROVED" && social?.approvalStatus === "APPROVED" ? "APPROVED" : environment?.approvalStatus || social?.approvalStatus || "DRAFT";
+                return <tr key={facility.id} onClick={() => openFacility(facility)}><td><strong>{facility.facilityName}</strong><small className="cell-sub">ID {facility.id}</small></td><td>{facility.facilityType === "HQ" ? "본사" : "공장"}</td><td>{facility.address}</td><td>{formatNumber(facility.contractPowerKw)} kW</td><td><StatusBadge status={collection} /></td><td><StatusBadge status={reflection} /></td><td><StatusBadge status={approval} /></td><td><Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); openFacility(facility); }}>상세보기</Button></td></tr>;
+              })}
+              {filteredFacilities.length === 0 && <tr><td colSpan={8} className="empty-cell">조건에 맞는 사업장이 없습니다.</td></tr>}
+            </tbody>
+          </table>
         </div>
       </Card>
 
-      {showFacilityDetailModal && selectedFacility && (
+      {selectedFacility && selectedDetail && (
         <FacilityDetailModal
-          facility={selectedFacility}
-          onClose={handleCloseFacilityDetailModal}
-          onEdit={handleEditFacility}
-          onDelete={handleDeleteFacility}
+          snapshot={selectedDetail}
+          period={selectedDetail.selectedPeriod || period}
+          loading={detailLoading}
           canEdit={canManage}
+          onPeriodChange={(nextPeriod) => openFacility(selectedFacility, nextPeriod)}
+          onClose={() => { setSelectedFacility(null); setSelectedDetail(null); }}
+          onEdit={(facility) => { setSelectedFacility(null); setSelectedDetail(null); setEditingFacility(facility); setFormOpen(true); }}
+          onDelete={deleteFacility}
         />
       )}
 
-      {showFacilityFormModal && (
-        <FacilityFormModal
-          facility={editingFacility}
-          onClose={() => setShowFacilityFormModal(false)}
-          onSave={handleSaveFacility}
-        />
-      )}
+      {formOpen && <FacilityFormModal facility={editingFacility} onClose={() => { setFormOpen(false); setEditingFacility(null); }} onSave={saveFacility} />}
     </div>
   );
 }

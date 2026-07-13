@@ -7,12 +7,21 @@ export const METRIC_STATUS = Object.freeze({
 });
 
 export const STATUS_LABELS = Object.freeze({
+  NOT_COLLECTED: "수집 전",
   COLLECTED: "수집 완료",
+  FAILED: "수집 실패",
+  NOT_REFLECTED: "미반영",
+  REFLECTED: "반영 완료",
   DRAFT: "검토 중",
+  REVIEWING: "검토 중",
   PENDING: "승인 대기",
+  PENDING_APPROVAL: "승인 대기",
   APPROVED: "승인 완료",
   REJECTED: "반려",
+  NOT_HELD: "이사회 미개최",
+  HELD: "개최",
   NORMAL: "정상",
+  REVIEW: "확인 필요",
   DELAYED: "지연",
   ERROR: "오류",
   EMPTY: "미생성",
@@ -24,4 +33,9 @@ export const STATUS_LABELS = Object.freeze({
   COMPLETED: "수집 완료",
   INCOMPLETE: "수집 미완료",
   SYNCED: "동기화 완료",
+  ANALYZED: "분석 완료",
+  NOT_ANALYZED: "미분석",
+  LOW: "낮음",
+  MEDIUM: "보통",
+  HIGH: "높음",
 });

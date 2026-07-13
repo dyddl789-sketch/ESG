@@ -1,0 +1,652 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.esg.platform.domain.integration.mapper.EsgCollectionMapper">
+
+    <resultMap id="EnvironmentMap" type="com.esg.platform.domain.integration.dto.EnvironmentMonthlyDto">
+        <id property="id" column="id"/>
+        <result property="companyId" column="company_id"/>
+        <result property="facilityId" column="facility_id"/>
+        <result property="facilityName" column="facility_name"/>
+        <result property="facilityType" column="facility_type"/>
+        <result property="basePeriod" column="base_period"/>
+        <result property="electricityUsageKwh" column="electricity_usage_kwh"/>
+        <result property="productionTon" column="production_ton"/>
+        <result property="intensityKwhPerTon" column="intensity_kwh_per_ton"/>
+        <result property="emissionFactor" column="emission_factor"/>
+        <result property="scope2Tco2eq" column="scope2_tco2eq"/>
+        <result property="validationStatus" column="validation_status"/>
+        <result property="collectionStatus" column="collection_status"/>
+        <result property="reflectionStatus" column="reflection_status"/>
+        <result property="approvalStatus" column="approval_status"/>
+        <result property="collectedAt" column="collected_at"/>
+        <result property="reflectedAt" column="reflected_at"/>
+        <result property="approvedAt" column="approved_at"/>
+    </resultMap>
+
+    <resultMap id="SocialMap" type="com.esg.platform.domain.integration.dto.SocialMonthlyDto">
+        <id property="id" column="id"/>
+        <result property="companyId" column="company_id"/>
+        <result property="facilityId" column="facility_id"/>
+        <result property="facilityName" column="facility_name"/>
+        <result property="facilityType" column="facility_type"/>
+        <result property="basePeriod" column="base_period"/>
+        <result property="averageEmployees" column="average_employees"/>
+        <result property="exitCount" column="exit_count"/>
+        <result property="injuredEmployeeCount" column="injured_employee_count"/>
+        <result property="totalWorkHours" column="total_work_hours"/>
+        <result property="trainingTargetCount" column="training_target_count"/>
+        <result property="trainingCompletedCount" column="training_completed_count"/>
+        <result property="hazardTotalCount" column="hazard_total_count"/>
+        <result property="hazardCompletedCount" column="hazard_completed_count"/>
+        <result property="injuryRate" column="injury_rate"/>
+        <result property="trainingCompletionRate" column="training_completion_rate"/>
+        <result property="hazardActionRate" column="hazard_action_rate"/>
+        <result property="turnoverRate" column="turnover_rate"/>
+        <result property="validationStatus" column="validation_status"/>
+        <result property="collectionStatus" column="collection_status"/>
+        <result property="reflectionStatus" column="reflection_status"/>
+        <result property="approvalStatus" column="approval_status"/>
+        <result property="collectedAt" column="collected_at"/>
+        <result property="reflectedAt" column="reflected_at"/>
+        <result property="approvedAt" column="approved_at"/>
+    </resultMap>
+
+    <resultMap id="GovernanceMap" type="com.esg.platform.domain.integration.dto.GovernancePeriodDto">
+        <id property="id" column="id"/>
+        <result property="companyId" column="company_id"/>
+        <result property="headquartersFacilityId" column="headquarters_facility_id"/>
+        <result property="headquartersName" column="headquarters_name"/>
+        <result property="basePeriod" column="base_period"/>
+        <result property="boardMeetingStatus" column="board_meeting_status"/>
+        <result property="boardMeetingCount" column="board_meeting_count"/>
+        <result property="totalDirectorSeats" column="total_director_seats"/>
+        <result property="attendedDirectorSeats" column="attended_director_seats"/>
+        <result property="totalDirectors" column="total_directors"/>
+        <result property="outsideDirectors" column="outside_directors"/>
+        <result property="ethicsTargetCount" column="ethics_target_count"/>
+        <result property="ethicsCompletedCount" column="ethics_completed_count"/>
+        <result property="boardAttendanceRate" column="board_attendance_rate"/>
+        <result property="outsideDirectorRate" column="outside_director_rate"/>
+        <result property="ethicsCompletionRate" column="ethics_completion_rate"/>
+        <result property="validationStatus" column="validation_status"/>
+        <result property="collectionStatus" column="collection_status"/>
+        <result property="reflectionStatus" column="reflection_status"/>
+        <result property="approvalStatus" column="approval_status"/>
+        <result property="collectedAt" column="collected_at"/>
+        <result property="reflectedAt" column="reflected_at"/>
+        <result property="approvedAt" column="approved_at"/>
+    </resultMap>
+
+    <resultMap id="RawMap" type="com.esg.platform.domain.integration.dto.RawDataDto">
+        <id property="id" column="id"/>
+        <result property="runId" column="run_id"/>
+        <result property="companyId" column="company_id"/>
+        <result property="facilityId" column="facility_id"/>
+        <result property="facilityName" column="facility_name"/>
+        <result property="domain" column="domain"/>
+        <result property="sourceSystem" column="source_system"/>
+        <result property="sourceRecordId" column="source_record_id"/>
+        <result property="basePeriod" column="base_period"/>
+        <result property="payload" column="payload"/>
+        <result property="validationStatus" column="validation_status"/>
+        <result property="errorMessage" column="error_message"/>
+        <result property="collectedAt" column="collected_at"/>
+    </resultMap>
+
+    <resultMap id="RunMap" type="com.esg.platform.domain.integration.dto.CollectionRunDto">
+        <id property="id" column="id"/>
+        <result property="companyId" column="company_id"/>
+        <result property="domain" column="domain"/>
+        <result property="sourceSystem" column="source_system"/>
+        <result property="basePeriod" column="base_period"/>
+        <result property="triggerType" column="trigger_type"/>
+        <result property="status" column="status"/>
+        <result property="totalCount" column="total_count"/>
+        <result property="successCount" column="success_count"/>
+        <result property="errorCount" column="error_count"/>
+        <result property="startedAt" column="started_at"/>
+        <result property="completedAt" column="completed_at"/>
+        <result property="errorMessage" column="error_message"/>
+    </resultMap>
+
+    <select id="countFacilities" resultType="int">
+        SELECT COUNT(*) FROM company_facilities WHERE company_id = #{companyId}
+    </select>
+
+    <insert id="insertRun" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO integration_runs (
+            company_id, domain, source_system, base_period, trigger_type, status,
+            total_count, success_count, error_count, started_at
+        ) VALUES (
+            #{companyId}, #{domain}, #{sourceSystem}, #{basePeriod}, #{triggerType}, #{status},
+            #{totalCount}, #{successCount}, #{errorCount}, CURRENT_TIMESTAMP
+        )
+    </insert>
+
+    <update id="completeRun">
+        UPDATE integration_runs
+        SET status = #{status}, total_count = #{totalCount}, success_count = #{successCount},
+            error_count = #{errorCount}, error_message = #{errorMessage}, completed_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <insert id="upsertEnvironmentMonthly">
+        INSERT INTO environment_monthly_data (
+            company_id, facility_id, base_period, electricity_usage_kwh, production_ton,
+            intensity_kwh_per_ton, emission_factor, scope2_tco2eq, validation_status,
+            collection_status, reflection_status, approval_status, collected_at, updated_at
+        )
+        SELECT
+            f.company_id, f.id, #{basePeriod},
+            CASE f.facility_name
+                WHEN '서울 본사' THEN 56000
+                WHEN '부산공장' THEN 428500
+                WHEN '울산공장' THEN 395200
+                ELSE 180000
+            END,
+            CASE f.facility_name
+                WHEN '서울 본사' THEN 640
+                WHEN '부산공장' THEN 5480
+                WHEN '울산공장' THEN 4570
+                ELSE 2400
+            END,
+            ROUND((CASE f.facility_name
+                WHEN '서울 본사' THEN 56000
+                WHEN '부산공장' THEN 428500
+                WHEN '울산공장' THEN 395200
+                ELSE 180000
+            END)::NUMERIC / NULLIF(CASE f.facility_name
+                WHEN '서울 본사' THEN 640
+                WHEN '부산공장' THEN 5480
+                WHEN '울산공장' THEN 4570
+                ELSE 2400
+            END, 0), 4),
+            0.0004594,
+            ROUND((CASE f.facility_name
+                WHEN '서울 본사' THEN 56000
+                WHEN '부산공장' THEN 428500
+                WHEN '울산공장' THEN 395200
+                ELSE 180000
+            END) * 0.0004594, 4),
+            'NORMAL', 'COLLECTED', 'NOT_REFLECTED', 'DRAFT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        FROM company_facilities f
+        WHERE f.company_id = #{companyId}
+        ON CONFLICT (facility_id, base_period) DO UPDATE
+        SET electricity_usage_kwh = EXCLUDED.electricity_usage_kwh,
+            production_ton = EXCLUDED.production_ton,
+            intensity_kwh_per_ton = EXCLUDED.intensity_kwh_per_ton,
+            emission_factor = EXCLUDED.emission_factor,
+            scope2_tco2eq = EXCLUDED.scope2_tco2eq,
+            validation_status = EXCLUDED.validation_status,
+            collection_status = 'COLLECTED',
+            collected_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertSocialMonthly">
+        INSERT INTO social_monthly_data (
+            company_id, facility_id, base_period, average_employees, exit_count,
+            injured_employee_count, total_work_hours, training_target_count,
+            training_completed_count, hazard_total_count, hazard_completed_count,
+            injury_rate, training_completion_rate, hazard_action_rate, turnover_rate,
+            validation_status, collection_status, reflection_status, approval_status,
+            collected_at, updated_at
+        )
+        SELECT
+            f.company_id, f.id, #{basePeriod},
+            CASE f.facility_name WHEN '서울 본사' THEN 238 WHEN '부산공장' THEN 412 ELSE 328 END,
+            CASE f.facility_name WHEN '서울 본사' THEN 3 WHEN '부산공장' THEN 8 ELSE 6 END,
+            CASE WHEN f.facility_name = '부산공장' THEN 1 ELSE 0 END,
+            CASE f.facility_name WHEN '서울 본사' THEN 37200 WHEN '부산공장' THEN 64100 ELSE 51500 END,
+            CASE f.facility_name WHEN '서울 본사' THEN 238 WHEN '부산공장' THEN 412 ELSE 328 END,
+            CASE f.facility_name WHEN '서울 본사' THEN 234 WHEN '부산공장' THEN 396 ELSE 319 END,
+            CASE f.facility_name WHEN '서울 본사' THEN 11 WHEN '부산공장' THEN 16 ELSE 14 END,
+            CASE f.facility_name WHEN '서울 본사' THEN 10 WHEN '부산공장' THEN 14 ELSE 13 END,
+            ROUND((CASE WHEN f.facility_name = '부산공장' THEN 1 ELSE 0 END) * 100.0 /
+                NULLIF(CASE f.facility_name WHEN '서울 본사' THEN 238 WHEN '부산공장' THEN 412 ELSE 328 END, 0), 4),
+            ROUND((CASE f.facility_name WHEN '서울 본사' THEN 234 WHEN '부산공장' THEN 396 ELSE 319 END) * 100.0 /
+                NULLIF(CASE f.facility_name WHEN '서울 본사' THEN 238 WHEN '부산공장' THEN 412 ELSE 328 END, 0), 4),
+            ROUND((CASE f.facility_name WHEN '서울 본사' THEN 10 WHEN '부산공장' THEN 14 ELSE 13 END) * 100.0 /
+                NULLIF(CASE f.facility_name WHEN '서울 본사' THEN 11 WHEN '부산공장' THEN 16 ELSE 14 END, 0), 4),
+            ROUND((CASE f.facility_name WHEN '서울 본사' THEN 3 WHEN '부산공장' THEN 8 ELSE 6 END) * 100.0 /
+                NULLIF(CASE f.facility_name WHEN '서울 본사' THEN 238 WHEN '부산공장' THEN 412 ELSE 328 END, 0), 4),
+            'NORMAL', 'COLLECTED', 'NOT_REFLECTED', 'DRAFT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        FROM company_facilities f
+        WHERE f.company_id = #{companyId}
+        ON CONFLICT (facility_id, base_period) DO UPDATE
+        SET average_employees = EXCLUDED.average_employees,
+            exit_count = EXCLUDED.exit_count,
+            injured_employee_count = EXCLUDED.injured_employee_count,
+            total_work_hours = EXCLUDED.total_work_hours,
+            training_target_count = EXCLUDED.training_target_count,
+            training_completed_count = EXCLUDED.training_completed_count,
+            hazard_total_count = EXCLUDED.hazard_total_count,
+            hazard_completed_count = EXCLUDED.hazard_completed_count,
+            injury_rate = EXCLUDED.injury_rate,
+            training_completion_rate = EXCLUDED.training_completion_rate,
+            hazard_action_rate = EXCLUDED.hazard_action_rate,
+            turnover_rate = EXCLUDED.turnover_rate,
+            validation_status = EXCLUDED.validation_status,
+            collection_status = 'COLLECTED',
+            collected_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertGovernancePeriod">
+        INSERT INTO governance_monthly_data (
+            company_id, headquarters_facility_id, base_period, board_meeting_status,
+            board_meeting_count, total_director_seats, attended_director_seats,
+            total_directors, outside_directors, ethics_target_count, ethics_completed_count,
+            board_attendance_rate, outside_director_rate, ethics_completion_rate,
+            validation_status, collection_status, reflection_status, approval_status,
+            collected_at, updated_at
+        )
+        SELECT
+            #{companyId},
+            (SELECT id FROM company_facilities WHERE company_id = #{companyId} AND facility_type = 'HQ' ORDER BY id LIMIT 1),
+            #{basePeriod}, 'HELD', 1, 8, 7, 8, 3, 1250, 1230,
+            87.5000, 37.5000, 98.4000,
+            'NORMAL', 'COLLECTED', 'NOT_REFLECTED', 'DRAFT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        ON CONFLICT (company_id, base_period) DO UPDATE
+        SET headquarters_facility_id = EXCLUDED.headquarters_facility_id,
+            board_meeting_status = EXCLUDED.board_meeting_status,
+            board_meeting_count = EXCLUDED.board_meeting_count,
+            total_director_seats = EXCLUDED.total_director_seats,
+            attended_director_seats = EXCLUDED.attended_director_seats,
+            total_directors = EXCLUDED.total_directors,
+            outside_directors = EXCLUDED.outside_directors,
+            ethics_target_count = EXCLUDED.ethics_target_count,
+            ethics_completed_count = EXCLUDED.ethics_completed_count,
+            board_attendance_rate = EXCLUDED.board_attendance_rate,
+            outside_director_rate = EXCLUDED.outside_director_rate,
+            ethics_completion_rate = EXCLUDED.ethics_completion_rate,
+            collection_status = 'COLLECTED',
+            collected_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertEnvironmentRaw">
+        INSERT INTO integration_raw_data (
+            run_id, company_id, facility_id, domain, source_system,
+            source_record_id, base_period, payload, validation_status, collected_at
+        )
+        SELECT #{runId}, e.company_id, e.facility_id, 'ENVIRONMENT', 'EMS',
+               'EMS-' || e.facility_id || '-' || REPLACE(#{basePeriod}, '-', ''), #{basePeriod},
+               jsonb_build_object('electricityUsageKwh', e.electricity_usage_kwh,
+                                  'productionTon', e.production_ton,
+                                  'unit', 'kWh'),
+               e.validation_status, CURRENT_TIMESTAMP
+        FROM environment_monthly_data e
+        WHERE e.company_id = #{companyId} AND e.base_period = #{basePeriod}
+        ON CONFLICT (company_id, source_system, source_record_id) DO UPDATE
+        SET run_id = EXCLUDED.run_id, payload = EXCLUDED.payload,
+            validation_status = EXCLUDED.validation_status, error_message = NULL,
+            collected_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertSocialRaw">
+        INSERT INTO integration_raw_data (
+            run_id, company_id, facility_id, domain, source_system,
+            source_record_id, base_period, payload, validation_status, collected_at
+        )
+        SELECT #{runId}, s.company_id, s.facility_id, 'SOCIAL', 'HR_SAFETY',
+               'SOCIAL-' || s.facility_id || '-' || REPLACE(#{basePeriod}, '-', ''), #{basePeriod},
+               jsonb_build_object('averageEmployees', s.average_employees,
+                                  'exitCount', s.exit_count,
+                                  'injuredEmployeeCount', s.injured_employee_count,
+                                  'trainingTargetCount', s.training_target_count,
+                                  'trainingCompletedCount', s.training_completed_count,
+                                  'hazardTotalCount', s.hazard_total_count,
+                                  'hazardCompletedCount', s.hazard_completed_count),
+               s.validation_status, CURRENT_TIMESTAMP
+        FROM social_monthly_data s
+        WHERE s.company_id = #{companyId} AND s.base_period = #{basePeriod}
+        ON CONFLICT (company_id, source_system, source_record_id) DO UPDATE
+        SET run_id = EXCLUDED.run_id, payload = EXCLUDED.payload,
+            validation_status = EXCLUDED.validation_status, error_message = NULL,
+            collected_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertGovernanceRaw">
+        INSERT INTO integration_raw_data (
+            run_id, company_id, facility_id, domain, source_system,
+            source_record_id, base_period, payload, validation_status, collected_at
+        )
+        SELECT #{runId}, g.company_id, g.headquarters_facility_id, 'GOVERNANCE', 'GROUPWARE',
+               'GOV-' || REPLACE(#{basePeriod}, '-', ''), #{basePeriod},
+               jsonb_build_object('boardMeetingStatus', g.board_meeting_status,
+                                  'boardMeetingCount', g.board_meeting_count,
+                                  'totalDirectors', g.total_directors,
+                                  'outsideDirectors', g.outside_directors,
+                                  'ethicsTargetCount', g.ethics_target_count,
+                                  'ethicsCompletedCount', g.ethics_completed_count),
+               g.validation_status, CURRENT_TIMESTAMP
+        FROM governance_monthly_data g
+        WHERE g.company_id = #{companyId} AND g.base_period = #{basePeriod}
+        ON CONFLICT (company_id, source_system, source_record_id) DO UPDATE
+        SET run_id = EXCLUDED.run_id, payload = EXCLUDED.payload,
+            validation_status = EXCLUDED.validation_status, error_message = NULL,
+            collected_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <sql id="environmentSelect">
+        SELECT e.*, f.facility_name, f.facility_type
+        FROM environment_monthly_data e
+        JOIN company_facilities f ON f.id = e.facility_id
+    </sql>
+
+    <select id="findEnvironmentMonthly" resultMap="EnvironmentMap">
+        <include refid="environmentSelect"/>
+        WHERE e.company_id = #{companyId}
+        <if test="basePeriod != null and basePeriod != ''">AND e.base_period = #{basePeriod}</if>
+        <if test="facilityId != null">AND e.facility_id = #{facilityId}</if>
+        <if test="search != null and search != ''">AND f.facility_name ILIKE '%' || #{search} || '%'</if>
+        <if test="reflectionStatus != null and reflectionStatus != ''">AND e.reflection_status = #{reflectionStatus}</if>
+        <if test="approvalStatus != null and approvalStatus != ''">AND e.approval_status = #{approvalStatus}</if>
+        <if test="approvedOnly">AND e.approval_status = 'APPROVED'</if>
+        ORDER BY e.base_period DESC,
+                 CASE WHEN f.facility_type = 'HQ' THEN 0 ELSE 1 END,
+                 f.facility_name
+    </select>
+
+    <select id="findSocialMonthly" resultMap="SocialMap">
+        SELECT s.*, f.facility_name, f.facility_type
+        FROM social_monthly_data s
+        JOIN company_facilities f ON f.id = s.facility_id
+        WHERE s.company_id = #{companyId}
+        <if test="basePeriod != null and basePeriod != ''">AND s.base_period = #{basePeriod}</if>
+        <if test="facilityId != null">AND s.facility_id = #{facilityId}</if>
+        <if test="search != null and search != ''">AND f.facility_name ILIKE '%' || #{search} || '%'</if>
+        <if test="reflectionStatus != null and reflectionStatus != ''">AND s.reflection_status = #{reflectionStatus}</if>
+        <if test="approvalStatus != null and approvalStatus != ''">AND s.approval_status = #{approvalStatus}</if>
+        <if test="approvedOnly">AND s.approval_status = 'APPROVED'</if>
+        ORDER BY s.base_period DESC,
+                 CASE WHEN f.facility_type = 'HQ' THEN 0 ELSE 1 END,
+                 f.facility_name
+    </select>
+
+    <select id="findGovernancePeriods" resultMap="GovernanceMap">
+        SELECT g.*, f.facility_name AS headquarters_name
+        FROM governance_monthly_data g
+        LEFT JOIN company_facilities f ON f.id = g.headquarters_facility_id
+        WHERE g.company_id = #{companyId}
+        <if test="basePeriod != null and basePeriod != ''">AND g.base_period = #{basePeriod}</if>
+        <if test="reflectionStatus != null and reflectionStatus != ''">AND g.reflection_status = #{reflectionStatus}</if>
+        <if test="approvalStatus != null and approvalStatus != ''">AND g.approval_status = #{approvalStatus}</if>
+        <if test="approvedOnly">AND g.approval_status = 'APPROVED'</if>
+        ORDER BY g.base_period DESC
+    </select>
+
+    <select id="findEnvironmentByFacility" resultMap="EnvironmentMap">
+        <include refid="environmentSelect"/>
+        WHERE e.company_id = #{companyId} AND e.facility_id = #{facilityId} AND e.base_period = #{basePeriod}
+    </select>
+
+    <select id="findSocialByFacility" resultMap="SocialMap">
+        SELECT s.*, f.facility_name, f.facility_type
+        FROM social_monthly_data s
+        JOIN company_facilities f ON f.id = s.facility_id
+        WHERE s.company_id = #{companyId} AND s.facility_id = #{facilityId} AND s.base_period = #{basePeriod}
+    </select>
+
+    <select id="findGovernancePeriod" resultMap="GovernanceMap">
+        SELECT g.*, f.facility_name AS headquarters_name
+        FROM governance_monthly_data g
+        LEFT JOIN company_facilities f ON f.id = g.headquarters_facility_id
+        WHERE g.company_id = #{companyId} AND g.base_period = #{basePeriod}
+    </select>
+
+    <select id="findEnvironmentHistory" resultMap="EnvironmentMap">
+        <include refid="environmentSelect"/>
+        WHERE e.company_id = #{companyId} AND e.facility_id = #{facilityId}
+          AND e.base_period LIKE CONCAT(#{year}, '-%')
+        ORDER BY e.base_period
+    </select>
+
+    <select id="findSocialHistory" resultMap="SocialMap">
+        SELECT s.*, f.facility_name, f.facility_type
+        FROM social_monthly_data s
+        JOIN company_facilities f ON f.id = s.facility_id
+        WHERE s.company_id = #{companyId} AND s.facility_id = #{facilityId}
+          AND s.base_period LIKE CONCAT(#{year}, '-%')
+        ORDER BY s.base_period
+    </select>
+
+    <select id="findRawData" resultMap="RawMap">
+        SELECT r.id, r.run_id, r.company_id, r.facility_id, r.domain, r.source_system,
+               r.source_record_id, r.base_period, r.payload::text AS payload,
+               r.validation_status, r.error_message, r.collected_at, f.facility_name
+        FROM integration_raw_data r
+        LEFT JOIN company_facilities f ON f.id = r.facility_id
+        WHERE r.company_id = #{companyId}
+        <if test="facilityId != null">AND r.facility_id = #{facilityId}</if>
+        <if test="domain != null and domain != ''">AND r.domain = #{domain}</if>
+        <if test="basePeriod != null and basePeriod != ''">AND r.base_period = #{basePeriod}</if>
+        ORDER BY r.collected_at DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="findRuns" resultMap="RunMap">
+        SELECT * FROM integration_runs
+        WHERE company_id = #{companyId}
+        <if test="domain != null and domain != ''">AND domain = #{domain}</if>
+        <if test="basePeriod != null and basePeriod != ''">AND base_period = #{basePeriod}</if>
+        ORDER BY started_at DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countEnvironmentReflectable" resultType="int">
+        SELECT COUNT(*) FROM environment_monthly_data
+        WHERE company_id = #{companyId} AND base_period = #{basePeriod}
+          AND collection_status = 'COLLECTED'
+          AND reflection_status = 'NOT_REFLECTED'
+          AND approval_status != 'APPROVED'
+        <if test="facilityId != null">AND facility_id = #{facilityId}</if>
+    </select>
+
+    <select id="countSocialReflectable" resultType="int">
+        SELECT COUNT(*) FROM social_monthly_data
+        WHERE company_id = #{companyId} AND base_period = #{basePeriod}
+          AND collection_status = 'COLLECTED'
+          AND reflection_status = 'NOT_REFLECTED'
+          AND approval_status != 'APPROVED'
+        <if test="facilityId != null">AND facility_id = #{facilityId}</if>
+    </select>
+
+    <select id="countGovernanceReflectable" resultType="int">
+        SELECT COUNT(*) FROM governance_monthly_data
+        WHERE company_id = #{companyId} AND base_period = #{basePeriod}
+          AND collection_status = 'COLLECTED'
+          AND reflection_status = 'NOT_REFLECTED'
+          AND approval_status != 'APPROVED'
+    </select>
+
+    <insert id="reflectEnvironmentMetrics">
+        INSERT INTO esg_metric_data (
+            company_id, facility_id, indicator_id, reporting_year, period_type, period_value,
+            activity_value, numerical_value, emission_factor_id, evidence_file_url, status, data_source_type,
+            input_user_id, additional_info, created_at, updated_at
+        )
+        SELECT e.company_id, e.facility_id, i.id,
+               SUBSTRING(e.base_period, 1, 4)::INT, 'MONTHLY', SUBSTRING(e.base_period, 6, 2)::INT,
+               e.electricity_usage_kwh,
+               CASE i.indicator_code WHEN 'IND_E_ELEC' THEN e.electricity_usage_kwh ELSE e.scope2_tco2eq END,
+               CASE WHEN i.indicator_code = 'IND_E_SCOPE2' THEN ef.factor_id END,
+               '/demo/evidence/' || REPLACE(e.base_period, '-', '') || '_' || LOWER(i.indicator_code) || '.pdf',
+               'DRAFT',
+               CASE WHEN i.indicator_code = 'IND_E_SCOPE2' THEN 'CALCULATION' ELSE 'API' END,
+               #{userId},
+               jsonb_build_object('basePeriod', e.base_period, 'sourceSystem', 'EMS',
+                                  'productionTon', e.production_ton,
+                                  'intensityKwhPerTon', e.intensity_kwh_per_ton,
+                                  'emissionFactor', e.emission_factor,
+                                  'reflectionStatus', 'REFLECTED',
+                                  'evaluationType', 'KCGS_ALIGNED_INTERNAL'),
+               CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        FROM environment_monthly_data e
+        CROSS JOIN esg_indicators i
+        LEFT JOIN emission_factors ef ON ef.energy_type = 'ELECTRICITY_KR'
+                                      AND ef.reference_year = SUBSTRING(e.base_period, 1, 4)::INT
+        WHERE e.company_id = #{companyId} AND e.base_period = #{basePeriod}
+          AND e.collection_status = 'COLLECTED' AND e.reflection_status = 'NOT_REFLECTED'
+          AND e.approval_status != 'APPROVED'
+          AND i.indicator_code IN ('IND_E_ELEC', 'IND_E_SCOPE2')
+        <if test="facilityId != null">AND e.facility_id = #{facilityId}</if>
+        ON CONFLICT (company_id, facility_id, indicator_id, reporting_year, period_type, period_value)
+        DO UPDATE SET
+            activity_value = EXCLUDED.activity_value,
+            numerical_value = EXCLUDED.numerical_value,
+            emission_factor_id = EXCLUDED.emission_factor_id,
+            evidence_file_url = EXCLUDED.evidence_file_url,
+            status = CASE WHEN esg_metric_data.status = 'APPROVED' THEN 'APPROVED'::data_status_enum ELSE 'DRAFT'::data_status_enum END,
+            data_source_type = EXCLUDED.data_source_type,
+            input_user_id = EXCLUDED.input_user_id,
+            reject_reason = NULL,
+            additional_info = EXCLUDED.additional_info,
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="reflectSocialMetrics">
+        INSERT INTO esg_metric_data (
+            company_id, facility_id, indicator_id, reporting_year, period_type, period_value,
+            activity_value, numerical_value, evidence_file_url, status, data_source_type, input_user_id,
+            additional_info, created_at, updated_at
+        )
+        SELECT s.company_id, s.facility_id, i.id,
+               SUBSTRING(s.base_period, 1, 4)::INT, 'MONTHLY', SUBSTRING(s.base_period, 6, 2)::INT,
+               CASE i.indicator_code
+                   WHEN 'IND_S_INJURY_RATE' THEN s.injured_employee_count
+                   WHEN 'IND_S_SAFETY_EDU' THEN s.training_completed_count
+                   WHEN 'IND_S_RISK_ACTION' THEN s.hazard_completed_count
+                   ELSE s.exit_count
+               END,
+               CASE i.indicator_code
+                   WHEN 'IND_S_INJURY_RATE' THEN s.injury_rate
+                   WHEN 'IND_S_SAFETY_EDU' THEN s.training_completion_rate
+                   WHEN 'IND_S_RISK_ACTION' THEN s.hazard_action_rate
+                   ELSE s.turnover_rate
+               END,
+               '/demo/evidence/' || REPLACE(s.base_period, '-', '') || '_social.xlsx',
+               'DRAFT', 'CALCULATION', #{userId},
+               jsonb_build_object('basePeriod', s.base_period, 'sourceSystem', 'HR_SAFETY',
+                                  'averageEmployees', s.average_employees,
+                                  'trainingTargetCount', s.training_target_count,
+                                  'hazardTotalCount', s.hazard_total_count,
+                                  'reflectionStatus', 'REFLECTED',
+                                  'evaluationType', 'KCGS_ALIGNED_INTERNAL'),
+               CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        FROM social_monthly_data s
+        CROSS JOIN esg_indicators i
+        WHERE s.company_id = #{companyId} AND s.base_period = #{basePeriod}
+          AND s.collection_status = 'COLLECTED' AND s.reflection_status = 'NOT_REFLECTED'
+          AND s.approval_status != 'APPROVED'
+          AND i.indicator_code IN ('IND_S_INJURY_RATE', 'IND_S_SAFETY_EDU', 'IND_S_RISK_ACTION', 'IND_S_TURNOVER')
+        <if test="facilityId != null">AND s.facility_id = #{facilityId}</if>
+        ON CONFLICT (company_id, facility_id, indicator_id, reporting_year, period_type, period_value)
+        DO UPDATE SET
+            activity_value = EXCLUDED.activity_value,
+            numerical_value = EXCLUDED.numerical_value,
+            evidence_file_url = EXCLUDED.evidence_file_url,
+            status = CASE WHEN esg_metric_data.status = 'APPROVED' THEN 'APPROVED'::data_status_enum ELSE 'DRAFT'::data_status_enum END,
+            data_source_type = EXCLUDED.data_source_type,
+            input_user_id = EXCLUDED.input_user_id,
+            reject_reason = NULL,
+            additional_info = EXCLUDED.additional_info,
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="reflectGovernanceMetrics">
+        INSERT INTO esg_metric_data (
+            company_id, facility_id, indicator_id, reporting_year, period_type, period_value,
+            activity_value, numerical_value, text_value, evidence_file_url, status, data_source_type,
+            input_user_id, additional_info, created_at, updated_at
+        )
+        SELECT g.company_id, g.headquarters_facility_id, i.id,
+               SUBSTRING(g.base_period, 1, 4)::INT, 'MONTHLY', SUBSTRING(g.base_period, 6, 2)::INT,
+               CASE i.indicator_code
+                   WHEN 'IND_G_ATTENDANCE' THEN g.attended_director_seats
+                   WHEN 'IND_G_OUTSIDE' THEN g.outside_directors
+                   ELSE g.ethics_completed_count
+               END,
+               CASE i.indicator_code
+                   WHEN 'IND_G_ATTENDANCE' THEN g.board_attendance_rate
+                   WHEN 'IND_G_OUTSIDE' THEN g.outside_director_rate
+                   ELSE g.ethics_completion_rate
+               END,
+               CASE WHEN i.indicator_code = 'IND_G_ATTENDANCE' AND g.board_meeting_status = 'NOT_HELD'
+                    THEN '이사회 미개최' END,
+               '/demo/evidence/' || REPLACE(g.base_period, '-', '') || '_governance.pdf',
+               'DRAFT', CASE WHEN i.indicator_code = 'IND_G_ATTENDANCE' THEN 'DOCUMENT_AI' ELSE 'API' END,
+               #{userId},
+               jsonb_build_object('basePeriod', g.base_period, 'sourceSystem', 'GROUPWARE',
+                                  'boardMeetingStatus', g.board_meeting_status,
+                                  'reflectionStatus', 'REFLECTED',
+                                  'evaluationType', 'KCGS_ALIGNED_INTERNAL'),
+               CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        FROM governance_monthly_data g
+        CROSS JOIN esg_indicators i
+        WHERE g.company_id = #{companyId} AND g.base_period = #{basePeriod}
+          AND g.collection_status = 'COLLECTED' AND g.reflection_status = 'NOT_REFLECTED'
+          AND g.approval_status != 'APPROVED'
+          AND i.indicator_code IN ('IND_G_ATTENDANCE', 'IND_G_OUTSIDE', 'IND_G_ETHICS_EDU')
+        ON CONFLICT (company_id, facility_id, indicator_id, reporting_year, period_type, period_value)
+        DO UPDATE SET
+            activity_value = EXCLUDED.activity_value,
+            numerical_value = EXCLUDED.numerical_value,
+            text_value = EXCLUDED.text_value,
+            evidence_file_url = EXCLUDED.evidence_file_url,
+            status = CASE WHEN esg_metric_data.status = 'APPROVED' THEN 'APPROVED'::data_status_enum ELSE 'DRAFT'::data_status_enum END,
+            data_source_type = EXCLUDED.data_source_type,
+            input_user_id = EXCLUDED.input_user_id,
+            reject_reason = NULL,
+            additional_info = EXCLUDED.additional_info,
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="insertReflectionHistory">
+        INSERT INTO esg_approval_history (
+            metric_data_id, action_type, from_status, to_status, comment, actor_user_id, acted_at
+        )
+        SELECT m.id, 'REFLECT', NULL::data_status_enum, 'DRAFT'::data_status_enum,
+               '월간 원천 데이터를 ESG 지표로 반영했습니다.', #{userId}, CURRENT_TIMESTAMP
+        FROM esg_metric_data m
+        JOIN esg_indicators i ON i.id = m.indicator_id
+        WHERE m.company_id = #{companyId}
+          AND m.reporting_year = SUBSTRING(#{basePeriod}, 1, 4)::INT
+          AND m.period_value = SUBSTRING(#{basePeriod}, 6, 2)::INT
+          AND i.category::text = #{domain}
+          AND m.status = 'DRAFT'
+        <if test="facilityId != null">AND m.facility_id = #{facilityId}</if>
+          AND NOT EXISTS (
+              SELECT 1 FROM esg_approval_history h
+              WHERE h.metric_data_id = m.id AND h.action_type = 'REFLECT'
+          )
+    </insert>
+
+    <update id="markEnvironmentReflected">
+        UPDATE environment_monthly_data
+        SET reflection_status = 'REFLECTED', approval_status = 'DRAFT', reflected_at = CURRENT_TIMESTAMP,
+            approved_at = NULL, updated_at = CURRENT_TIMESTAMP
+        WHERE company_id = #{companyId} AND base_period = #{basePeriod}
+          AND reflection_status = 'NOT_REFLECTED' AND approval_status != 'APPROVED'
+        <if test="facilityId != null">AND facility_id = #{facilityId}</if>
+    </update>
+
+    <update id="markSocialReflected">
+        UPDATE social_monthly_data
+        SET reflection_status = 'REFLECTED', approval_status = 'DRAFT', reflected_at = CURRENT_TIMESTAMP,
+            approved_at = NULL, updated_at = CURRENT_TIMESTAMP
+        WHERE company_id = #{companyId} AND base_period = #{basePeriod}
+          AND reflection_status = 'NOT_REFLECTED' AND approval_status != 'APPROVED'
+        <if test="facilityId != null">AND facility_id = #{facilityId}</if>
+    </update>
+
+    <update id="markGovernanceReflected">
+        UPDATE governance_monthly_data
+        SET reflection_status = 'REFLECTED', approval_status = 'DRAFT', reflected_at = CURRENT_TIMESTAMP,
+            approved_at = NULL, updated_at = CURRENT_TIMESTAMP
+        WHERE company_id = #{companyId} AND base_period = #{basePeriod}
+          AND reflection_status = 'NOT_REFLECTED' AND approval_status != 'APPROVED'
+    </update>
+</mapper>

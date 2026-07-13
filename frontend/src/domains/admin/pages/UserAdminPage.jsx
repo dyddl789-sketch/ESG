@@ -34,7 +34,30 @@ export default function UserAdminPage() {
   };
 
   useEffect(() => {
-    fetchUsers();
+    let isMounted = true;
+
+    userApi
+      .getUsers()
+      .then((res) => {
+        if (isMounted) {
+          setUsers(res.data);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setError("사용자 목록을 불러오는데 실패했습니다.");
+        }
+        console.error("Failed to fetch users:", err);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const openDetail = (user) => {

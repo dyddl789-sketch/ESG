@@ -19,6 +19,14 @@ const companyApi = {
     return response.data;
   },
 
+  // 사업장별 환경·사회 원천 데이터와 수집 이력 조회
+  getFacilityEsgDetail: async (id, period) => {
+    const response = await axios.get(`/esg/facilities/${id}`, {
+      params: period ? { period } : undefined,
+    });
+    return response.data;
+  },
+
   // 사업장 등록
   createFacility: async (data) => {
     const response = await axios.post("/companies/me/facilities", data);

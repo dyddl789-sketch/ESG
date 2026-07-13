@@ -66,6 +66,7 @@ public class SecurityConfig {
                                 "/oauth2/**",
                                 "/login/oauth2/**",
                                 "/actuator/health",
+                                "/ws/**",
                                 "/error"
                         ).permitAll()
                         .requestMatchers(HttpMethod.POST,

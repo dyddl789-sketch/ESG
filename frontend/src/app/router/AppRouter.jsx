@@ -63,11 +63,11 @@ export default function AppRouter() {
           <Route path="benchmarks" element={<ExternalBenchmarkPage />} />
           <Route path="company" element={<CompanyProfilePage />} />
 
-          <Route path="metrics" element={guard([ROLES.COMPANY_MANAGER], <MetricListPage />)} />
-          <Route path="metrics/:metricId" element={guard([ROLES.COMPANY_MANAGER], <MetricDetailPage />)} />
-          <Route path="documents" element={guard([ROLES.COMPANY_MANAGER], <DocumentAiPage />)} />
-          <Route path="performance" element={guard([ROLES.COMPANY_MANAGER], <PerformancePage />)} />
-          <Route path="reports" element={guard([ROLES.COMPANY_MANAGER], <ReportBuilderPage />)} />
+          <Route path="metrics" element={guard([ROLES.COMPANY_MANAGER, ROLES.SYSTEM_ADMIN], <MetricListPage />)} />
+          <Route path="metrics/:metricId" element={guard([ROLES.COMPANY_MANAGER, ROLES.SYSTEM_ADMIN], <MetricDetailPage />)} />
+          <Route path="documents" element={guard([ROLES.COMPANY_MANAGER, ROLES.SYSTEM_ADMIN], <DocumentAiPage />)} />
+          <Route path="performance" element={guard([ROLES.COMPANY_MANAGER, ROLES.SYSTEM_ADMIN], <PerformancePage />)} />
+          <Route path="reports" element={guard([ROLES.COMPANY_MANAGER, ROLES.SYSTEM_ADMIN], <ReportBuilderPage />)} />
         </Route>
 
         <Route path="/admin" element={layout([ROLES.SYSTEM_ADMIN])}>
