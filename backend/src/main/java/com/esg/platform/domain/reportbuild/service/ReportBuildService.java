@@ -1,14 +1,12 @@
-// 파일 위치: src/main/java/com/esg/platform/domain/report/service/ReportService.java
-// 버전: v1.1.0
 // 기능 요약: 템플릿 전체 목록을 조회하여 DTO로 변환 반환하는 getTemplates() 메서드와 필요한 List, Collectors 임포트를 추가합니다.
-package com.esg.platform.domain.report.service;
+package com.esg.platform.domain.reportbuild.service;
 
-import com.esg.platform.domain.report.dto.request.ReportCreateRequest;
-import com.esg.platform.domain.report.dto.response.ReportResponse;
-import com.esg.platform.domain.report.dto.response.ReportTemplateResponse;
-import com.esg.platform.domain.report.entity.GeneratedReport;
-import com.esg.platform.domain.report.exception.ReportNotFoundException;
-import com.esg.platform.domain.report.mapper.ReportMapper;
+import com.esg.platform.domain.reportbuild.dto.request.ReportCreateRequest;
+import com.esg.platform.domain.reportbuild.dto.response.ReportBuildResponse;
+import com.esg.platform.domain.reportbuild.dto.response.ReportTemplateResponse;
+import com.esg.platform.domain.reportbuild.entity.GeneratedReport;
+import com.esg.platform.domain.reportbuild.exception.ReportNotFoundException;
+import com.esg.platform.domain.reportbuild.mapper.ReportBuildMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,9 +17,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class ReportService {
+public class ReportBuildService {
 
-    private final ReportMapper reportMapper;
+    private final ReportBuildMapper reportMapper;
 
     public ReportTemplateResponse getReportTemplate(Long id) {
         return reportMapper.selectReportTemplateById(id)
@@ -36,7 +34,7 @@ public class ReportService {
     }
 
     @Transactional
-    public ReportResponse createReport(ReportCreateRequest request, Long userId) {
+    public ReportBuildResponse createReport(ReportCreateRequest request, Long userId) {
         // 템플릿 존재 여부 검증
         reportMapper.selectReportTemplateById(request.getTemplateId())
                 .orElseThrow(() -> new ReportNotFoundException("유효하지 않은 템플릿입니다. ID: " + request.getTemplateId()));
@@ -57,7 +55,7 @@ public class ReportService {
         reportMapper.insertGeneratedReport(report); // DB Insert
 
         return reportMapper.selectGeneratedReportById(report.getId())
-                .map(ReportResponse::from)
+                .map(ReportBuildResponse::from)
                 .orElseThrow(() -> new RuntimeException("보고서 저장 중 오류가 발생했습니다."));
     }
 }

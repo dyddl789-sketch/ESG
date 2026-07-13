@@ -1,5 +1,4 @@
-// 파일 위치: src/main/java/com/esg/platform/domain/report/entity/ReportTemplate.java
-package com.esg.platform.domain.report.entity;
+package com.esg.platform.domain.reportbuild.entity;
 
 import lombok.*;
 import java.time.OffsetDateTime; // [핵심] LocalDateTime 대신 OffsetDateTime 사용

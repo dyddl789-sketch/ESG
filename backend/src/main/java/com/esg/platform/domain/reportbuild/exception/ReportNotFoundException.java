@@ -1,5 +1,5 @@
 // 기능 요약: 리포트 템플릿이나 생성된 리포트를 데이터베이스에서 찾을 수 없을 때 발생하는 커스텀 예외 클래스입니다.
-package com.esg.platform.domain.report.exception;
+package com.esg.platform.domain.reportbuild.exception;
 
 public class ReportNotFoundException extends RuntimeException {
     

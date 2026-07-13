@@ -1,4 +1,4 @@
-package com.esg.platform.domain.report.entity;
+package com.esg.platform.domain.reportbuild.entity;
 
 import lombok.*;
 import java.time.OffsetDateTime;
