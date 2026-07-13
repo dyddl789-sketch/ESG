@@ -193,12 +193,23 @@ export default function ReportBuilderPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleSaveReport = async () => {
+const handleSaveReport = async () => {
+    // 기능 설명: 작성자에게 최종 저장 의사를 묻고 취소 클릭 시 함수 실행을 즉시 중단합니다.
+    const isConfirm = window.confirm("작성하신 보고서의 최종 내용을 서버에 공시 저장하시겠습니까?");
+    console.log("보고서 최종 저장 컨펌 창 선택 결과:", isConfirm);
+    
+    if (!isConfirm) {
+      return;
+    }
+
     setIsSaving(true);
     try {
       const dummyFileUrl = "https://example.com/downloads/generated-report.pdf";
       const requestData = { templateId: parseInt(selectedTemplateId), title, content, targetYear: parseInt(year), scope, version: "v1.0", fileUrl: dummyFileUrl, isPublic: false };
+      
+      console.log("보고서 공시 API 전송 데이터 스캔:", requestData);
       await reportApi.generate(requestData);
+      
       localStorage.removeItem("esg_report_draft"); 
       alert("보고서가 서버에 성공적으로 공시 저장되었습니다.");
     } catch (error) {
