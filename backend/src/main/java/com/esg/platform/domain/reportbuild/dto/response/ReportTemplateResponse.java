@@ -1,7 +1,7 @@
 // 파일 위치: src/main/java/com/esg/platform/domain/report/dto/response/ReportTemplateResponse.java
-package com.esg.platform.domain.report.dto.response;
+package com.esg.platform.domain.reportbuild.dto.response;
 
-import com.esg.platform.domain.report.entity.ReportTemplate;
+import com.esg.platform.domain.reportbuild.entity.ReportTemplate;
 import lombok.Builder;
 import lombok.Getter;
 import java.time.OffsetDateTime; // [수정]
@@ -15,7 +15,7 @@ public class ReportTemplateResponse {
     private String content;
     private String includedIndicators;
     private String layoutSettings;
-    private OffsetDateTime createdAt; // [수정]
+    private OffsetDateTime createdAt;
 
     public static ReportTemplateResponse from(ReportTemplate entity) {
         return ReportTemplateResponse.builder()

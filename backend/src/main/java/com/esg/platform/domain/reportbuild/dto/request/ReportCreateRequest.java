@@ -1,6 +1,5 @@
-// 파일 위치: src/main/java/com/esg/platform/domain/report/dto/request/ReportCreateRequest.java
 // 기능 요약: 보고서 생성 요청(Request) 데이터를 유효성 검증과 함께 바인딩하는 DTO 클래스이며, 누락된 비즈니스 필드인 보고 연도와 범위를 추가합니다.
-package com.esg.platform.domain.report.dto.request;
+package com.esg.platform.domain.reportbuild.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

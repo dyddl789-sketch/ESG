@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.esg.platform.domain.report.mapper.ReportMapper">
+<mapper namespace="com.esg.platform.domain.reportbuild.mapper.ReportBuildMapper">
 
-    <select id="selectReportTemplateById" resultType="com.esg.platform.domain.report.entity.ReportTemplate">
+    <select id="selectReportTemplateById" resultType="com.esg.platform.domain.reportbuild.entity.ReportTemplate">
         SELECT id, company_id AS companyId, title, content, 
                included_indicators::text AS includedIndicators, 
                layout_settings::text AS layoutSettings, created_at AS createdAt
@@ -18,8 +18,7 @@
         )
     </insert>
 
-    <!-- [핵심 추가] 전체 목록을 가져올 때 content도 함께 가져옵니다. -->
-    <select id="selectReportTemplates" resultType="com.esg.platform.domain.report.entity.ReportTemplate">
+    <select id="selectReportTemplates" resultType="com.esg.platform.domain.reportbuild.entity.ReportTemplate">
         SELECT id, company_id AS companyId, title, content, 
                included_indicators::text AS includedIndicators, 
                layout_settings::text AS layoutSettings, created_at AS createdAt
@@ -27,12 +26,33 @@
         ORDER BY id ASC
     </select>
 
-    <select id="selectGeneratedReportById" resultType="com.esg.platform.domain.report.entity.GeneratedReport">
-        SELECT id, template_id AS templateId, title, content, version,
+    <select id="selectGeneratedReportById" resultType="com.esg.platform.domain.reportbuild.entity.GeneratedReport">
+        SELECT id, company_id AS companyId, template_id AS templateId, 
+               target_year AS targetYear, scope, title, content, version,
                file_url AS fileUrl, is_public AS isPublic,
                generated_by AS generatedBy, created_at AS createdAt
         FROM generated_reports
         WHERE id = #{id}
     </select>
+
+    <select id="selectGeneratedReports" resultType="com.esg.platform.domain.reportbuild.entity.GeneratedReport">
+        SELECT id, company_id AS companyId, template_id AS templateId, 
+               target_year AS targetYear, scope, title, content, version,
+               file_url AS fileUrl, is_public AS isPublic,
+               generated_by AS generatedBy, created_at AS createdAt
+        FROM generated_reports
+        ORDER BY created_at DESC
+    </select>
+
+    <delete id="deleteGeneratedReport">
+        DELETE FROM generated_reports 
+        WHERE id = #{id}
+    </delete>
+
+    <update id="updateReportPublicStatus">
+        UPDATE generated_reports 
+        SET is_public = #{isPublic}
+        WHERE id = #{id}
+    </update>
 
 </mapper>
