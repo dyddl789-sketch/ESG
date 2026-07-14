@@ -1,6 +1,4 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "../../../app/providers/AuthProvider";
-// [변경] EsgDataProvider 사용
 import { useEsgData } from "../../../app/providers/EsgDataProvider";
 import PageHeader from "../../../shared/components/PageHeader";
 import Button from "../../../shared/components/Button";
@@ -10,22 +8,35 @@ import MetricDetailPanel from "../components/MetricDetailPanel";
 export default function MetricDetailPage() {
   const { metricId } = useParams();
   const nav = useNavigate();
-  const { user } = useAuth();
-  // [변경] 실제 서버 데이터를 관리하는 useEsgData 호출
-  const { db, requestApproval } = useEsgData();
-  
-  const metric = db?.metrics?.find(m => m.id === Number(metricId));
-  
-  if (!metric) return <p className="p-10 text-center">데이터를 찾을 수 없습니다.</p>;
+  // [수정] EsgDataProvider에서 loading까지 받아 로딩/미존재를 구분
+  //  - 기존에는 데이터 로딩이 끝나기 전에 "데이터를 찾을 수 없습니다"가 먼저 떴다.
+  const { metrics, loading, requestApproval } = useEsgData();
+
+  const metric = metrics.find((m) => Number(m.id) === Number(metricId));
+
+  if (loading) {
+    return <p className="p-10 text-center">데이터를 불러오는 중입니다...</p>;
+  }
+
+  if (!metric) {
+    return (
+      <div className="page-stack">
+        <p className="p-10 text-center">데이터를 찾을 수 없습니다. (ID: {metricId})</p>
+        <div style={{ textAlign: "center" }}>
+          <Button variant="outline" onClick={() => nav(-1)}>목록으로 돌아가기</Button>
+        </div>
+      </div>
+    );
+  }
 
   const canRequest = ["DRAFT", "REJECTED", "COLLECTED"].includes(metric.status);
 
   return (
     <div className="page-stack">
-      <PageHeader 
-        breadcrumbs={["ESG 데이터 관리", metric.title]} 
-        title={metric.title} 
-        description={`${metric.facility} · ${metric.period}`} 
+      <PageHeader
+        breadcrumbs={["ESG 데이터 관리", metric.title]}
+        title={metric.title}
+        description={`${metric.facility ?? ""} · ${metric.period ?? ""}`}
         actions={
           <>
             <Button variant="outline" onClick={() => nav(-1)}>목록</Button>
@@ -39,9 +50,9 @@ export default function MetricDetailPage() {
           <div className="action-card">
             <h3>업무 처리</h3>
             <p>기업 ESG 관리자가 검토를 완료하면 시스템 총괄 관리자에게 최종 승인을 요청합니다.</p>
-            <Button 
-              className="full" 
-              disabled={!canRequest} 
+            <Button
+              className="full"
+              disabled={!canRequest}
               onClick={() => requestApproval(metric.id)}
             >
               승인 요청

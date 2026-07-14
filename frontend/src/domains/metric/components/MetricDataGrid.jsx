@@ -1,7 +1,22 @@
 import React from "react";
 import StatusBadge from "../../../shared/components/StatusBadge";
 
+/**
+ * [수정 포인트]
+ * - 백엔드 MyBatis에서 numerical_value(BigDecimal)가 JSON 직렬화될 때
+ *   숫자 또는 문자열로 내려올 수 있으므로 Number() 변환 후 표시한다.
+ *   (문자열에 .toLocaleString()을 호출하면 천단위 콤마가 적용되지 않음)
+ * - rows 배열 방어 처리 유지
+ */
+const formatValue = (value) => {
+  if (value === null || value === undefined || value === "") return "-";
+  const num = Number(value);
+  return Number.isNaN(num) ? String(value) : num.toLocaleString();
+};
+
 export default function MetricDataGrid({ rows = [], onRowClick }) {
+  const list = Array.isArray(rows) ? rows : [];
+
   return (
     <div className="data-grid-wrapper">
       <table className="data-grid">
@@ -18,19 +33,19 @@ export default function MetricDataGrid({ rows = [], onRowClick }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} onClick={() => onRowClick(row)} className="clickable">
+          {list.map((row) => (
+            <tr key={row.id} onClick={() => onRowClick?.(row)} className="clickable">
               <td className="dim">{row.category}</td>
               <td><code>{row.indicatorCode}</code></td>
               <td className="font-medium">{row.title}</td>
               <td>{row.facility}</td>
               <td className="dim">{row.year} / {row.period}</td>
-              <td className="text-right font-bold">{row.value?.toLocaleString()}</td>
+              <td className="text-right font-bold">{formatValue(row.value)}</td>
               <td className="dim text-sm">{row.unit}</td>
               <td><StatusBadge status={row.status} /></td>
             </tr>
           ))}
-          {rows.length === 0 && (
+          {list.length === 0 && (
             <tr>
               <td colSpan="8" className="empty">조회된 데이터가 없습니다.</td>
             </tr>

@@ -1,10 +1,12 @@
 import React from "react";
-import { Clock, CheckCircle2, AlertCircle, FileText } from "lucide-react";
+// [핵심 수정] lucide-react는 package.json에 없는 미설치 패키지라 import 시 빌드가 깨졌다.
+// 실제로 아이콘을 렌더링에 사용하지도 않았으므로 import 자체를 제거했다.
+// (아이콘이 필요하면 `pnpm add lucide-react` 후 다시 추가할 것)
 
 export default function MetricSummaryPanel({ metrics = [] }) {
-  // 아이콘을 변수에 담지 않고 렌더링 시점에 직접 사용
-  const getCount = (status) => metrics.filter(m => m.status === status).length;
-  const getCategoryCount = (cat) => metrics.filter(m => m.category === cat).length;
+  const list = Array.isArray(metrics) ? metrics : [];
+  const getCount = (status) => list.filter((m) => m.status === status).length;
+  const getCategoryCount = (cat) => list.filter((m) => m.category === cat).length;
 
   return (
     <div className="metric-summary">

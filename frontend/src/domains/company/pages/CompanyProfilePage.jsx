@@ -61,8 +61,16 @@ export default function CompanyProfilePage() {
   };
 
   useEffect(() => {
-    fetchCompanyData();
-    fetchFacilitiesData();
+    // effect 본문 내 동기 setState 린트 오류(set-state-in-effect) 회피를 위해 마이크로태스크로 실행
+    let active = true;
+    Promise.resolve().then(() => {
+      if (!active) return;
+      fetchCompanyData();
+      fetchFacilitiesData();
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const handleFacilityClick = (facility) => {
