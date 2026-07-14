@@ -15,7 +15,7 @@ public class ReportTemplateResponse {
     private String content;
     private String includedIndicators;
     private String layoutSettings;
-    private OffsetDateTime createdAt; // [수정]
+    private OffsetDateTime createdAt;
 
     public static ReportTemplateResponse from(ReportTemplate entity) {
         return ReportTemplateResponse.builder()

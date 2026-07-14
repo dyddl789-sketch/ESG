@@ -12,6 +12,6 @@ public class ReportTemplate {
     private String content;
     private String includedIndicators;
     private String layoutSettings;
-    private OffsetDateTime createdAt; // [수정] DB의 TIMESTAMPTZ와 매핑
-    private OffsetDateTime updatedAt; // [수정] DB의 TIMESTAMPTZ와 매핑
+    private OffsetDateTime createdAt;
+    private OffsetDateTime updatedAt;
 }
