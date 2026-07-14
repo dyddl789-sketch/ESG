@@ -1,0 +1,20 @@
+package com.esg.platform.domain.metric.dto;
+
+import java.math.BigDecimal;
+
+/**
+ * [신규] ESG 데이터 신규 등록 요청 DTO
+ * - 프론트엔드 신규 데이터 등록 폼(MetricCreatePage)에서 전송하는 필드
+ * - companyId / inputUserId는 인증 정보(EsgUserPrincipal)에서 추출하므로 받지 않는다
+ */
+public record MetricCreateRequest(
+    Integer indicatorId,      // 필수: esg_indicators.id
+    Integer facilityId,       // 선택: 사업장 (null이면 '전체')
+    Integer reportingYear,    // 필수: 보고 연도
+    String periodType,        // MONTHLY | QUARTERLY | HALFYEARLY | YEARLY (기본 MONTHLY)
+    Integer periodValue,      // 필수: 월(1~12) 또는 분기(1~4) 등
+    BigDecimal value,         // 정량 수치 (numerical_value)
+    String textValue,         // 정성 텍스트
+    String evidenceFileUrl,   // 증빙 파일 URL
+    Boolean submitForApproval // true면 등록 즉시 PENDING(승인 요청), false/null이면 DRAFT
+) {}

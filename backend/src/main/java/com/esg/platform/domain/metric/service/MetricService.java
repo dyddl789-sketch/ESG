@@ -1,9 +1,12 @@
 package com.esg.platform.domain.metric.service;
 
+import com.esg.platform.domain.metric.dto.IndicatorResponse;
+import com.esg.platform.domain.metric.dto.MetricCreateRequest;
 import com.esg.platform.domain.metric.dto.MetricResponse;
 import com.esg.platform.domain.metric.dto.MetricUpdateRequest;
 import com.esg.platform.domain.metric.entity.DataStatus;
 import com.esg.platform.domain.metric.entity.EsgMetricData;
+import com.esg.platform.domain.metric.entity.PeriodType;
 import com.esg.platform.domain.metric.mapper.MetricMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -59,6 +62,55 @@ public class MetricService {
         }
         
         metricMapper.updateMetricData(data);
+    }
+
+    /**
+     * [신규] ESG 데이터 등록
+     * - submitForApproval=true면 등록과 동시에 승인 요청(PENDING) 상태로 생성
+     * - companyId / inputUserId는 인증 정보에서 전달받아 서버가 직접 설정 (위변조 방지)
+     */
+    @Transactional
+    public Long createMetric(MetricCreateRequest request, Integer companyId, Integer inputUserId) {
+        if (request.indicatorId() == null) {
+            throw new IllegalArgumentException("지표를 선택해주세요.");
+        }
+        if (request.reportingYear() == null || request.periodValue() == null) {
+            throw new IllegalArgumentException("보고 연도와 기간을 입력해주세요.");
+        }
+        if (request.value() == null && (request.textValue() == null || request.textValue().isBlank())) {
+            throw new IllegalArgumentException("측정값 또는 내용을 입력해주세요.");
+        }
+
+        PeriodType periodType = request.periodType() == null || request.periodType().isBlank()
+                ? PeriodType.MONTHLY
+                : PeriodType.valueOf(request.periodType());
+
+        boolean submit = Boolean.TRUE.equals(request.submitForApproval());
+
+        EsgMetricData data = EsgMetricData.builder()
+                .companyId(companyId)
+                .facilityId(request.facilityId())
+                .indicatorId(request.indicatorId())
+                .reportingYear(request.reportingYear())
+                .periodType(periodType)
+                .periodValue(request.periodValue())
+                .numericalValue(request.value())
+                .textValue(request.textValue())
+                .evidenceFileUrl(request.evidenceFileUrl())
+                .status(submit ? DataStatus.PENDING : DataStatus.DRAFT)
+                .dataSourceType("MANUAL")
+                .inputUserId(inputUserId)
+                .build();
+
+        metricMapper.insertMetricData(data);
+        return data.getId();
+    }
+
+    /**
+     * [신규] 활성 지표 마스터 목록 조회 (등록 폼 드롭다운용)
+     */
+    public List<IndicatorResponse> getIndicators() {
+        return metricMapper.findActiveIndicators();
     }
 
     /**

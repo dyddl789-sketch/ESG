@@ -24,7 +24,7 @@ export default function MetricListPage() {
   }));
 
   if (loading) {
-    return <p className="p-10 text-center">ESG 데이터를 불러오는 중입니다...</p>;
+    return <div className="page-stack"><p style={{ padding: "40px", textAlign: "center" }}>ESG 데이터를 불러오는 중입니다...</p></div>;
   }
 
   return (
@@ -39,7 +39,7 @@ export default function MetricListPage() {
               <option>‹ 2026 ›</option>
               <option>2025</option>
             </select>
-            <Button>신규 데이터 등록</Button>
+            <Button onClick={() => navigate("/manager/metrics/new")}>신규 데이터 등록</Button>
           </>
         }
       />

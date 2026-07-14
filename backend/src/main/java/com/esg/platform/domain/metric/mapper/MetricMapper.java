@@ -1,5 +1,6 @@
 package com.esg.platform.domain.metric.mapper;
 
+import com.esg.platform.domain.metric.dto.IndicatorResponse;
 import com.esg.platform.domain.metric.dto.MetricResponse;
 import com.esg.platform.domain.metric.entity.EsgMetricData;
 import com.esg.platform.domain.metric.entity.DataStatus;
@@ -52,4 +53,14 @@ public interface MetricMapper {
         @Param("facilityId") Integer facilityId,
         @Param("limit") int limit
     );
+
+    /**
+     * [신규] ESG 데이터 등록 (useGeneratedKeys로 id 자동 반환)
+     */
+    int insertMetricData(EsgMetricData data);
+
+    /**
+     * [신규] 활성화된 지표 마스터 목록 조회 (등록 폼 드롭다운용)
+     */
+    List<IndicatorResponse> findActiveIndicators();
 }

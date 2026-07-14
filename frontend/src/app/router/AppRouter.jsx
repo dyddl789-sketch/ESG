@@ -16,6 +16,7 @@ const ExternalBenchmarkPage = lazy(() => import("../../domains/benchmark/pages/E
 const SocialDataPage = lazy(() => import("../../domains/social/pages/SocialDataPage"));
 const GovernanceDataPage = lazy(() => import("../../domains/governance/pages/GovernanceDataPage"));
 const MetricListPage = lazy(() => import("../../domains/metric/pages/MetricListPage"));
+const MetricCreatePage = lazy(() => import("../../domains/metric/pages/MetricCreatePage"));
 const MetricDetailPage = lazy(() => import("../../domains/metric/pages/MetricDetailPage"));
 const PerformancePage = lazy(() => import("../../domains/metric/pages/PerformancePage"));
 const DocumentAiPage = lazy(() => import("../../domains/document/pages/DocumentAiPage"));
@@ -64,6 +65,7 @@ export default function AppRouter() {
           <Route path="company" element={<CompanyProfilePage />} />
 
           <Route path="metrics" element={guard([ROLES.COMPANY_MANAGER], <MetricListPage />)} />
+          <Route path="metrics/new" element={guard([ROLES.COMPANY_MANAGER], <MetricCreatePage />)} />
           <Route path="metrics/:metricId" element={guard([ROLES.COMPANY_MANAGER], <MetricDetailPage />)} />
           <Route path="documents" element={guard([ROLES.COMPANY_MANAGER], <DocumentAiPage />)} />
           <Route path="performance" element={guard([ROLES.COMPANY_MANAGER], <PerformancePage />)} />

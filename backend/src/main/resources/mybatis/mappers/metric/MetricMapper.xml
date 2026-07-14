@@ -69,6 +69,52 @@
         WHERE id = #{id}
     </update>
 
+    <!-- [신규] ESG 데이터 등록 -->
+    <insert id="insertMetricData" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO esg_metric_data (
+            company_id,
+            facility_id,
+            indicator_id,
+            reporting_year,
+            period_type,
+            period_value,
+            numerical_value,
+            text_value,
+            evidence_file_url,
+            status,
+            data_source_type,
+            input_user_id
+        ) VALUES (
+            #{companyId},
+            #{facilityId},
+            #{indicatorId},
+            #{reportingYear},
+            #{periodType}::period_type_enum,
+            #{periodValue},
+            #{numericalValue},
+            #{textValue},
+            #{evidenceFileUrl},
+            #{status}::data_status_enum,
+            #{dataSourceType},
+            #{inputUserId}
+        )
+    </insert>
+
+    <!-- [신규] 활성 지표 마스터 목록 조회 (등록 폼 드롭다운용) -->
+    <select id="findActiveIndicators" resultType="com.esg.platform.domain.metric.dto.IndicatorResponse">
+        SELECT
+            id,
+            category,
+            sub_category AS subCategory,
+            indicator_code AS indicatorCode,
+            title,
+            value_type AS valueType,
+            unit
+        FROM esg_indicators
+        WHERE is_active = TRUE
+        ORDER BY category, indicator_code
+    </select>
+
     <!-- 상태 변경 (승인/반려 등) -->
     <update id="updateStatus">
         UPDATE esg_metric_data
