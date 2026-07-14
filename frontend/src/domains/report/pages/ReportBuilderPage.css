@@ -58,3 +58,90 @@
   color: #166534;
   font-weight: 600;
 }
+
+/* 1. Tailwind CSS 충돌 방지: Quill 에디터 SVG 아이콘 무한 팽창 억제 */
+.ql-toolbar svg {
+    display: inline-block !important;
+    vertical-align: middle !important;
+    max-width: 18px !important;
+    max-height: 18px !important;
+    width: 18px !important;
+    height: 18px !important;
+}
+
+/* 2. 드롭다운 화살표(삼각형) 전용 위치 및 크기 강제 교정 */
+.ql-picker-label svg {
+    position: absolute !important;
+    right: 0 !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    margin-top: 0 !important;
+}
+
+/* =========================================================
+   [신규 기능] 플로팅 액션 버튼(FAB) CSS
+========================================================= */
+.fab-container {
+  position: fixed;
+  bottom: 40px;
+  right: 40px;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: 16px;
+  z-index: 9999;
+}
+
+.fab-main-button {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: #0f172a;
+  color: white;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fab-main-button:hover {
+  transform: scale(1.05);
+}
+
+.fab-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.fab-item-button {
+  background-color: white;
+  border: 1px solid #cbd5e1;
+  padding: 10px 20px;
+  border-radius: 30px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+  transition: all 0.2s;
+}
+
+.fab-item-button:hover {
+  background-color: #f8fafc;
+  border-color: #94a3b8;
+  transform: translateY(-2px);
+}
+
+.fab-item-button.active {
+  background-color: #10b981;
+  color: white;
+  border-color: #10b981;
+}
