@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.esg.platform.domain.esgindicator.mapper.IndicatorMapper">
+
+    <resultMap id="IndicatorResultMap" type="com.esg.platform.domain.esgindicator.dto.IndicatorDto">
+        <id property="id" column="id"/>
+        <result property="category" column="category"/>
+        <result property="subCategory" column="sub_category"/>
+        <result property="indicatorCode" column="indicator_code"/>
+        <result property="title" column="title"/>
+        <result property="valueType" column="value_type"/>
+        <result property="description" column="description"/>
+        <result property="unit" column="unit"/>
+        <result property="isActive" column="is_active"/>
+    </resultMap>
+
+    <select id="findAll" resultMap="IndicatorResultMap">
+        SELECT id, category, sub_category, indicator_code, title, value_type, description, unit, is_active
+        FROM esg_indicators
+        ORDER BY category, id
+    </select>
+
+    <select id="findById" resultMap="IndicatorResultMap">
+        SELECT id, category, sub_category, indicator_code, title, value_type, description, unit, is_active
+        FROM esg_indicators
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO esg_indicators (category, sub_category, indicator_code, title, value_type, description, unit, is_active)
+        VALUES (#{category}::esg_category_enum, #{subCategory}, #{indicatorCode}, #{title}, #{valueType}::indicator_value_type_enum, #{description}, #{unit}, true)
+    </insert>
+
+    <update id="update">
+        UPDATE esg_indicators
+        SET category = #{category}::esg_category_enum,
+            sub_category = #{subCategory},
+            indicator_code = #{indicatorCode},
+            title = #{title},
+            value_type = #{valueType}::indicator_value_type_enum,
+            description = #{description},
+            unit = #{unit},
+            is_active = #{isActive}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM esg_indicators WHERE id = #{id}
+    </delete>
+
+</mapper>
