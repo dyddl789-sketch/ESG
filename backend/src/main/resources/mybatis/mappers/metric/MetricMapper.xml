@@ -4,7 +4,28 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
  <mapper namespace="com.esg.platform.domain.metric.mapper.MetricMapper">
  <!-- ESG 데이터 리스트 조회 (필터 포함 ) -->
-    <select id="findMetricsByFilters" resultType="com.esg.platform.domain.metric.dto.MetricResponse">
+    <resultMap id="MetricResponseMap" type="com.esg.platform.domain.metric.dto.MetricResponse">
+        <id property="id" column="id"/>
+        <result property="category" column="category"/>
+        <result property="subCategory" column="subCategory"/>
+        <result property="indicatorCode" column="indicatorCode"/>
+        <result property="title" column="title"/>
+        <result property="facility" column="facility"/>
+        <result property="year" column="year"/>
+        <result property="period" column="period"/>
+        <result property="value" column="value"/>
+        <result property="unit" column="unit"/>
+        <result property="source" column="source"/>
+        <result property="method" column="method"/>
+        <result property="status" column="status"/>
+        <result property="evidence" column="evidence"/>
+        <result property="risk" column="risk"/>
+        <result property="aiFinding" column="aiFinding"/>
+        <result property="assignee" column="assignee"/>
+        <!-- months와 history는 별도 로직으로 채우거나 null 허용을 위해 매핑 제외(방어) -->
+    </resultMap>
+
+    <select id="findMetricsByFilters" resultMap="MetricResponseMap">
         SELECT 
             m.id,
             i.category,
@@ -13,11 +34,11 @@
             i.title,
             COALESCE(f.facility_name, '전체') AS facility,
             m.reporting_year AS year,
-            CONCAT(m.reporting_year, '-', LPAD(CAST(m.period_value AS TEXT), 2, '0')) AS period,
+            CONCAT(CAST(m.reporting_year AS TEXT), '-', LPAD(CAST(m.period_value AS TEXT), 2, '0')) AS period,
             m.numerical_value AS value,
             i.unit,
             m.data_source_type AS source,
-            'API/MANUAL' AS method, -- 스키마에 따라 고정 또는 로직 처리
+            'API/MANUAL' AS method,
             m.status,
             m.evidence_file_url AS evidence,
             CASE 
@@ -25,7 +46,7 @@
                 ELSE '정상'
             END AS risk,
             m.reject_reason AS aiFinding,
-            u.name AS assignee
+            COALESCE(u.name, '시스템') AS assignee
         FROM esg_metric_data m
         JOIN esg_indicators i ON m.indicator_id = i.id
         LEFT JOIN company_facilities f ON m.facility_id = f.id
