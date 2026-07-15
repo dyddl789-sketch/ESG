@@ -35,7 +35,7 @@ public class PerformanceService {
         // 콘솔 로그: 조회된 원시 데이터 행(Row) 개수를 출력합니다.
         log.info("[Service] 조회된 원시 데이터 개수: {}", rawData.size());
 
-        // 기능 설명: indicatorCode가 존재하는 데이터만 필터링하여 지표 코드별로 그룹핑합니다. 
+        // 기능 설명: indicatorCode가 존재하는 데이터만 필터링하여 지표 코드별로 그룹핑합니다.
         Map<String, List<Map<String, Object>>> groupedByCode = rawData.stream()
                 .filter(row -> row.get("indicatorCode") != null)
                 .collect(Collectors.groupingBy(row -> row.get("indicatorCode").toString()));
