@@ -101,28 +101,28 @@ export default function MetricFormPage() {
     fetchData();
   }, [metricId, isEditMode]);
 
-  const handleFileChange = async (e) => {
-    const selectedFile = e.target.files ? e.target.files : null; 
+const handleFileChange = async (e) => {
+    const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
     setUploading(true);
     try {
-      const response = await fileApi.upload(selectedFile);
-      const uploadedUrl = response.data.fileUrl;
+        const response = await fileApi.upload(selectedFile);
+        const uploadedUrl = response.data.fileUrl;
 
-      setFormData(prev => ({
-        ...prev,
-        evidenceFileUrl: uploadedUrl
-      }));
+        setFormData(prev => ({
+            ...prev,
+            evidenceFileUrl: uploadedUrl
+        }));
 
-      Swal.fire("알림", "증빙 자료가 서버에 안전하게 업로드되었습니다.", "success");
+        Swal.fire("알림", "증빙 자료가 서버에 안전하게 업로드되었습니다.", "success");
     } catch (err) {
-      console.error("증빙 자료 업로드 실패:", err);
-      Swal.fire("오류", "파일 업로드에 실패했습니다.", "error");
+        console.error("증빙 자료 업로드 실패:", err);
+        Swal.fire("오류", "파일 업로드에 실패했습니다.", "error");
     } finally {
-      setUploading(false);
+        setUploading(false);
     }
-  };
+};
 
   const handlePeriodTypeChange = (e) => {
     const type = e.target.value;

@@ -2,16 +2,22 @@ package com.esg.platform.global.file.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Map;
 import java.util.UUID;
 
@@ -24,7 +30,37 @@ public class FileUploadController {
     private String uploadDir;
 
     /**
-     * 1. 파일 업로드 API (UUID와 원본 파일명을 언더바(_)로 결합하여 디스크 저장)
+     * 💡 운영체제별 루트 권한 거부 버그를 방어하기 위해 
+     * 프로그래밍 방식으로 안전한 가상 물리 경로를 동적 계산하여 반환합니다.
+     */
+    private Path getSafeUploadPath() throws IOException {
+        String cleanDir = uploadDir;
+        
+        // 윈도우 로컬 개발 환경(인텔리제이)일 경우, C드라이브 루트 차단 에러를 막기 위해
+        // 무조건 현재 실행 중인 프로젝트 루트 폴더 하위의 상대 경로 구조로 강제 고정 전개합니다.
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            cleanDir = cleanDir.replace("C:", "").replace("\\", "/");
+            if (cleanDir.startsWith("/")) {
+                cleanDir = cleanDir.substring(1);
+            }
+            Path winPath = Paths.get(System.getProperty("user.dir")).resolve(cleanDir).normalize();
+            if (!Files.exists(winPath)) {
+                Files.createDirectories(winPath);
+                System.out.println("📁 [윈도우 인프라 복구] 프로젝트 하위 자동 생성 완료: " + winPath);
+            }
+            return winPath;
+        }
+
+        // 리눅스/도커 배포 환경일 경우의 기존 정석 절대 경로 로직 유지
+        Path linuxPath = Paths.get(cleanDir).normalize();
+        if (!Files.exists(linuxPath)) {
+            Files.createDirectories(linuxPath);
+        }
+        return linuxPath;
+    }
+
+    /**
+     * 1. 파일 업로드 API (NIO 스트림 기반 500 에러 완치본)
      */
     @PostMapping("/upload")
     public ResponseEntity<Map<String, String>> uploadFile(@RequestParam("file") MultipartFile file) {
@@ -32,62 +68,62 @@ public class FileUploadController {
             throw new IllegalArgumentException("업로드할 파일이 존재하지 않습니다.");
         }
 
-        try {
-            File directory = new File(uploadDir);
-            if (!directory.exists()) {
-                directory.mkdirs(); 
-            }
+        // 💡 [500 에러 완치 핵심] Windows 톰캣 임시파일 경로 충돌을 방지하기 위해 
+        // transferTo를 쓰지 않고 순수 바이트 입출력 스트림을 직접 열어 지정된 폴더에 강제로 덮어씁니다.
+        try (InputStream inputStream = file.getInputStream()) {
+            Path targetDirectoryPath = getSafeUploadPath();
 
             String originalFileName = file.getOriginalFilename();
             if (originalFileName == null) {
                 originalFileName = "unnamed_file";
             }
             
-            // 공백이나 특수문자로 인한 쿼리 꼬임을 방지하기 위해 파일명 정돈
+            // 공백이나 특수문자로 인한 파일명 뒤틀림 방지
             originalFileName = originalFileName.replaceAll("[\\s\\\\/:*?\"<>|]", "_");
 
-            // 💡 [핵심 고도화] 물리 파일 이름 충돌을 피하면서 원본명을 보존하기 위해 UUID_원본파일명 형태로 결합
+            // UUID 명세 엄격 보존
             String savedFileName = UUID.randomUUID().toString() + "_" + originalFileName;
+            Path targetFilePath = targetDirectoryPath.resolve(savedFileName).normalize();
 
-            File targetFile = new File(uploadDir + savedFileName);
-            file.transferTo(targetFile);
+            // 💡 파일 스트림을 타겟 경로로 직접 복사 (기존 파일이 혹시 있으면 REPLACE 덮어쓰기 안전망 장착)
+            Files.copy(inputStream, targetFilePath, StandardCopyOption.REPLACE_EXISTING);
 
             String fileUrl = "/uploads/evidence/" + savedFileName;
             return ResponseEntity.ok(Map.of("fileUrl", fileUrl));
 
         } catch (IOException e) {
-            throw new RuntimeException("서ver 내부 디스크 파일 저장 중 오류가 발생했습니다.", e);
+            System.err.println("❌ [물리 디스크 에러 상세 내역]: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("error", "서버 내부 디스크 파일 저장 중 물리 오류 발생: " + e.getMessage()));
         }
     }
 
     /**
-     * 2. 파일 다운로드 API (앞의 UUID 영역을 칼같이 잘라내고 순수 원본명으로 복원)
+     * 2. 파일 다운로드 API
      */
     @GetMapping("/download")
-    public ResponseEntity<org.springframework.core.io.Resource> downloadFile(
-            @RequestParam(name = "fileUrl") String fileUrl) {
+    public ResponseEntity<Resource> downloadFile(@RequestParam(name = "fileUrl") String fileUrl) {
         try {
-            // URL 경로에서 저장된 파일명 추출 (예: UUID_2026_전기요금.xls)
             String savedFileName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
-            Path filePath = Paths.get(uploadDir).resolve(savedFileName).normalize();
-            org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
+            
+            Path targetDirectoryPath = getSafeUploadPath();
+            Path filePath = targetDirectoryPath.resolve(savedFileName).normalize();
+            Resource resource = new UrlResource(filePath.toUri());
 
             if (!resource.exists()) {
                 throw new IllegalArgumentException("요청하신 증빙 파일이 서버에 존재하지 않습니다.");
             }
 
-            // 💡 [핵심 고도화] 파일 이름에 언더바(_)가 존재할 경우 앞의 UUID(36자) 영역을 통째로 잘라내고 순수 원본 파일명만 복원
             String originalFileName = savedFileName;
             if (savedFileName.contains("_") && savedFileName.indexOf("_") > 30) {
                 originalFileName = savedFileName.substring(savedFileName.indexOf("_") + 1);
             }
 
-            // 한글이나 공백이 깨지지 않도록 UTF-8 인코딩 처리
             String encodedFileName = URLEncoder.encode(originalFileName, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
 
             return ResponseEntity.ok()
-                    .contentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM)
-                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + encodedFileName + "\"")
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + encodedFileName + "\"")
                     .body(resource);
 
         } catch (Exception e) {

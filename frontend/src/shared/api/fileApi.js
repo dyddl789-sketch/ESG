@@ -5,7 +5,11 @@ export const fileApi = {
    * 전역 단독 파일 업로드 API
    * @param {File} fileObject - 브라우저 인풋에서 선택된 실제 파일 객체
    */
+  
   upload: (fileObject) => {
+    console.log(fileObject);
+    console.log(fileObject instanceof File);
+
     const formData = new FormData();
     formData.append("file", fileObject);
 
