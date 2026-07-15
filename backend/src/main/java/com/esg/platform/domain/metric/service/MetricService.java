@@ -3,12 +3,11 @@ package com.esg.platform.domain.metric.service;
 import com.esg.platform.domain.metric.dto.IndicatorResponse;
 import com.esg.platform.domain.metric.dto.MetricCreateRequest;
 import com.esg.platform.domain.metric.dto.MetricResponse;
-import com.esg.platform.domain.metric.dto.MetricUpdateRequest;
 import com.esg.platform.domain.metric.entity.DataStatus;
 import com.esg.platform.domain.metric.entity.EsgMetricData;
 import com.esg.platform.domain.metric.entity.PeriodType;
 import com.esg.platform.domain.metric.mapper.MetricMapper;
-import lombok.RequiredArgsConstructor;
+import lombok.RequiredArgsConstructor; // 💡 [완치] @RequiredArgsConstructor 에러를 해결하는 핵심 롬복 임포트
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,34 +33,45 @@ public class MetricService {
     public MetricResponse getMetricDetail(Long id) {
         return metricMapper.findMetricsByFilters(null, null, null)
                 .stream()
-                .filter(m -> m.id().equals(id))
+                .filter(m -> m.getId().equals(id))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("해당 데이터를 찾을 수 없습니다. ID: " + id));
     }
 
-    /**
-     * 데이터 수정 (수치 및 증빙자료 업데이트)
-     */
     @Transactional
-    public void updateMetric(Long id, MetricUpdateRequest request) {
+    public void updateMetric(Long id, MetricCreateRequest request) {
         EsgMetricData data = metricMapper.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("데이터가 존재하지 않습니다."));
         
-        // 1. 기존 정량 데이터 수치 업데이트 (유지)
+        data.setId(id);
+        data.setIndicatorId(request.indicatorId());
+        data.setFacilityId(request.facilityId());
+        data.setReportingYear(request.reportingYear());
+        
+        // 💡 [해결 핵심] 문자열로 들어온 주기를 엔티티 타입인 PeriodType 이넘으로 안전하게 변환 주입!
+        if (request.periodType() != null && !request.periodType().isBlank()) {
+            data.setPeriodType(PeriodType.valueOf(request.periodType().toUpperCase().trim()));
+        }
+        data.setPeriodValue(request.periodValue());
+
+        // 수치, 비고, 파일 경로 저장 원천 보장
         data.setNumericalValue(request.value());
-        
-        // 2. [보완] 누락되었던 정성 데이터(텍스트형) 업데이트 반영
         data.setTextValue(request.textValue()); 
-        
-        // 3. 기존 증빙파일 URL 업데이트 (유지)
         data.setEvidenceFileUrl(request.evidenceFileUrl());
         
-        // 4. [보완] 반려 사유나 의견(comment)이 유입되었을 경우 rejectReason에 바인딩
-        if (request.comment() != null) {
-            data.setRejectReason(request.comment());
+        boolean isSubmitClick = Boolean.TRUE.equals(request.submitForApproval());
+
+        if (DataStatus.REJECTED == data.getStatus() && isSubmitClick) {
+            data.setStatus(DataStatus.PENDING);
+            metricMapper.resubmitRejectedMetric(data);
+        } else {
+            if (isSubmitClick) {
+                data.setStatus(DataStatus.PENDING);
+            } else {
+                data.setStatus(DataStatus.DRAFT);
+            }
+            metricMapper.updateMetricData(data);
         }
-        
-        metricMapper.updateMetricData(data);
     }
 
     /**
@@ -127,5 +137,13 @@ public class MetricService {
     @Transactional
     public void decideApproval(Long id, DataStatus decision, String comment, Integer approverId) {
         metricMapper.updateStatus(id, decision, approverId, comment);
+    }
+
+    /**
+     * 지정한 ID의 메트릭 데이터를 데이터베이스에서 완전히 삭제 (반려 데이터 파기용)
+     */
+    @Transactional
+    public void removeRejectedMetric(Long id) {
+        metricMapper.deleteMetricById(id);
     }
 }

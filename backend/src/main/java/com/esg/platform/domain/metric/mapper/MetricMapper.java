@@ -26,7 +26,7 @@ public interface MetricMapper {
     );
 
     /**
-     * 특정 데이터 상세 조회
+     * 특정 데이터 상세 조회 (Optional 상자로 안전하게 설계된 표준 명세)
      */
     Optional<EsgMetricData> findById(@Param("id") Long id);
 
@@ -63,4 +63,16 @@ public interface MetricMapper {
      * [신규] 활성화된 지표 마스터 목록 조회 (등록 폼 드롭다운용)
      */
     List<IndicatorResponse> findActiveIndicators();
+    
+    /**
+     * 지정한 ID의 메트릭 데이터를 데이터베이스에서 완전히 삭제 (반려 데이터 파기용)
+     */
+    void deleteMetricById(@Param("id") Long id);
+    
+    /**
+     * [신규 단독 개설] 반려된 지표 실적 재제출용 전용 메서드 
+     * - 예전 반려 사유 의견을 NULL로 클리어 처리하고 상태를 PENDING으로 자동 전환
+     */
+    void resubmitRejectedMetric(EsgMetricData metricData);
+
 }

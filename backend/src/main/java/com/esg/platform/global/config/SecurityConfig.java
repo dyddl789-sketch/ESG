@@ -66,7 +66,8 @@ public class SecurityConfig {
                                 "/oauth2/**",
                                 "/login/oauth2/**",
                                 "/actuator/health",
-                                "/error"
+                                "/error",
+                                "/uploads/evidence/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/auth/login",
@@ -75,13 +76,15 @@ public class SecurityConfig {
                                 "/api/auth/oauth/exchange",
                                 "/api/auth/email-verifications/send",
                                 "/api/auth/email-verifications/confirm",
-                                "/api/auth/logout"
+                                "/api/auth/logout",
+                                "/api/files/upload"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/auth/config",
                                 "/api/auth/check-login-id",
                                 "/api/auth/check-email",
-                                "/api/auth/check-phone"
+                                "/api/auth/check-phone",
+                                "/api/files/download"
                         ).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("SYSTEM_ADMIN")
                         .requestMatchers("/api/manager/**")

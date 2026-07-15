@@ -1,4 +1,5 @@
 import React from "react";
+
 // 아이콘 대신 텍스트로 대체하여 React Hook 충돌을 원천 차단
 export default function MetricFilterBar({ filters, onChange }) {
   return (
@@ -28,7 +29,7 @@ export default function MetricFilterBar({ filters, onChange }) {
           onChange={(e) => onChange({ ...filters, status: e.target.value })}
         >
           <option value="ALL">모든 상태</option>
-          <option value="DRAFT">검토 중</option>
+          <option value="DRAFT">작성 중</option>
           <option value="PENDING">승인 대기</option>
           <option value="REJECTED">반려</option>
           <option value="APPROVED">승인 완료</option>

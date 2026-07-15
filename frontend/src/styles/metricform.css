@@ -55,6 +55,7 @@
 .card-internal-wrapper .form-group textarea {
   resize: none !important; /* 👈 이 코드를 추가해 주세요 */
 }
+
 .card-internal-wrapper .form-group input:focus,
 .card-internal-wrapper .form-group select:focus,
 .card-internal-wrapper .form-group textarea:focus {

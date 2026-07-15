@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 
 /**
  * [신규] ESG 데이터 신규 등록 요청 DTO
- * - 프론트엔드 신규 데이터 등록 폼(MetricCreatePage)에서 전송하는 필드
+ * - 프론트엔드 신규 데이터 등록 폼(MetricFormPage)에서 전송하는 필드
  * - companyId / inputUserId는 인증 정보(EsgUserPrincipal)에서 추출하므로 받지 않는다
  */
 public record MetricCreateRequest(

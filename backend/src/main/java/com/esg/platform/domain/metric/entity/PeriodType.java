@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum PeriodType {
     YEARLY("연간"),
-    HALFYEARLY("반기"),
     QUARTERLY("분기"),
     MONTHLY("월간");
 

@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/esg/metrics") // [수정] 앞에 /api를 추가
+@RequestMapping("/api/esg/metrics") 
 @RequiredArgsConstructor
 public class MetricController {
 
@@ -25,23 +25,22 @@ public class MetricController {
 
     /**
      * ESG 데이터 목록 조회 (필터: 카테고리, 연도, 상태)
-     * GET /esg/metrics?category=ENVIRONMENT&year=2026&status=PENDING
+     * GET /api/esg/metrics?category=ENVIRONMENT&year=2026&status=PENDING
      */
     @GetMapping
     public ResponseEntity<List<MetricResponse>> getMetrics(
-            @RequestParam(required = false) String category,
-            @RequestParam(required = false) Integer year,
-            @RequestParam(required = false) DataStatus status) {
+            @RequestParam(name = "category", required = false) String category,
+            @RequestParam(name = "year", required = false) Integer year,
+            @RequestParam(name = "status", required = false) DataStatus status) {
         
         List<MetricResponse> metrics = metricService.getMetrics(category, year, status);
         return ResponseEntity.ok(metrics);
     }
 
     /**
-     * [신규] ESG 데이터 등록
+     * ESG 데이터 등록
      * POST /api/esg/metrics
      * - submitForApproval=true면 등록과 동시에 승인 요청(PENDING)
-     * - companyId / inputUserId는 인증 토큰에서 추출 (프론트 입력값 신뢰하지 않음)
      */
     @PostMapping
     public ResponseEntity<Map<String, Long>> createMetric(
@@ -50,7 +49,7 @@ public class MetricController {
 
         Integer companyId = principal.getUser().getCompanyId() != null
                 ? principal.getUser().getCompanyId().intValue()
-                : 1; // 단일 기업 모델 폴백 (CompanyService.COMPANY_ID와 동일)
+                : 1; 
         Integer inputUserId = principal.getUser().getId().intValue();
 
         Long newId = metricService.createMetric(request, companyId, inputUserId);
@@ -59,7 +58,7 @@ public class MetricController {
     }
 
     /**
-     * [신규] 활성 지표 마스터 목록 조회 (등록 폼 드롭다운용)
+     * 활성 지표 마스터 목록 조회 (등록 폼 드롭다운용)
      * GET /api/esg/metrics/indicators
      */
     @GetMapping("/indicators")
@@ -69,33 +68,33 @@ public class MetricController {
 
     /**
      * 특정 ESG 데이터 상세 조회
-     * GET /esg/metrics/{id}
+     * GET /api/esg/metrics/{id}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<MetricResponse> getMetricDetail(@PathVariable Long id) {
+    public ResponseEntity<MetricResponse> getMetricDetail(@PathVariable(name = "id") Long id) {
         MetricResponse detail = metricService.getMetricDetail(id);
         return ResponseEntity.ok(detail);
     }
 
     /**
      * ESG 데이터 수정
-     * PUT /esg/metrics/{id}
+     * PUT /api/esg/metrics/{id}
      */
     @PutMapping("/{id}")
     public ResponseEntity<Void> updateMetric(
-            @PathVariable Long id,
-            @RequestBody MetricUpdateRequest request) {
+            @PathVariable(name = "id") Long id,
+            @RequestBody MetricCreateRequest request) { // 💡 프론트엔드가 던지는 폼 페이로드 수신
         
-        metricService.updateMetric(id, request);
-        return ResponseEntity.noContent().build();
+        metricService.updateMetric(id, request); // 💡 2단계의 고도화 서비스 로직 트리거 실행
+        return ResponseEntity.ok().build();
     }
 
     /**
      * 승인 요청 처리
-     * PATCH /esg/metrics/{id}/request-approval
+     * PATCH /api/esg/metrics/{id}/request-approval
      */
     @PatchMapping("/{id}/request-approval")
-    public ResponseEntity<Void> requestApproval(@PathVariable Long id) {
+    public ResponseEntity<Void> requestApproval(@PathVariable(name = "id") Long id) {
         metricService.requestApproval(id);
         return ResponseEntity.noContent().build();
     }
@@ -103,22 +102,18 @@ public class MetricController {
     /**
      * 최종 승인/반려 결정 (관리자 전용)
      * PATCH /api/esg/metrics/{id}/decide
-     * [개선] approverId를 프론트 파라미터가 아닌 인증 토큰에서 추출하도록 변경
-     *        (결재자 위변조 방지). comment는 반려 사유로 사용된다.
      */
     @PatchMapping("/{id}/decide")
     public ResponseEntity<Void> decideApproval(
-            @PathVariable Long id,
+            @PathVariable(name = "id") Long id,
             @RequestParam("decision") DataStatus decision,
             @RequestParam(value = "comment", required = false) String comment,
             @AuthenticationPrincipal EsgUserPrincipal principal) {
 
-        // 잘못된 결재 상태(DRAFT 등)가 요청으로 들어오는 것을 방어
         if (decision == DataStatus.DRAFT || decision == DataStatus.PENDING) {
             throw new IllegalArgumentException("결정 상태는 APPROVED(승인) 또는 REJECTED(반려)만 가능합니다.");
         }
 
-        // 반려 시 사유 필수 검증
         if (decision == DataStatus.REJECTED && (comment == null || comment.isBlank())) {
             throw new IllegalArgumentException("반려 시 사유를 입력해야 합니다.");
         }
@@ -126,5 +121,15 @@ public class MetricController {
         Integer approverId = principal.getUser().getId().intValue();
         metricService.decideApproval(id, decision, comment, approverId);
         return ResponseEntity.noContent().build();
+    }
+
+    /*
+     * 반려(REJECTED) 상태인 지표 데이터 단건 삭제 API
+     * 최종 결합 경로: DELETE /api/esg/metrics/{id}
+     */
+    @DeleteMapping("/{id}") // 💡 절대경로 기법인 /api/metrics/ 를 과감히 걷어내고, 클래스 공통 주소인 /api/esg/metrics/{id} 규칙으로 완벽히 통일시킵니다.
+    public ResponseEntity<Void> deleteMetric(@PathVariable(name = "id") Long id) {
+        metricService.removeRejectedMetric(id); 
+        return ResponseEntity.ok().build();
     }
 }

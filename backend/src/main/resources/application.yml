@@ -67,14 +67,16 @@ spring:
             user-info-uri: https://kapi.kakao.com/v2/user/me
             user-name-attribute: id
 
+  # 💡 [교정] logging 하위에서 꺼내어 최상위 spring 정렬에 맞춰 올바르게 배치
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 10MB
+
 server:
   port: ${SERVER_PORT:8080}
   forward-headers-strategy: framework
-  servlet:
-    encoding:
-      charset: UTF-8
-      enabled: true
-      force: true
 
 mybatis:
   mapper-locations: classpath:mybatis/mappers/**/*.xml
@@ -120,3 +122,5 @@ logging:
     root: INFO
     com.esg.platform: ${APP_LOG_LEVEL:DEBUG}
     org.springframework.security: ${SECURITY_LOG_LEVEL:INFO}
+file:
+  upload-dir: D:/dev/teamproject4/upload/evidence/

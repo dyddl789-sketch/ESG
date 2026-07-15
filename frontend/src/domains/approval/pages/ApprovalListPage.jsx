@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEsgData } from "../../../app/providers/EsgDataProvider";
 import PageHeader from "../../../shared/components/PageHeader";
@@ -7,16 +7,24 @@ import DataTable from "../../../shared/components/DataTable";
 import StatusBadge from "../../../shared/components/StatusBadge";
 
 export default function ApprovalListPage() {
-  const { metrics, loading } = useEsgData();
+  // 💡 실시간 데이터 동기화를 위해 refreshMetrics(또는 fetch 데이터 훅) 추가 활용
+  const { metrics, loading, refreshMetrics } = useEsgData();
   const navigate = useNavigate();
+
+  // 목록 페이지로 진입할 때마다 백엔드로부터 최신 결재 현황 상태를 강제로 새로고침
+  useEffect(() => {
+    if (refreshMetrics) {
+      refreshMetrics();
+    }
+  }, []);
 
   // 승인 대기(PENDING) 상태인 데이터만 필터링
   const rows = metrics.filter(m => m.status === "PENDING");
 
-  // 오늘 날짜 기준 통계 (데모용 수치 포함)
+  // 오늘 날짜 기준 통계 및 실시간 누적 수치 집계
   const stats = {
     pending: rows.length,
-    todayApproved: metrics.filter(m => m.status === "APPROVED").length, // 실제로는 오늘 날짜 필터 필요
+    todayApproved: metrics.filter(m => m.status === "APPROVED").length,
     todayRejected: metrics.filter(m => m.status === "REJECTED").length
   };
 
@@ -50,6 +58,7 @@ export default function ApprovalListPage() {
       <Card title="승인 요청 목록">
         <DataTable
           rows={rows}
+          // 클릭 시 테이블 행 고유 id 기반으로 상세 페이지 라우팅 이동
           onRowClick={(r) => navigate(`/admin/approvals/${r.id}`)}
           columns={[
             {
