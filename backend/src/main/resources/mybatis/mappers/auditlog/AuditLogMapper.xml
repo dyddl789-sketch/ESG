@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.esg.platform.domain.auditlog.mapper.AuditLogMapper">
+
+    <resultMap id="auditLogResponseMap" type="com.esg.platform.domain.auditlog.dto.AuditLogResponse">
+        <constructor>
+            <idArg column="id" javaType="Long" />
+            <arg column="at" javaType="String" />
+            <arg column="reporter" javaType="String" />
+            <arg column="approver" javaType="String" />
+            <arg column="action" javaType="String" />
+            <arg column="target" javaType="String" />
+            <arg column="detail" javaType="String" />
+        </constructor>
+    </resultMap>
+
+    <select id="findApprovedAuditLogs" resultType="com.esg.platform.domain.auditlog.dto.AuditLogResponse">
+        SELECT 
+            a.id,
+            TO_CHAR(a.performed_at, 'YYYY-MM-DD HH24:MI:SS') AS "at",
+            
+            -- ① 보고자 실명 매핑
+            COALESCE(
+                (SELECT name FROM users WHERE id = CAST(a.new_values ->> 'input_user_id' AS INT)),
+                '담당자'
+            ) AS "reporter",
+            
+            -- ② 최종 결재 승인권자 실명 매핑
+            COALESCE(
+                (SELECT name FROM users WHERE id = CAST(a.new_values ->> 'approver_user_id' AS INT)),
+                '최종 승인자'
+            ) AS "approver",
+            
+            '최종승인확정' AS "action",
+            COALESCE(
+                (SELECT title FROM esg_indicators WHERE id = CAST(a.new_values ->> 'indicator_id' AS INT)),
+                '미식별 지표'
+            ) AS "target",
+            CONCAT(
+                '[', 
+                COALESCE((SELECT facility_name FROM company_facilities WHERE id = CAST(a.new_values ->> 'facility_id' AS INT)), '본사공통'),
+                '] ',
+                a.new_values ->> 'reporting_year', '년 ',
+                
+                /* 💡 [정합성 마감] 자바 이넘 대문자 문자열 명세와 100% 매칭되도록 TRIM 및 UPPER 안전 가공 */
+                CASE 
+                    WHEN UPPER(TRIM(a.new_values ->> 'period_type')) = 'YEARLY' THEN '연간'
+                    WHEN UPPER(TRIM(a.new_values ->> 'period_type')) = 'QUARTERLY' THEN CONCAT(a.new_values ->> 'period_value', '분기')
+                    WHEN UPPER(TRIM(a.new_values ->> 'period_type')) = 'HALFYEARLY' THEN CONCAT(a.new_values ->> 'period_value', '반기')
+                    ELSE CONCAT(a.new_values ->> 'period_value', '월')
+                END,
+                ' 실적 최종 공시 확정 (확정 수치: ',
+                a.new_values ->> 'numerical_value',
+                ')'
+            ) AS "detail"
+        FROM audit_logs a
+        WHERE a.table_name = 'esg_metric_data'
+          AND (a.new_values ->> 'status') = 'APPROVED'
+          AND (a.new_values ->> 'approver_user_id') IS NOT NULL
+          AND a.old_values IS NOT NULL
+          AND (a.old_values ->> 'status') IS DISTINCT FROM 'APPROVED'
+        ORDER BY a.performed_at DESC
+    </select>
+</mapper>
