@@ -19,7 +19,7 @@ const latestByCode = (metrics, codes) =>
 const formatValue = (metric) => 
   `${Number(metric.value || 0).toLocaleString("ko-KR", { maximumFractionDigits: 2 })} ${metric.unit || ''}`;
 
-// 💡 1. 복사 전용 SVG 아이콘 컴포넌트
+// 💡 1. 복사 전용 SVG 아이콘 컴포넌트 
 const CopyIcon = ({ onClick }) => (
   <svg 
     onClick={onClick}
