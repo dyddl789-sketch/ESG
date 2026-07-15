@@ -77,7 +77,9 @@ public class SecurityConfig {
                                 "/api/auth/email-verifications/send",
                                 "/api/auth/email-verifications/confirm",
                                 "/api/auth/logout",
-                                "/api/files/upload"
+                                "/api/files/upload",
+                                "/api/document-analysis/helper",
+                                "/api/document-analysis/submit"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/auth/config",
