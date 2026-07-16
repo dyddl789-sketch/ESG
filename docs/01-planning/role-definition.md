@@ -1,19 +1,19 @@
-# 사용자 권한
+# 사용자 권한 정의
 작성자·승인자·조회자를 분리해 데이터 신뢰성을 확보
 
-## 기업 ESG 관리자 (COMPANY_MANAGER)
+## `기업 ESG 관리자` ― COMPANY_MANAGER
 **데이터 작성·수정·승인 요청**<br>
 - 원천 데이터 수집/검토
 - 증빙 등록 및 AI 분석
 - 승인 요청 및 반려 데이터 재처리
 
-## 시스템 총괄 관리자 (SYSTEM_ADMIN)
+## `시스템 총괄 관리자` ― SYSTEM_ADMIN
 **최종 승인·반려·시스템 관리**
 - 승인 대기 데이터 검토
 - 최종 승인 또는 반려
 - 기업·사용자·지표·연동 상태 관리
 
-## 일반 사용자 (EXTERNAL_USER)
+## `일반 사용자` ― EXTERNAL_USER
 **승인 완료 데이터 조회**
 - 승인된 ESG 실적 조회
 - 공개 대시보드 및 보고서 확인
@@ -21,5 +21,5 @@
 
 ## 운영 원칙
 > COMPANY_MANAGER가 데이터를 작성·수정하고,<br>
-> SYSTEM_ADMIN이 최종 승인합니다. <br>
+> SYSTEM_ADMIN이 최종 승인합니다.<br>
 > EXTERNAL_USER는 APPROVED 데이터만 조회합니다.
