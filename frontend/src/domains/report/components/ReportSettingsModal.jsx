@@ -48,8 +48,11 @@ export default function ReportSettingsModal({
             <label style={{ display: "flex", flexDirection: "column", gap: "8px", flex: 1 }}>
               <span style={{ fontWeight: "600", fontSize: "14px" }}>보고 범위</span>
               <select value={builderState.scope} onChange={(e) => builderState.setScope(e.target.value)} style={{ padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px" }}>
-                <option value="전체 사업장">전체 사업장</option>
-                <option value="부산공장">부산공장</option>
+                {builderState.scopesList?.map((scopeOption, index) => (
+                  <option key={index} value={scopeOption}>
+                    {scopeOption}
+                  </option>
+                ))}
               </select>
             </label>
           </div>

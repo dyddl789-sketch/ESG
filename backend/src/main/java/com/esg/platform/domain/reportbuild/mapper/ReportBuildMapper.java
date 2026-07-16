@@ -19,4 +19,6 @@ public interface ReportBuildMapper {
     
     int updateReportPublicStatus(@Param("id") Long id, @Param("isPublic") Boolean isPublic);
     int deleteGeneratedReport(@Param("id") Long id);
+
+    List<String> selectFacilityNamesByCompanyId(@Param("companyId") Long companyId);
 }

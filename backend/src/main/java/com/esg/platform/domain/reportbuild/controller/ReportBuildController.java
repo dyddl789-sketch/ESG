@@ -44,6 +44,14 @@ public class ReportBuildController {
         return ResponseEntity.ok(reportService.getTemplates());
     }
 
+    @GetMapping("/facilities")
+    public ResponseEntity<List<String>> getFacilities() {
+        // Spring Security ContextHolder를 통한 유저의 소속 회사 ID 획득 로직으로 대체
+        Long currentCompanyId = 1L; 
+        System.out.println("[ReportBuildController] 사업장 목록 반환 API가 호출되었습니다.");
+        return ResponseEntity.ok(reportService.getFacilities(currentCompanyId));
+    }
+
     // 관리자용 작성 이력 아카이브 조회
     @GetMapping
     public ResponseEntity<List<ReportBuildResponse>> getGeneratedReports() {

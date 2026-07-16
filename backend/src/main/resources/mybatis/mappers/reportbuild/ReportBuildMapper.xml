@@ -55,4 +55,11 @@
         WHERE id = #{id}
     </update>
 
+    <select id="selectFacilityNamesByCompanyId" resultType="java.lang.String">
+        SELECT facility_name
+        FROM company_facilities
+        WHERE company_id = #{companyId}
+        ORDER BY id ASC
+    </select>
+
 </mapper>
