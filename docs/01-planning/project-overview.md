@@ -7,27 +7,13 @@ ESG의 의미와 데이터 관리 시스템으로 구현한 방향
 
 > #### **ESG 관리는 단순 보고서 작성이 아니라, 기업의 환경·사회·거버넌스 활동을 "측정 가능한 데이터"로 남기고 검증하는 과정입니다.**
 
-
-<table>
-  <thead>
-    <tr>
-      <th align="center">원천 데이터</th>
-      <th align="center">월별 수집</th>
-      <th align="center">검증/AI</th>
-      <th align="center">승인</th>
-      <th align="center">공개</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td align="left">EMS·인사·안전·그룹웨어</td>
-      <td align="left">사업장·월 기준 데이터 정리</td>
-      <td align="left">누락·이상치·증빙 확인</td>
-      <td align="left">관리자 최종 승인/반려</td>
-      <td align="left">대시보드·보고서 반영</td>
-    </tr>
-  </tbody>
-</table>
+```mermaid
+graph LR;
+    A["`**원천 데이터**<br/>EMS·인사·안전·그룹웨어`"] --> B["`**월별 수집**<br/>사업장·월 기준 데이터 정리`"]
+    B["`**월별 수집**<br/>사업장·월 기준 데이터 정리`"] --> C["`**검증/AI**<br/>누락·이상치·증빙 확인`"]
+    C["`**검증/AI**<br/>누락·이상치·증빙 확인`"] --> D["`**승인**<br/>관리자 최종 승인/반려`"]
+    D["`**승인**<br/>관리자 최종 승인/반려`"] --> E["`**공개**<br/>대시보드·보고서 반영`"]
+```
 
 > [!CAUTION]
 > 문제 정의
