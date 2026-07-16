@@ -1,0 +1,243 @@
+/* =========================================================
+   [신규 생성] metric 도메인 컴포넌트 전용 스타일
+   - MetricFilterBar / MetricDataGrid / MetricDetailPanel 등
+     신규 컴포넌트가 사용하는 클래스가 기존 스타일시트에
+     정의되어 있지 않아 화면(폼)이 깨져 보이던 문제를 해결
+   - 기존 디자인 토큰(tokens.css의 --border, --muted 등)을 재사용
+   ========================================================= */
+
+/* ---------- 필터 바 (MetricFilterBar) ---------- */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+.filter-bar .search-input {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 220px;
+  max-width: 380px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fff;
+}
+
+.filter-bar .search-input input {
+  flex: 1;
+  border: 0;
+  outline: none;
+  font-size: 12px;
+  background: transparent;
+}
+
+.filter-bar .filter-group {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-bar .filter-group select {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fff;
+  font-size: 12px;
+  color: var(--ink, #1c2a22);
+  cursor: pointer;
+}
+
+/* ---------- 데이터 그리드 (MetricDataGrid / PerformanceTable) ---------- */
+.data-grid-wrapper {
+  overflow-x: auto;
+}
+
+.data-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.data-grid th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: #f8faf9;
+  white-space: nowrap;
+}
+
+.data-grid td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.data-grid tr.clickable {
+  cursor: pointer;
+}
+
+.data-grid tr.clickable:hover {
+  background: #f3f8f5;
+}
+
+.data-grid td.empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 36px 0;
+}
+
+.data-grid .dim { color: var(--muted); }
+.data-grid .text-right { text-align: right; }
+.data-grid .text-sm { font-size: 11px; }
+.data-grid .font-medium { font-weight: 600; }
+.data-grid .font-bold { font-weight: 800; }
+.data-grid code {
+  font-size: 11px;
+  background: #f0f4f1;
+  padding: 2px 6px;
+  border-radius: 5px;
+}
+
+/* ---------- 상세 패널 (MetricDetailPanel) ---------- */
+.detail-panel {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.detail-panel section h4 {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--ink, #1c2a22);
+  border-left: 3px solid var(--green-600, #1f6b46);
+  padding-left: 8px;
+}
+
+.detail-panel .info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.detail-panel .info-grid .item {
+  padding: 10px 12px;
+  background: #f8faf9;
+  border-radius: 9px;
+}
+
+.detail-panel .info-grid .item span,
+.detail-panel .info-grid .item strong {
+  display: block;
+}
+
+.detail-panel .info-grid .item span {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.detail-panel .info-grid .item strong {
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.detail-panel .value-display {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 16px;
+  background: var(--green-50, #eef7f1);
+  border-radius: 10px;
+}
+
+.detail-panel .value-display .label {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.detail-panel .value-display .value {
+  font-size: 22px;
+  color: var(--green-800, #14532d);
+}
+
+.detail-panel .source-info {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  gap: 20px;
+}
+
+.detail-panel .source-info p { margin: 0; }
+.detail-panel .source-info span { color: var(--ink, #1c2a22); font-weight: 600; }
+
+.detail-panel .evidence-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--green-700, #1f6b46);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  border-radius: 9px;
+}
+
+.detail-panel .evidence-link:hover { background: #f3f8f5; }
+
+.detail-panel .no-data {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.detail-panel .reject-section .reject-box {
+  background: #fdf3f2;
+  border: 1px solid #f2cfcb;
+  border-radius: 9px;
+  padding: 12px 14px;
+}
+
+.detail-panel .reject-box p {
+  margin: 0;
+  font-size: 11px;
+  color: #a03a33;
+  line-height: 1.6;
+}
+
+/* ---------- 상세 페이지 우측 안내 문구 ---------- */
+.action-card .readonly,
+.action-card .approved-note {
+  margin-top: 10px;
+  font-size: 10px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  line-height: 1.5;
+}
+
+.action-card .readonly {
+  background: #fff8e8;
+  color: #8a6d1d;
+  border: 1px solid #f0e2b6;
+}
+
+.action-card .approved-note {
+  background: var(--green-50, #eef7f1);
+  color: var(--green-800, #14532d);
+  border: 1px solid #cbe5d5;
+}

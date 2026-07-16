@@ -7,6 +7,7 @@
         <id property="id" column="id"/>
         <result property="companyId" column="company_id"/>
         <result property="facilityId" column="facility_id"/>
+        <result property="indicatorId" column="indicator_id"/>
         <result property="facility" column="facility"/>
         <result property="facilityType" column="facility_type"/>
         <result property="category" column="category"/>
@@ -15,6 +16,8 @@
         <result property="title" column="title"/>
         <result property="year" column="reporting_year"/>
         <result property="period" column="period"/>
+        <result property="periodType" column="period_type"/>
+        <result property="periodValue" column="period_value"/>
         <result property="activityValue" column="activity_value"/>
         <result property="value" column="numerical_value"/>
         <result property="textValue" column="text_value"/>
@@ -23,10 +26,6 @@
         <result property="method" column="data_source_type"/>
         <result property="status" column="status"/>
         <result property="evidence" column="evidence_file_url"/>
-        <result property="aiStatus" column="ai_status"/>
-        <result property="risk" column="risk_level"/>
-        <result property="aiFinding" column="ai_summary"/>
-        <result property="aiModel" column="model_name"/>
         <result property="assignee" column="assignee"/>
         <result property="approver" column="approver"/>
         <result property="rejectReason" column="reject_reason"/>
@@ -50,6 +49,7 @@
             m.id,
             m.company_id,
             m.facility_id,
+            m.indicator_id,
             COALESCE(f.facility_name, '기업 전체') AS facility,
             f.facility_type,
             i.category::text AS category,
@@ -57,20 +57,17 @@
             i.indicator_code,
             i.title,
             m.reporting_year,
-            LPAD(m.period_value::text, 2, '0') AS month_value,
+            m.period_type::text AS period_type,
+            m.period_value,
             m.reporting_year || '-' || LPAD(m.period_value::text, 2, '0') AS period,
             m.activity_value,
             m.numerical_value,
             m.text_value,
             i.unit,
-            COALESCE(m.additional_info ->> 'sourceSystem', m.data_source_type) AS source,
+            COALESCE(m.additional_info -&gt;&gt; 'sourceSystem', m.data_source_type) AS source,
             m.data_source_type,
             m.status::text AS status,
             m.evidence_file_url,
-            COALESCE(ai.analysis_status, 'WAITING') AS ai_status,
-            COALESCE(ai.risk_level, 'LOW') AS risk_level,
-            ai.summary AS ai_summary,
-            ai.model_name,
             input_user.name AS assignee,
             approver.name AS approver,
             m.reject_reason,
@@ -82,7 +79,6 @@
         LEFT JOIN company_facilities f ON f.id = m.facility_id
         LEFT JOIN users input_user ON input_user.id = m.input_user_id
         LEFT JOIN users approver ON approver.id = m.approver_user_id
-        LEFT JOIN esg_ai_analyses ai ON ai.metric_data_id = m.id
     </sql>
 
     <select id="findMetrics" resultMap="MetricMap">
@@ -123,29 +119,73 @@
         ORDER BY h.acted_at DESC, h.id DESC
     </select>
 
-    <insert id="upsertAiAnalysis">
-        INSERT INTO esg_ai_analyses (
-            metric_data_id, analysis_status, risk_level, summary, findings,
-            model_name, analyzed_by, analyzed_at, updated_at
+    <select id="findEntityById" resultType="com.esg.platform.domain.metric.entity.EsgMetricData">
+        SELECT id, company_id, facility_id, indicator_id, reporting_year, period_type,
+               period_value, activity_value, energy_cost, toe_value, peak_demand_kw,
+               emission_factor_id, numerical_value, text_value, evidence_file_url,
+               status, data_source_type, input_user_id, approver_user_id, reject_reason,
+               hash_signature, additional_info::text AS additional_info, created_at, updated_at
+        FROM esg_metric_data
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insertMetricData" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO esg_metric_data (
+            company_id, facility_id, indicator_id, reporting_year, period_type, period_value,
+            numerical_value, text_value, evidence_file_url, status, data_source_type, input_user_id
         ) VALUES (
-            #{metricId}, #{status}, #{riskLevel}, #{summary}, CAST(#{findings} AS jsonb),
-            #{modelName}, #{userId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            #{companyId}, #{facilityId}, #{indicatorId}, #{reportingYear},
+            CAST(#{periodType} AS period_type_enum), #{periodValue}, #{numericalValue},
+            #{textValue}, #{evidenceFileUrl}, CAST(#{status} AS data_status_enum),
+            #{dataSourceType}, #{inputUserId}
         )
-        ON CONFLICT (metric_data_id) DO UPDATE
-        SET analysis_status = EXCLUDED.analysis_status,
-            risk_level = EXCLUDED.risk_level,
-            summary = EXCLUDED.summary,
-            findings = EXCLUDED.findings,
-            model_name = EXCLUDED.model_name,
-            analyzed_by = EXCLUDED.analyzed_by,
-            analyzed_at = CURRENT_TIMESTAMP,
-            updated_at = CURRENT_TIMESTAMP
     </insert>
+
+    <update id="updateMetricData">
+        UPDATE esg_metric_data
+        SET indicator_id = #{indicatorId},
+            facility_id = #{facilityId},
+            reporting_year = #{reportingYear},
+            period_type = CAST(#{periodType} AS period_type_enum),
+            period_value = #{periodValue},
+            numerical_value = #{numericalValue},
+            text_value = #{textValue},
+            evidence_file_url = #{evidenceFileUrl},
+            status = CAST(#{status} AS data_status_enum),
+            input_user_id = #{inputUserId},
+            approver_user_id = NULL,
+            reject_reason = #{rejectReason},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteRejectedMetric">
+        DELETE FROM esg_metric_data
+        WHERE id = #{id} AND status = 'REJECTED'
+    </delete>
+
+    <select id="findActiveIndicators" resultType="com.esg.platform.domain.metric.dto.IndicatorResponse">
+        SELECT id, category, sub_category AS subCategory, indicator_code AS indicatorCode,
+               title, value_type AS valueType, unit
+        FROM esg_indicators
+        WHERE is_active = TRUE
+        ORDER BY category, indicator_code
+    </select>
+
+    <select id="findIndicatorIdByCode" resultType="int">
+        SELECT id FROM esg_indicators WHERE indicator_code = #{indicatorCode} AND is_active = TRUE
+    </select>
+
+    <select id="findHeadquartersFacilityId" resultType="int">
+        SELECT id FROM company_facilities
+        WHERE company_id = #{companyId} AND facility_type = 'HQ'
+        ORDER BY id LIMIT 1
+    </select>
 
     <update id="updateMetricStatus">
         UPDATE esg_metric_data
         SET status = CAST(#{toStatus} AS data_status_enum),
-            approver_user_id = CASE WHEN #{toStatus} = 'APPROVED' THEN #{userId} ELSE approver_user_id END,
+            approver_user_id = CASE WHEN #{toStatus} = 'APPROVED' THEN #{userId} ELSE NULL END,
             reject_reason = #{rejectReason},
             updated_at = CURRENT_TIMESTAMP
         WHERE company_id = #{companyId}
@@ -169,11 +209,6 @@
         )
     </insert>
 
-    <select id="countCompletedAi" resultType="int">
-        SELECT COUNT(*) FROM esg_ai_analyses
-        WHERE metric_data_id = #{metricId} AND analysis_status = 'COMPLETED'
-    </select>
-
     <select id="findMetricIdsForBatch" resultType="long">
         SELECT m.id
         FROM esg_metric_data m
@@ -189,146 +224,12 @@
         ORDER BY m.id
     </select>
 
-    <update id="syncEnvironmentStatus">
-        UPDATE environment_monthly_data e
-        SET approval_status = CASE
-                WHEN EXISTS (
-                    SELECT 1 FROM esg_metric_data m
-                    JOIN esg_indicators i ON i.id = m.indicator_id
-                    WHERE m.company_id = e.company_id AND m.facility_id = e.facility_id
-                      AND m.reporting_year = SUBSTRING(e.base_period, 1, 4)::INT
-                      AND m.period_value = SUBSTRING(e.base_period, 6, 2)::INT
-                      AND i.category = 'ENVIRONMENT' AND m.status = 'REJECTED'
-                ) THEN 'REJECTED'
-                WHEN NOT EXISTS (
-                    SELECT 1 FROM esg_metric_data m
-                    JOIN esg_indicators i ON i.id = m.indicator_id
-                    WHERE m.company_id = e.company_id AND m.facility_id = e.facility_id
-                      AND m.reporting_year = SUBSTRING(e.base_period, 1, 4)::INT
-                      AND m.period_value = SUBSTRING(e.base_period, 6, 2)::INT
-                      AND i.category = 'ENVIRONMENT' AND m.status != 'APPROVED'
-                ) THEN 'APPROVED'
-                WHEN EXISTS (
-                    SELECT 1 FROM esg_metric_data m
-                    JOIN esg_indicators i ON i.id = m.indicator_id
-                    WHERE m.company_id = e.company_id AND m.facility_id = e.facility_id
-                      AND m.reporting_year = SUBSTRING(e.base_period, 1, 4)::INT
-                      AND m.period_value = SUBSTRING(e.base_period, 6, 2)::INT
-                      AND i.category = 'ENVIRONMENT' AND m.status = 'PENDING'
-                ) THEN 'PENDING'
-                ELSE 'DRAFT'
-            END,
-            approved_at = CASE WHEN NOT EXISTS (
-                SELECT 1 FROM esg_metric_data m
-                JOIN esg_indicators i ON i.id = m.indicator_id
-                WHERE m.company_id = e.company_id AND m.facility_id = e.facility_id
-                  AND m.reporting_year = SUBSTRING(e.base_period, 1, 4)::INT
-                  AND m.period_value = SUBSTRING(e.base_period, 6, 2)::INT
-                  AND i.category = 'ENVIRONMENT' AND m.status != 'APPROVED'
-            ) THEN CURRENT_TIMESTAMP ELSE NULL END,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE e.company_id = #{companyId} AND e.facility_id = #{facilityId} AND e.base_period = #{period}
-    </update>
-
-    <update id="syncSocialStatus">
-        UPDATE social_monthly_data s
-        SET approval_status = CASE
-                WHEN EXISTS (
-                    SELECT 1 FROM esg_metric_data m
-                    JOIN esg_indicators i ON i.id = m.indicator_id
-                    WHERE m.company_id = s.company_id AND m.facility_id = s.facility_id
-                      AND m.reporting_year = SUBSTRING(s.base_period, 1, 4)::INT
-                      AND m.period_value = SUBSTRING(s.base_period, 6, 2)::INT
-                      AND i.category = 'SOCIAL' AND m.status = 'REJECTED'
-                ) THEN 'REJECTED'
-                WHEN NOT EXISTS (
-                    SELECT 1 FROM esg_metric_data m
-                    JOIN esg_indicators i ON i.id = m.indicator_id
-                    WHERE m.company_id = s.company_id AND m.facility_id = s.facility_id
-                      AND m.reporting_year = SUBSTRING(s.base_period, 1, 4)::INT
-                      AND m.period_value = SUBSTRING(s.base_period, 6, 2)::INT
-                      AND i.category = 'SOCIAL' AND m.status != 'APPROVED'
-                ) THEN 'APPROVED'
-                WHEN EXISTS (
-                    SELECT 1 FROM esg_metric_data m
-                    JOIN esg_indicators i ON i.id = m.indicator_id
-                    WHERE m.company_id = s.company_id AND m.facility_id = s.facility_id
-                      AND m.reporting_year = SUBSTRING(s.base_period, 1, 4)::INT
-                      AND m.period_value = SUBSTRING(s.base_period, 6, 2)::INT
-                      AND i.category = 'SOCIAL' AND m.status = 'PENDING'
-                ) THEN 'PENDING'
-                ELSE 'DRAFT'
-            END,
-            approved_at = CASE WHEN NOT EXISTS (
-                SELECT 1 FROM esg_metric_data m
-                JOIN esg_indicators i ON i.id = m.indicator_id
-                WHERE m.company_id = s.company_id AND m.facility_id = s.facility_id
-                  AND m.reporting_year = SUBSTRING(s.base_period, 1, 4)::INT
-                  AND m.period_value = SUBSTRING(s.base_period, 6, 2)::INT
-                  AND i.category = 'SOCIAL' AND m.status != 'APPROVED'
-            ) THEN CURRENT_TIMESTAMP ELSE NULL END,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE s.company_id = #{companyId} AND s.facility_id = #{facilityId} AND s.base_period = #{period}
-    </update>
-
-    <update id="syncGovernanceStatus">
-        UPDATE governance_monthly_data g
-        SET approval_status = CASE
-                WHEN EXISTS (
-                    SELECT 1 FROM esg_metric_data m
-                    JOIN esg_indicators i ON i.id = m.indicator_id
-                    WHERE m.company_id = g.company_id
-                      AND m.reporting_year = SUBSTRING(g.base_period, 1, 4)::INT
-                      AND m.period_value = SUBSTRING(g.base_period, 6, 2)::INT
-                      AND i.category = 'GOVERNANCE' AND m.status = 'REJECTED'
-                ) THEN 'REJECTED'
-                WHEN NOT EXISTS (
-                    SELECT 1 FROM esg_metric_data m
-                    JOIN esg_indicators i ON i.id = m.indicator_id
-                    WHERE m.company_id = g.company_id
-                      AND m.reporting_year = SUBSTRING(g.base_period, 1, 4)::INT
-                      AND m.period_value = SUBSTRING(g.base_period, 6, 2)::INT
-                      AND i.category = 'GOVERNANCE' AND m.status != 'APPROVED'
-                ) THEN 'APPROVED'
-                WHEN EXISTS (
-                    SELECT 1 FROM esg_metric_data m
-                    JOIN esg_indicators i ON i.id = m.indicator_id
-                    WHERE m.company_id = g.company_id
-                      AND m.reporting_year = SUBSTRING(g.base_period, 1, 4)::INT
-                      AND m.period_value = SUBSTRING(g.base_period, 6, 2)::INT
-                      AND i.category = 'GOVERNANCE' AND m.status = 'PENDING'
-                ) THEN 'PENDING'
-                ELSE 'DRAFT'
-            END,
-            approved_at = CASE WHEN NOT EXISTS (
-                SELECT 1 FROM esg_metric_data m
-                JOIN esg_indicators i ON i.id = m.indicator_id
-                WHERE m.company_id = g.company_id
-                  AND m.reporting_year = SUBSTRING(g.base_period, 1, 4)::INT
-                  AND m.period_value = SUBSTRING(g.base_period, 6, 2)::INT
-                  AND i.category = 'GOVERNANCE' AND m.status != 'APPROVED'
-            ) THEN CURRENT_TIMESTAMP ELSE NULL END,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE g.company_id = #{companyId} AND g.base_period = #{period}
-    </update>
-
-    <select id="isPeriodFullyApproved" resultType="boolean">
-        SELECT
-            EXISTS (SELECT 1 FROM environment_monthly_data WHERE company_id = #{companyId} AND base_period = #{period})
-            AND EXISTS (SELECT 1 FROM social_monthly_data WHERE company_id = #{companyId} AND base_period = #{period})
-            AND EXISTS (SELECT 1 FROM governance_monthly_data WHERE company_id = #{companyId} AND base_period = #{period})
-            AND NOT EXISTS (
-                SELECT 1 FROM environment_monthly_data
-                WHERE company_id = #{companyId} AND base_period = #{period} AND approval_status != 'APPROVED'
-            )
-            AND NOT EXISTS (
-                SELECT 1 FROM social_monthly_data
-                WHERE company_id = #{companyId} AND base_period = #{period} AND approval_status != 'APPROVED'
-            )
-            AND NOT EXISTS (
-                SELECT 1 FROM governance_monthly_data
-                WHERE company_id = #{companyId} AND base_period = #{period} AND approval_status != 'APPROVED'
-            )
+    <select id="countApprovedForPeriod" resultType="int">
+        SELECT COUNT(*) FROM esg_metric_data
+        WHERE company_id = #{companyId}
+          AND reporting_year = SUBSTRING(#{period}, 1, 4)::INT
+          AND period_value = SUBSTRING(#{period}, 6, 2)::INT
+          AND status = 'APPROVED'
     </select>
 
     <select id="findScoreValues" resultType="com.esg.platform.domain.metric.dto.MetricScoreValueDto">
@@ -342,13 +243,6 @@
           AND m.period_value = SUBSTRING(#{period}, 6, 2)::INT
           AND m.status = 'APPROVED'
         GROUP BY i.indicator_code
-    </select>
-
-    <select id="findEnvironmentIntensity" resultType="java.math.BigDecimal">
-        SELECT SUM(e.electricity_usage_kwh) / NULLIF(SUM(e.production_ton), 0)
-        FROM environment_monthly_data e
-        WHERE e.company_id = #{companyId} AND e.base_period = #{period}
-          AND e.approval_status = 'APPROVED'
     </select>
 
     <select id="findPreviousApprovedTotal" resultType="java.math.BigDecimal">

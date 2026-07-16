@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./app/providers/AuthProvider";
 import { DemoDataProvider } from "./app/providers/DemoDataProvider";
+import { EsgDataProvider } from "./app/providers/EsgDataProvider";
 import { RealtimeProvider } from "./app/providers/RealtimeProvider";
 import "./shared/chart/registerChart";
 import "./styles/index.css";
@@ -14,7 +15,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <AuthProvider>
         <RealtimeProvider>
           <DemoDataProvider>
-            <App />
+            <EsgDataProvider>
+              <App />
+            </EsgDataProvider>
           </DemoDataProvider>
         </RealtimeProvider>
       </AuthProvider>

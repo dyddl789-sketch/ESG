@@ -11,19 +11,45 @@ import com.esg.platform.domain.dashboard.dto.DashboardScoreDto;
 
 @Mapper
 public interface DashboardMapper {
-    DashboardScoreDto findLatestScore(@Param("companyId") Long companyId, @Param("year") int year);
+    DashboardScoreDto findScore(
+            @Param("companyId") Long companyId,
+            @Param("year") int year,
+            @Param("month") Integer month);
 
-    List<DashboardScoreDto> findScoreTrend(@Param("companyId") Long companyId, @Param("year") int year);
+    List<DashboardScoreDto> findScoreTrend(
+            @Param("companyId") Long companyId,
+            @Param("year") int year,
+            @Param("month") Integer month);
 
-    String findLatestCollectedPeriod(@Param("companyId") Long companyId, @Param("year") int year);
+    String findApprovedPeriod(
+            @Param("companyId") Long companyId,
+            @Param("year") int year,
+            @Param("month") Integer month,
+            @Param("facilityId") Long facilityId);
 
-    String findPendingPeriod(@Param("companyId") Long companyId, @Param("year") int year);
+    String findLatestRegisteredPeriod(
+            @Param("companyId") Long companyId,
+            @Param("year") int year,
+            @Param("facilityId") Long facilityId);
 
-    int countPendingApprovals(@Param("companyId") Long companyId);
+    String findPendingPeriod(
+            @Param("companyId") Long companyId,
+            @Param("year") int year,
+            @Param("facilityId") Long facilityId);
 
-    List<DashboardKpiDto> findKpis(@Param("companyId") Long companyId, @Param("period") String period);
+    int countPendingApprovals(
+            @Param("companyId") Long companyId,
+            @Param("facilityId") Long facilityId);
 
-    List<DashboardFacilityDto> findFacilityComparison(@Param("companyId") Long companyId, @Param("period") String period);
+    List<DashboardKpiDto> findKpis(
+            @Param("companyId") Long companyId,
+            @Param("period") String period,
+            @Param("facilityId") Long facilityId);
+
+    List<DashboardFacilityDto> findFacilityComparison(
+            @Param("companyId") Long companyId,
+            @Param("period") String period,
+            @Param("facilityId") Long facilityId);
 
     String findEvaluationName(@Param("companyId") Long companyId, @Param("year") int year);
 

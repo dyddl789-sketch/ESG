@@ -12,10 +12,9 @@ export default function MetricDataGrid({ rows, onRowClick }) {
             <th>지표명</th>
             <th>사업장</th>
             <th>기준월</th>
-            <th>실제값</th>
-            <th>출처</th>
-            <th>AI 분석</th>
-            <th>위험</th>
+            <th>등록값</th>
+            <th>증빙</th>
+            <th>담당자</th>
             <th>승인 상태</th>
           </tr>
         </thead>
@@ -28,13 +27,12 @@ export default function MetricDataGrid({ rows, onRowClick }) {
               <td><strong>{row.facility}</strong><small className="cell-sub">{row.category === "GOVERNANCE" ? "기업·본사 기준" : "사업장 기준"}</small></td>
               <td>{row.period}</td>
               <td><strong>{row.value === null || row.value === undefined ? row.textValue || "-" : formatNumber(row.value, 2)}</strong> <small>{row.value === null || row.value === undefined ? "" : row.unit}</small></td>
-              <td>{row.source || row.method || "-"}</td>
-              <td><StatusBadge status={row.aiStatus} label={row.aiStatus === "COMPLETED" ? "분석 완료" : "미분석"} /></td>
-              <td><StatusBadge status={row.risk} label={row.risk === "HIGH" ? "높음" : row.risk === "MEDIUM" ? "보통" : "낮음"} /></td>
+              <td>{row.evidence ? "PDF 등록" : "미등록"}</td>
+              <td>{row.assignee || "-"}</td>
               <td><StatusBadge status={row.status} /></td>
             </tr>
           ))}
-          {rows.length === 0 && <tr><td colSpan={10} className="empty-cell">조건에 맞는 ESG 지표가 없습니다.</td></tr>}
+          {rows.length === 0 && <tr><td colSpan={9} className="empty-cell">조건에 맞는 ESG 데이터가 없습니다.</td></tr>}
         </tbody>
       </table>
     </div>

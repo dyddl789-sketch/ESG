@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import PageHeader from "../../../shared/components/PageHeader";
+import Card from "../../../shared/components/Card";
 import Button from "../../../shared/components/Button";
 import StatusBadge from "../../../shared/components/StatusBadge";
 import MetricDetailPanel from "../../metric/components/MetricDetailPanel";
@@ -23,7 +24,7 @@ export default function ApprovalDetailPage() {
     finally { setLoading(false); }
   }, [metricId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
   const approve = async () => {
     const result = await Swal.fire({ title: "최종 승인", text: "승인된 데이터는 확정값과 내부 ESG 관리지수 계산에 반영됩니다.", icon: "warning", showCancelButton: true, confirmButtonText: "최종 승인", cancelButtonText: "취소" });

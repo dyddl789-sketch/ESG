@@ -24,7 +24,11 @@ public class DashboardController {
 
     @GetMapping("/summary")
     public ApiResponse<DashboardSummaryDto> getSummary(
-            @RequestParam(name = "year", required = false) Integer year) {
-        return ApiResponse.ok(dashboardService.getSummary(year == null ? Year.now().getValue() : year));
+            @RequestParam(name = "year", required = false) Integer year,
+            @RequestParam(name = "month", required = false) Integer month,
+            @RequestParam(name = "facilityId", required = false) Long facilityId) {
+        int resolvedYear = year == null ? Year.now().getValue() : year;
+        Integer resolvedMonth = month != null && month >= 1 && month <= 12 ? month : null;
+        return ApiResponse.ok(dashboardService.getSummary(resolvedYear, resolvedMonth, facilityId));
     }
 }

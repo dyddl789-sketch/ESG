@@ -7,9 +7,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import lombok.Data;
 
-@Data
 public class FacilityDto {
     private Long id;
 
@@ -30,9 +28,43 @@ public class FacilityDto {
     @JsonProperty("contract_power_kw")
     private Double contractPowerKw;
 
+    @Size(max = 100, message = "담당자명은 100자 이하여야 합니다.")
+    @JsonProperty("manager_name")
+    private String managerName;
+
+    @Size(max = 50, message = "담당자 연락처는 50자 이하여야 합니다.")
+    @JsonProperty("manager_phone")
+    private String managerPhone;
+
+    @JsonProperty("is_active")
+    private Boolean active;
+
     @JsonProperty("created_at")
     private OffsetDateTime createdAt;
 
     private Double latitude;
     private Double longitude;
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getFacilityName() { return facilityName; }
+    public void setFacilityName(String facilityName) { this.facilityName = facilityName; }
+    public String getFacilityType() { return facilityType; }
+    public void setFacilityType(String facilityType) { this.facilityType = facilityType; }
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
+    public Double getContractPowerKw() { return contractPowerKw; }
+    public void setContractPowerKw(Double contractPowerKw) { this.contractPowerKw = contractPowerKw; }
+    public String getManagerName() { return managerName; }
+    public void setManagerName(String managerName) { this.managerName = managerName; }
+    public String getManagerPhone() { return managerPhone; }
+    public void setManagerPhone(String managerPhone) { this.managerPhone = managerPhone; }
+    public Boolean getActive() { return active; }
+    public void setActive(Boolean active) { this.active = active; }
+    public OffsetDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
+    public Double getLatitude() { return latitude; }
+    public void setLatitude(Double latitude) { this.latitude = latitude; }
+    public Double getLongitude() { return longitude; }
+    public void setLongitude(Double longitude) { this.longitude = longitude; }
 }

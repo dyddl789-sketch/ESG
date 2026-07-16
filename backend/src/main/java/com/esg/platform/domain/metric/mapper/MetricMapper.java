@@ -6,9 +6,11 @@ import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import com.esg.platform.domain.metric.dto.IndicatorResponse;
 import com.esg.platform.domain.metric.dto.MetricDto;
 import com.esg.platform.domain.metric.dto.MetricHistoryDto;
 import com.esg.platform.domain.metric.dto.MetricScoreValueDto;
+import com.esg.platform.domain.metric.entity.EsgMetricData;
 
 @Mapper
 public interface MetricMapper {
@@ -25,16 +27,21 @@ public interface MetricMapper {
 
     MetricDto findById(@Param("companyId") Long companyId, @Param("id") Long id);
 
+    EsgMetricData findEntityById(@Param("id") Long id);
+
     List<MetricHistoryDto> findHistory(@Param("metricId") Long metricId);
 
-    int upsertAiAnalysis(
-            @Param("metricId") Long metricId,
-            @Param("status") String status,
-            @Param("riskLevel") String riskLevel,
-            @Param("summary") String summary,
-            @Param("findings") String findings,
-            @Param("modelName") String modelName,
-            @Param("userId") Long userId);
+    int insertMetricData(EsgMetricData data);
+
+    int updateMetricData(EsgMetricData data);
+
+    int deleteRejectedMetric(@Param("id") Long id);
+
+    List<IndicatorResponse> findActiveIndicators();
+
+    Integer findIndicatorIdByCode(@Param("indicatorCode") String indicatorCode);
+
+    Integer findHeadquartersFacilityId(@Param("companyId") Long companyId);
 
     int updateMetricStatus(
             @Param("companyId") Long companyId,
@@ -52,33 +59,15 @@ public interface MetricMapper {
             @Param("comment") String comment,
             @Param("userId") Long userId);
 
-    int countCompletedAi(@Param("metricId") Long metricId);
-
     List<Long> findMetricIdsForBatch(
             @Param("companyId") Long companyId,
             @Param("period") String period,
             @Param("category") String category,
             @Param("statuses") List<String> statuses);
 
-    int syncEnvironmentStatus(
-            @Param("companyId") Long companyId,
-            @Param("facilityId") Long facilityId,
-            @Param("period") String period);
-
-    int syncSocialStatus(
-            @Param("companyId") Long companyId,
-            @Param("facilityId") Long facilityId,
-            @Param("period") String period);
-
-    int syncGovernanceStatus(
-            @Param("companyId") Long companyId,
-            @Param("period") String period);
-
-    boolean isPeriodFullyApproved(@Param("companyId") Long companyId, @Param("period") String period);
+    int countApprovedForPeriod(@Param("companyId") Long companyId, @Param("period") String period);
 
     List<MetricScoreValueDto> findScoreValues(@Param("companyId") Long companyId, @Param("period") String period);
-
-    BigDecimal findEnvironmentIntensity(@Param("companyId") Long companyId, @Param("period") String period);
 
     BigDecimal findPreviousApprovedTotal(
             @Param("companyId") Long companyId,

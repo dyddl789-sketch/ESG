@@ -25,35 +25,38 @@ public class DashboardService {
 
     private final DashboardMapper dashboardMapper;
 
-    public DashboardSummaryDto getSummary(int year) {
-        DashboardScoreDto latestScore = dashboardMapper.findLatestScore(COMPANY_ID, year);
-        String latestApprovedPeriod = latestScore == null ? null : latestScore.getPeriod();
-        List<DashboardKpiDto> kpis = latestApprovedPeriod == null
+    public DashboardSummaryDto getSummary(int year, Integer month, Long facilityId) {
+        String approvedPeriod = dashboardMapper.findApprovedPeriod(COMPANY_ID, year, month, facilityId);
+        DashboardScoreDto score = approvedPeriod == null
+                ? null
+                : dashboardMapper.findScore(COMPANY_ID, year, month == null
+                        ? Integer.valueOf(approvedPeriod.substring(5, 7))
+                        : month);
+        List<DashboardKpiDto> kpis = approvedPeriod == null
                 ? List.of()
-                : dashboardMapper.findKpis(COMPANY_ID, latestApprovedPeriod);
+                : dashboardMapper.findKpis(COMPANY_ID, approvedPeriod, facilityId);
         for (DashboardKpiDto kpi : kpis) {
             kpi.setChangeRate(calculateChange(kpi.getValue(), kpi.getPreviousValue()));
         }
 
         DashboardSummaryDto result = new DashboardSummaryDto(
                 year,
-                latestApprovedPeriod,
-                dashboardMapper.findLatestCollectedPeriod(COMPANY_ID, year),
-                dashboardMapper.findPendingPeriod(COMPANY_ID, year),
-                dashboardMapper.countPendingApprovals(COMPANY_ID),
-                latestScore,
-                dashboardMapper.findScoreTrend(COMPANY_ID, year),
+                approvedPeriod,
+                dashboardMapper.findLatestRegisteredPeriod(COMPANY_ID, year, facilityId),
+                dashboardMapper.findPendingPeriod(COMPANY_ID, year, facilityId),
+                dashboardMapper.countPendingApprovals(COMPANY_ID, facilityId),
+                score,
+                dashboardMapper.findScoreTrend(COMPANY_ID, year, month),
                 kpis,
-                latestApprovedPeriod == null ? List.of() : dashboardMapper.findFacilityComparison(COMPANY_ID, latestApprovedPeriod),
+                approvedPeriod == null
+                        ? List.of()
+                        : dashboardMapper.findFacilityComparison(COMPANY_ID, approvedPeriod, facilityId),
                 dashboardMapper.findEvaluationName(COMPANY_ID, year),
                 dashboardMapper.findEvaluationVersion(COMPANY_ID, year),
                 dashboardMapper.findEvaluationDisclaimer(COMPANY_ID, year));
 
-        log.debug("[ESG_DASHBOARD] 대시보드 조회 year={} latestApproved={} latestCollected={} pendingPeriod={} pendingCount={}",
-                year,
-                result.latestApprovedPeriod(),
-                result.latestCollectedPeriod(),
-                result.pendingPeriod(),
+        log.debug("[ESG_DASHBOARD] 조회 year={} month={} facilityId={} approvedPeriod={} registeredPeriod={} pendingCount={}",
+                year, month, facilityId, result.latestApprovedPeriod(), result.latestCollectedPeriod(),
                 result.pendingApprovalCount());
         return result;
     }

@@ -6,9 +6,9 @@
     <resultMap id="ScoreMap" type="com.esg.platform.domain.dashboard.dto.DashboardScoreDto">
         <result property="period" column="period"/>
         <result property="totalScore" column="total_score"/>
-        <result property="eScore" column="e_score"/>
-        <result property="sScore" column="s_score"/>
-        <result property="gScore" column="g_score"/>
+        <result property="environmentScore" column="e_score"/>
+        <result property="socialScore" column="s_score"/>
+        <result property="governanceScore" column="g_score"/>
         <result property="grade" column="grade"/>
         <result property="calculatedAt" column="calculated_at"/>
     </resultMap>
@@ -49,47 +49,60 @@
                    WHEN total_score &gt;= 50 THEN 'C'
                    ELSE 'D'
                END AS grade,
-               calculated_at
+               calculated_at,
+               period_value
         FROM esg_scores
         WHERE company_id = #{companyId}
           AND reporting_year = #{year}
           AND reporting_period = 'MONTHLY'
     </sql>
 
-    <select id="findLatestScore" resultMap="ScoreMap">
+    <select id="findScore" resultMap="ScoreMap">
         <include refid="scoreSelect"/>
+        <if test="month != null">AND period_value = #{month}</if>
         ORDER BY period_value DESC
         LIMIT 1
     </select>
 
     <select id="findScoreTrend" resultMap="ScoreMap">
         <include refid="scoreSelect"/>
+        <if test="month != null">AND period_value &lt;= #{month}</if>
         ORDER BY period_value
     </select>
 
-    <select id="findLatestCollectedPeriod" resultType="string">
-        SELECT MAX(base_period)
-        FROM environment_monthly_data
-        WHERE company_id = #{companyId} AND base_period LIKE CONCAT(#{year}, '-%')
+    <select id="findApprovedPeriod" resultType="string">
+        SELECT MAX(m.reporting_year || '-' || LPAD(m.period_value::text, 2, '0'))
+        FROM esg_metric_data m
+        WHERE m.company_id = #{companyId}
+          AND m.reporting_year = #{year}
+          AND m.status = 'APPROVED'
+          <if test="month != null">AND m.period_value = #{month}</if>
+          <if test="facilityId != null">AND m.facility_id = #{facilityId}</if>
+    </select>
+
+    <select id="findLatestRegisteredPeriod" resultType="string">
+        SELECT MAX(m.reporting_year || '-' || LPAD(m.period_value::text, 2, '0'))
+        FROM esg_metric_data m
+        WHERE m.company_id = #{companyId}
+          AND m.reporting_year = #{year}
+          <if test="facilityId != null">AND m.facility_id = #{facilityId}</if>
     </select>
 
     <select id="findPendingPeriod" resultType="string">
-        SELECT MAX(base_period)
-        FROM (
-            SELECT base_period FROM environment_monthly_data
-            WHERE company_id = #{companyId} AND base_period LIKE CONCAT(#{year}, '-%') AND approval_status != 'APPROVED'
-            UNION ALL
-            SELECT base_period FROM social_monthly_data
-            WHERE company_id = #{companyId} AND base_period LIKE CONCAT(#{year}, '-%') AND approval_status != 'APPROVED'
-            UNION ALL
-            SELECT base_period FROM governance_monthly_data
-            WHERE company_id = #{companyId} AND base_period LIKE CONCAT(#{year}, '-%') AND approval_status != 'APPROVED'
-        ) pending
+        SELECT MAX(m.reporting_year || '-' || LPAD(m.period_value::text, 2, '0'))
+        FROM esg_metric_data m
+        WHERE m.company_id = #{companyId}
+          AND m.reporting_year = #{year}
+          AND m.status IN ('DRAFT', 'PENDING', 'REJECTED')
+          <if test="facilityId != null">AND m.facility_id = #{facilityId}</if>
     </select>
 
     <select id="countPendingApprovals" resultType="int">
-        SELECT COUNT(*) FROM esg_metric_data
-        WHERE company_id = #{companyId} AND status = 'PENDING'
+        SELECT COUNT(*)
+        FROM esg_metric_data
+        WHERE company_id = #{companyId}
+          AND status = 'PENDING'
+          <if test="facilityId != null">AND facility_id = #{facilityId}</if>
     </select>
 
     <select id="findKpis" resultMap="KpiMap">
@@ -104,7 +117,16 @@
               AND m.reporting_year = SUBSTRING(#{period}, 1, 4)::INT
               AND m.period_value = SUBSTRING(#{period}, 6, 2)::INT
               AND m.status = 'APPROVED'
+              <if test="facilityId != null">AND m.facility_id = #{facilityId}</if>
             GROUP BY i.category, i.indicator_code, i.title, i.unit
+        ), previous_period AS (
+            SELECT MAX(m2.reporting_year * 100 + m2.period_value) AS period_key
+            FROM esg_metric_data m2
+            WHERE m2.company_id = #{companyId}
+              AND m2.status = 'APPROVED'
+              AND (m2.reporting_year * 100 + m2.period_value)
+                  &lt; (SUBSTRING(#{period}, 1, 4)::INT * 100 + SUBSTRING(#{period}, 6, 2)::INT)
+              <if test="facilityId != null">AND m2.facility_id = #{facilityId}</if>
         ), previous_values AS (
             SELECT i.indicator_code,
                    CASE WHEN i.indicator_code IN ('IND_E_ELEC', 'IND_E_SCOPE2')
@@ -113,15 +135,9 @@
             FROM esg_metric_data m
             JOIN esg_indicators i ON i.id = m.indicator_id
             WHERE m.company_id = #{companyId}
-              AND (m.reporting_year * 100 + m.period_value) = (
-                  SELECT MAX(m2.reporting_year * 100 + m2.period_value)
-                  FROM esg_metric_data m2
-                  WHERE m2.company_id = #{companyId}
-                    AND m2.status = 'APPROVED'
-                    AND (m2.reporting_year * 100 + m2.period_value)
-                        &lt; (SUBSTRING(#{period}, 1, 4)::INT * 100 + SUBSTRING(#{period}, 6, 2)::INT)
-              )
+              AND (m.reporting_year * 100 + m.period_value) = (SELECT period_key FROM previous_period)
               AND m.status = 'APPROVED'
+              <if test="facilityId != null">AND m.facility_id = #{facilityId}</if>
             GROUP BY i.indicator_code
         )
         SELECT c.category, c.indicator_code, c.title, c.unit, c.value, p.previous_value
@@ -148,25 +164,26 @@
              AND m.status = 'APPROVED'
         LEFT JOIN esg_indicators i ON i.id = m.indicator_id
         WHERE f.company_id = #{companyId}
+          <if test="facilityId != null">AND f.id = #{facilityId}</if>
         GROUP BY f.id, f.facility_name, f.facility_type, f.address, f.facility_center
         ORDER BY CASE WHEN f.facility_type = 'HQ' THEN 0 ELSE 1 END, f.facility_name
     </select>
 
     <select id="findEvaluationName" resultType="string">
-        SELECT config_name FROM esg_evaluation_configs
-        WHERE company_id = #{companyId} AND effective_year = #{year} AND is_active = TRUE
+        SELECT evaluation_name FROM esg_evaluation_configs
+        WHERE company_id = #{companyId} AND reporting_year = #{year}
         ORDER BY id DESC LIMIT 1
     </select>
 
     <select id="findEvaluationVersion" resultType="string">
-        SELECT version FROM esg_evaluation_configs
-        WHERE company_id = #{companyId} AND effective_year = #{year} AND is_active = TRUE
+        SELECT evaluation_version FROM esg_evaluation_configs
+        WHERE company_id = #{companyId} AND reporting_year = #{year}
         ORDER BY id DESC LIMIT 1
     </select>
 
     <select id="findEvaluationDisclaimer" resultType="string">
         SELECT disclaimer FROM esg_evaluation_configs
-        WHERE company_id = #{companyId} AND effective_year = #{year} AND is_active = TRUE
+        WHERE company_id = #{companyId} AND reporting_year = #{year}
         ORDER BY id DESC LIMIT 1
     </select>
 </mapper>

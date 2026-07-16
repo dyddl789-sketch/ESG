@@ -10,6 +10,9 @@
         <result property="facilityType" column="facility_type" />
         <result property="address" column="address" />
         <result property="contractPowerKw" column="contract_power_kw" />
+        <result property="managerName" column="manager_name" />
+        <result property="managerPhone" column="manager_phone" />
+        <result property="active" column="is_active" />
         <result property="createdAt" column="created_at" />
         <result property="latitude" column="latitude" />
         <result property="longitude" column="longitude" />
@@ -21,6 +24,9 @@
         facility_type,
         address,
         contract_power_kw,
+        manager_name,
+        manager_phone,
+        is_active,
         created_at,
         ST_Y(facility_center::geometry) AS latitude,
         ST_X(facility_center::geometry) AS longitude
@@ -51,6 +57,9 @@
             facility_type,
             address,
             contract_power_kw,
+            manager_name,
+            manager_phone,
+            is_active,
             facility_center,
             created_at
         ) VALUES (
@@ -59,6 +68,9 @@
             #{dto.facilityType},
             #{dto.address},
             #{dto.contractPowerKw},
+            #{dto.managerName},
+            #{dto.managerPhone},
+            COALESCE(#{dto.active}, TRUE),
             CASE
                 WHEN #{dto.longitude} IS NOT NULL AND #{dto.latitude} IS NOT NULL
                     THEN ST_SetSRID(ST_MakePoint(#{dto.longitude}, #{dto.latitude}), 4326)
@@ -74,6 +86,9 @@
             facility_type = #{dto.facilityType},
             address = #{dto.address},
             contract_power_kw = #{dto.contractPowerKw},
+            manager_name = #{dto.managerName},
+            manager_phone = #{dto.managerPhone},
+            is_active = COALESCE(#{dto.active}, is_active),
             facility_center = CASE
                 WHEN #{dto.longitude} IS NOT NULL AND #{dto.latitude} IS NOT NULL
                     THEN ST_SetSRID(ST_MakePoint(#{dto.longitude}, #{dto.latitude}), 4326)

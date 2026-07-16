@@ -42,7 +42,7 @@ export default function ApprovalListPage() {
     }
   }, [filters.category, filters.facilityId, filters.search, period]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
   const summary = useMemo(() => ({
     total: rows.length,

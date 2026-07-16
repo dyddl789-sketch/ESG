@@ -11,6 +11,7 @@ public class MetricDto {
     private Long id;
     private Long companyId;
     private Long facilityId;
+    private Long indicatorId;
     private String facility;
     private String facilityType;
     private String category;
@@ -19,6 +20,8 @@ public class MetricDto {
     private String title;
     private Integer year;
     private String period;
+    private String periodType;
+    private Integer periodValue;
     private BigDecimal activityValue;
     private BigDecimal value;
     private String textValue;

@@ -1,50 +1,61 @@
+import { useState } from "react";
+import Swal from "sweetalert2";
 import Card from "../../../shared/components/Card";
 import StatusBadge from "../../../shared/components/StatusBadge";
-import { categoryLabel, formatDateTime, formatNumber } from "../../../shared/utils/esgFormat";
+import { fileApi } from "../../../shared/api/fileApi";
+import { apiErrorMessage, categoryLabel, formatDateTime, formatNumber } from "../../../shared/utils/esgFormat";
 
 export default function MetricDetailPanel({ metric }) {
+  const [downloading, setDownloading] = useState(false);
   const actual = metric.value === null || metric.value === undefined
     ? metric.textValue || "-"
     : `${formatNumber(metric.value, 4)} ${metric.unit || ""}`;
 
+  const downloadEvidence = async () => {
+    if (!metric.evidence || downloading) return;
+    setDownloading(true);
+    try {
+      await fileApi.download(metric.evidence);
+    } catch (error) {
+      Swal.fire("증빙 다운로드 실패", apiErrorMessage(error), "error");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="detail-main">
-      <Card title="지표 기본정보" description="영역별 ESG 반영으로 생성된 실제 DB 지표입니다.">
+      <Card title="지표 기본정보" description="ESG 데이터 관리에서 직접 등록한 사업장별 지표입니다.">
         <div className="detail-grid three">
           <div><span>ESG 영역</span><strong>{categoryLabel(metric.category)}</strong></div>
           <div><span>지표 코드</span><strong>{metric.indicatorCode}</strong></div>
           <div><span>기준월</span><strong>{metric.period}</strong></div>
           <div><span>사업장</span><strong>{metric.facility}</strong></div>
-          <div><span>원천 시스템</span><strong>{metric.source || metric.method || "-"}</strong></div>
-          <div><span>담당자</span><strong>{metric.assignee || "시스템 자동 반영"}</strong></div>
+          <div><span>등록 방식</span><strong>{metric.method === "CALCULATION" ? "계산값" : "직접 등록"}</strong></div>
+          <div><span>등록 담당자</span><strong>{metric.assignee || "-"}</strong></div>
         </div>
       </Card>
 
-      <Card title="실제값 및 검증 상태">
+      <Card title="등록값 및 승인 상태">
         <div className="metric-actual-value">
-          <div><span>현재 실제값</span><strong>{actual}</strong></div>
+          <div><span>등록값</span><strong>{actual}</strong></div>
           <div><span>승인 상태</span><StatusBadge status={metric.status} /></div>
-          <div><span>AI 위험수준</span><StatusBadge status={metric.risk} label={metric.risk === "HIGH" ? "높음" : metric.risk === "MEDIUM" ? "보통" : "낮음"} /></div>
+          <div><span>최종 승인자</span><strong>{metric.approver || "-"}</strong></div>
         </div>
+        {metric.textValue && <div className="reject-reason"><b>등록 메모</b><p>{metric.textValue}</p></div>}
         {metric.rejectReason && <div className="reject-reason"><b>반려 사유</b><p>{metric.rejectReason}</p></div>}
       </Card>
 
-      <Card title="AI 사전 분석" description="AI는 이상치와 누락 여부를 제안하며 승인 판단을 대신하지 않습니다.">
-        {metric.aiStatus === "COMPLETED" ? (
-          <div className={`ai-review-box risk-${String(metric.risk).toLowerCase()}`}>
-            <div><StatusBadge status={metric.aiStatus} label="분석 완료" /><span>{metric.aiModel || "RULE ENGINE"}</span></div>
-            <p>{metric.aiFinding || "특이사항이 없습니다."}</p>
-          </div>
-        ) : (
-          <div className="empty-state"><strong>AI 분석 전</strong><p>승인 요청 전에 AI 사전 분석을 실행해 주세요.</p></div>
-        )}
-      </Card>
-
-      <Card title="증빙자료">
+      <Card title="증빙자료" description="사업장 ESG 내역 PDF를 확인합니다.">
         <div className="file-row">
-          <span>FILE</span>
-          <div><strong>{metric.evidence || "등록된 증빙자료 없음"}</strong><small>원천 시스템 연결정보와 증빙 파일을 확인합니다.</small></div>
-          <button type="button" disabled={!metric.evidence}>원문 보기</button>
+          <span>PDF</span>
+          <div>
+            <strong>{metric.evidence ? metric.evidence.split("/").pop() : "등록된 증빙자료 없음"}</strong>
+            <small>증빙 파일은 권한 확인 후 서버에서 내려받습니다.</small>
+          </div>
+          <button type="button" disabled={!metric.evidence || downloading} onClick={downloadEvidence}>
+            {downloading ? "다운로드 중" : "증빙 다운로드"}
+          </button>
         </div>
       </Card>
 

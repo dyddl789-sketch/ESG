@@ -7,8 +7,8 @@ import Icon from "../../shared/components/Icon";
 
 const eventTitle = (event) => {
   const labels = {
-    COLLECTION_COMPLETED: "데이터 수집 완료",
-    COLLECTION_FAILED: "데이터 수집 오류",
+    COLLECTION_COMPLETED: "데이터 등록 완료",
+    COLLECTION_FAILED: "데이터 등록 오류",
     FILE_VALIDATED: "파일 검증 완료",
     FILE_UPLOAD_FAILED: "파일 업로드 오류",
     APPROVAL_STATUS_CHANGED: "승인 상태 변경",
@@ -82,7 +82,7 @@ export default function TopHeader({ collapsed }) {
               <div className="notification-head">
                 <div>
                   <strong>실시간 알림</strong>
-                  <span>수집·검증·승인 상태 변경</span>
+                  <span>등록·검토·승인 상태 변경</span>
                 </div>
                 <button type="button" onClick={clearNotifications}>모두 지우기</button>
               </div>

@@ -2,11 +2,6 @@ package com.esg.platform.global.exception;
 
 import org.springframework.http.HttpStatus;
 
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-
-@Getter
-@RequiredArgsConstructor
 public enum ErrorCode {
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "입력값을 확인해 주세요."),
     LOGIN_ID_ALREADY_EXISTS(HttpStatus.CONFLICT, "LOGIN_ID_ALREADY_EXISTS", "이미 사용 중인 로그인 아이디입니다."),
@@ -33,10 +28,29 @@ public enum ErrorCode {
     COLLECTION_ALREADY_RUNNING(HttpStatus.CONFLICT, "COLLECTION_ALREADY_RUNNING", "동일 영역의 수집 작업이 이미 실행 중입니다."),
     UNSUPPORTED_ESG_DOMAIN(HttpStatus.BAD_REQUEST, "UNSUPPORTED_ESG_DOMAIN", "지원하지 않는 ESG 영역입니다."),
     INVALID_ESG_FILE(HttpStatus.BAD_REQUEST, "INVALID_ESG_FILE", "업로드 파일을 확인해 주세요."),
+    FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "FILE_NOT_FOUND", "요청한 파일을 찾을 수 없습니다."),
     GEMINI_API_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "GEMINI_API_ERROR", "Gemini AI 분석을 처리하지 못했습니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "서버 처리 중 오류가 발생했습니다.");
 
     private final HttpStatus status;
     private final String code;
     private final String message;
+
+    ErrorCode(HttpStatus status, String code, String message) {
+        this.status = status;
+        this.code = code;
+        this.message = message;
+    }
+
+    public HttpStatus getStatus() {
+        return status;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public String getMessage() {
+        return message;
+    }
 }

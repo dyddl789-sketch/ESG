@@ -54,7 +54,7 @@ export default function PerformancePage() {
     }
   }, [search, tab, year]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
   const aggregated = useMemo(() => aggregateRows(rows, configs[tab].aggregate), [rows, tab]);
   const indicators = useMemo(() => {
@@ -63,9 +63,9 @@ export default function PerformancePage() {
     return [...map.values()];
   }, [aggregated]);
 
-  useEffect(() => {
-    if (!indicators.some((indicator) => indicator.code === selectedCode)) setSelectedCode(indicators[0]?.code || "");
-  }, [indicators, selectedCode]);
+  const activeSelectedCode = indicators.some((indicator) => indicator.code === selectedCode)
+    ? selectedCode
+    : indicators[0]?.code || "";
 
   const latestCards = useMemo(() => indicators.map((indicator) => {
     const values = aggregated.filter((row) => row.indicatorCode === indicator.code).sort((a, b) => a.period.localeCompare(b.period));
@@ -73,8 +73,8 @@ export default function PerformancePage() {
   }).filter(Boolean), [aggregated, indicators]);
 
   const selectedRows = useMemo(() => aggregated
-    .filter((row) => row.indicatorCode === selectedCode)
-    .sort((a, b) => a.period.localeCompare(b.period)), [aggregated, selectedCode]);
+    .filter((row) => row.indicatorCode === activeSelectedCode)
+    .sort((a, b) => a.period.localeCompare(b.period)), [activeSelectedCode, aggregated]);
 
   const chart = selectedRows.length ? {
     labels: selectedRows.map((row) => `${Number(row.period.slice(5))}월`),
@@ -102,7 +102,7 @@ export default function PerformancePage() {
       <Card className="filter-card" title="조회 조건" description="연도·지표·검색어로 승인 완료 실적을 조회할 수 있습니다.">
         <div className="esg-filter-grid">
           <label><span>기준연도</span><select value={year} onChange={(event) => setYear(Number(event.target.value))}><option value={2026}>2026년</option><option value={2025}>2025년</option></select></label>
-          <label><span>추이 지표</span><select value={selectedCode} onChange={(event) => setSelectedCode(event.target.value)}><option value="">전체</option>{indicators.map((indicator) => <option key={indicator.code} value={indicator.code}>{indicator.title}</option>)}</select></label>
+          <label><span>추이 지표</span><select value={activeSelectedCode} onChange={(event) => setSelectedCode(event.target.value)}><option value="">전체</option>{indicators.map((indicator) => <option key={indicator.code} value={indicator.code}>{indicator.title}</option>)}</select></label>
           <label className="filter-search"><span>검색</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="지표명·코드·사업장" /></label>
           <div className="filter-actions"><Button variant="outline" onClick={() => { setYear(2026); setSearch(""); }}>초기화</Button><Button onClick={load}>검색</Button></div>
         </div>

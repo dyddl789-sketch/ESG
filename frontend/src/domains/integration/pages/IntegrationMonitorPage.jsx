@@ -32,7 +32,7 @@ export default function IntegrationMonitorPage() {
     }
   }, [filters.domain, period]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
   const searchedRaw = useMemo(() => {
     const keyword = filters.search.trim().toLowerCase();
