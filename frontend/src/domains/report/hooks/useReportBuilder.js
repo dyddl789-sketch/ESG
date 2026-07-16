@@ -12,13 +12,26 @@ export function useReportBuilder() {
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [lastSavedTime, setLastSavedTime] = useState("");
   const [showSaveMsg, setShowSaveMsg] = useState(false);
+  const [scopesList, setScopesList] = useState(["전체 사업장"]);
 
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
-        const response = await reportApi.getTemplates();
-        const data = response.data?.data || response.data;
+        console.log("[useReportBuilder v1.2] 템플릿 및 사업장 목록 DB 병렬 조회를 시작합니다.");
+        const [tplResponse, facResponse] = await Promise.all([
+          reportApi.getTemplates(),
+          reportApi.getFacilities()
+        ]);
+        
+        const data = tplResponse.data?.data || tplResponse.data;
+        console.log("[useReportBuilder v1.2] 템플릿 데이터 세팅 완료");
         setTemplates(data);
+
+        const facData = facResponse.data?.data || facResponse.data;
+        if (facData && facData.length > 0) {
+          console.log("[useReportBuilder v1.2] DB 사업장 목록 세팅 완료:", facData);
+          setScopesList(["전체 사업장", ...facData]);
+        }
         
         const draft = localStorage.getItem("esg_report_draft");
         if (draft && data && data.length > 0) {
@@ -77,6 +90,7 @@ export function useReportBuilder() {
     title, setTitle, year, setYear, scope, setScope,
     content, setContent, isSaving, setIsSaving,
     templates, selectedTemplateId, setSelectedTemplateId,
-    lastSavedTime, showSaveMsg
+    lastSavedTime, showSaveMsg,
+    scopesList
   };
 }

@@ -77,4 +77,9 @@ public class ReportBuildService {
     public void deleteReport(Long id) {
         reportMapper.deleteGeneratedReport(id); 
     }
+
+    public List<String> getFacilities(Long companyId) {
+        System.out.println("[ReportBuildService] 회사 ID " + companyId + "의 사업장 목록 조회를 요청합니다.");
+        return reportMapper.selectFacilityNamesByCompanyId(companyId);
+    }
 }
