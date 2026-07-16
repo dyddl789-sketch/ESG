@@ -309,7 +309,7 @@ const handleFileChange = async (e) => {
                   
                   {formData.evidenceFileUrl && (() => {
                     const fileUrl = formData.evidenceFileUrl;
-                    const downloadApiUrl = /api/files/download?fileUrl=${encodeURIComponent(formData.evidenceFileUrl)};
+                    const downloadApiUrl = `/api/files/download?fileUrl=${encodeURIComponent(formData.evidenceFileUrl)}`;
 
                     const isOfficeFile = ['.xlsx', '.xls', '.docx', '.hwp'].some(ext => 
                       formData.evidenceFileUrl.toLowerCase().endsWith(ext)
