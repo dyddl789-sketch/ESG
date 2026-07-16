@@ -90,8 +90,8 @@ export default function ApprovalDetailPage() {
 
   // 💡 [전역 첨부파일 인프라 매핑 결합]
   const hasFile = !!metric.evidence;
-  const fileUrl = hasFile ? `http://localhost:8080${metric.evidence}` : "";
-  const downloadApiUrl = hasFile ? `http://localhost:8080/api/files/download?fileUrl=${encodeURIComponent(metric.evidence)}` : "";
+  const fileUrl = hasFile ? `${metric.evidence}` : "";
+  const downloadApiUrl = hasFile ? `/api/files/download?fileUrl=${encodeURIComponent(metric.evidence)}` : "";
   const isOfficeFile = hasFile && ['.xlsx', '.xls', '.docx', '.hwp'].some(ext => metric.evidence.toLowerCase().endsWith(ext));
 
   // 💡 작성자 상세 창과 100% 동일하게 일관성을 맞춘 크롬 새 탭 전용 뷰어 핸들러 함수

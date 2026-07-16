@@ -55,10 +55,17 @@ export default function MetricDetailPage() {
   const canRequest = ["DRAFT", "REJECTED", "COLLECTED"].includes(metric.status);
   const canEdit = ["DRAFT", "REJECTED"].includes(metric.status);
 
-  // 💡 [핵심 고도화] 기존 왼쪽 하단 버튼에서 호출하기 위한 공통 주소 및 분기 연산 미리 정의
+    // 💡 [핵심 고도화] 기존 왼쪽 하단 버튼에서 호출하기 위한 공통 주소 및 분기 연산 미리 정의
   const hasFile = !!metric.evidence;
-  const fileUrl = hasFile ? `http://localhost:8080${metric.evidence}` : "";
-  const downloadApiUrl = hasFile ? `http://localhost:8080/api/files/download?fileUrl=${encodeURIComponent(metric.evidence)}` : "";
+
+  // 백엔드 주소를 동적으로 결정 (환경 변수가 없으면 로컬에선 localhost, 배포 환경에선 실제 도메인 사용)
+  const backendBaseUrl = import.meta.env.VITE_BACKEND_URL 
+    || (import.meta.env.DEV ? "http://localhost:8080" : window.location.origin);
+
+  // 하드코딩된 localhost를 제거하고 동적 주소(backendBaseUrl)를 적용합니다.
+  const fileUrl = hasFile ? `${backendBaseUrl}${metric.evidence}` : "";
+  const downloadApiUrl = hasFile ? `${backendBaseUrl}/api/files/download?fileUrl=${encodeURIComponent(metric.evidence)}` : "";
+  
   const isOfficeFile = hasFile && ['.xlsx', '.xls', '.docx', '.hwp'].some(ext => metric.evidence.toLowerCase().endsWith(ext));
 
   // 💡 오피스 문서 및 PDF 계열에 따라 동적으로 알맞은 주소를 반환해주는 뷰어 링크 핸들러
