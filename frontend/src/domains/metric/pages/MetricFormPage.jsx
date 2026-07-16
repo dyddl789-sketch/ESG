@@ -308,11 +308,14 @@ const handleFileChange = async (e) => {
                   {uploading && <p style={{ fontSize: "12px", color: "#2563eb", marginTop: "5px" }}>파일을 서버에 업로드하고 있습니다...</p>}
                   
                   {formData.evidenceFileUrl && (() => {
-                    const fileUrl = formData.evidenceFileUrl;
-                    const downloadApiUrl = `/api/files/download?fileUrl=${encodeURIComponent(formData.evidenceFileUrl)}`;
+                    const backendBaseUrl = import.meta.env.VITE_BACKEND_URL 
+                      || (import.meta.env.DEV ? "http://localhost:8080" : window.location.origin);
+                    const cleanPath = formData.evidenceFileUrl.startsWith('/') ? formData.evidenceFileUrl : `/${formData.evidenceFileUrl}`;
+                    const fileUrl = `${backendBaseUrl}${cleanPath}`;
+                    const downloadApiUrl = `${backendBaseUrl}/api/files/download?fileUrl=${encodeURIComponent(cleanPath)}`;
 
                     const isOfficeFile = ['.xlsx', '.xls', '.docx', '.hwp'].some(ext => 
-                      formData.evidenceFileUrl.toLowerCase().endsWith(ext)
+                      cleanPath.toLowerCase().endsWith(ext)
                     );
 
                     return (
