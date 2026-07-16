@@ -183,7 +183,7 @@ export default function ReportBuilderPage() {
                   { key: "scope", label: "공간 범위" },
                   { key: "version", label: "공시 버전" },
                   { key: "createdAt", label: "생성 일시", render: (val) => new Date(val).toLocaleString("ko-KR") },
-                  { key: "isPublic", label: "대외공시 상태", render: (val, row) => (<Button variant={val ? "primary" : "outline"} size="small" onClick={() => historyState.handleTogglePublic(row.id, val)}>{val ? "공개 (1)" : "비공개 (0)"}</Button>)},
+                  { key: "isPublic", label: "대외공시 상태", render: (val, row) => (<Button variant={val ? "primary" : "outline"} size="small" onClick={() => historyState.handleTogglePublic(row.id, val)}>{val ? "공개" : "비공개"}</Button>)},
                   { key: "actions", label: "관리 기능", render: (_, row) => (<div style={{ display: "flex", gap: "6px" }}><Button variant="outline" size="small" onClick={() => handleEditLoad(row)}>수정</Button><Button variant="danger" size="small" onClick={() => historyState.handlePermanentDelete(row.id)}>삭제</Button></div>)}
                 ]} />
             )}
