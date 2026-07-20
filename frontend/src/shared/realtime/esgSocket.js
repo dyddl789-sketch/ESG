@@ -49,6 +49,11 @@ export const connectEsgSocket = () => {
   socket = new WebSocket(resolveUrl());
 
   socket.onopen = () => {
+    if (manualClose) {
+      socket?.close(1000, "application shutdown");
+      return;
+    }
+
     retryCount = 0;
     notify({
       type: "SOCKET_CONNECTED",
@@ -96,11 +101,19 @@ export const connectEsgSocket = () => {
 
 export const disconnectEsgSocket = () => {
   manualClose = true;
-  window.clearTimeout(retryTimer);
-  retryTimer = null;
+
+  if (retryTimer) {
+    window.clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+
   retryCount = 0;
 
-  if (socket) {
+  if (!socket) {
+    return;
+  }
+
+  if (socket.readyState === WebSocket.OPEN) {
     socket.close(1000, "application shutdown");
     socket = null;
   }

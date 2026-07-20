@@ -242,6 +242,7 @@ export default function PerformancePage() {
 
           <Card title="지표별 최종 승인 데이터" description="이 목록과 동일한 확정 실적만 리포트 빌더로 전달됩니다.">
             <DataTable
+              rowKey="indicatorCode"
               rows={categoryMetrics}
               columns={[
                 { key: "indicatorCode", label: "지표코드" },
