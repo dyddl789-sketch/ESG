@@ -35,24 +35,27 @@
         WHERE id = #{id}
     </select>
 
-    <select id="selectGeneratedReports" resultType="com.esg.platform.domain.reportbuild.entity.GeneratedReport">
-        SELECT id, company_id AS companyId, template_id AS templateId, 
+    <select id="selectGeneratedReportsByCompanyId" resultType="com.esg.platform.domain.reportbuild.entity.GeneratedReport">
+        SELECT id, company_id AS companyId, template_id AS templateId,
                target_year AS targetYear, scope, title, content, version,
                file_url AS fileUrl, is_public AS isPublic,
                generated_by AS generatedBy, created_at AS createdAt
         FROM generated_reports
+        WHERE company_id = #{companyId}
         ORDER BY created_at DESC
     </select>
 
     <delete id="deleteGeneratedReport">
-        DELETE FROM generated_reports 
+        DELETE FROM generated_reports
         WHERE id = #{id}
+          AND company_id = #{companyId}
     </delete>
 
     <update id="updateReportPublicStatus">
-        UPDATE generated_reports 
+        UPDATE generated_reports
         SET is_public = #{isPublic}
         WHERE id = #{id}
+          AND company_id = #{companyId}
     </update>
 
     <select id="selectFacilityNamesByCompanyId" resultType="java.lang.String">

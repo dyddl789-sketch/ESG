@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.esg.platform.domain.metric.mapper.MetricMapper">
+
+    <resultMap id="MetricMap" type="com.esg.platform.domain.metric.dto.MetricDto">
+        <id property="id" column="id"/>
+        <result property="companyId" column="company_id"/>
+        <result property="facilityId" column="facility_id"/>
+        <result property="indicatorId" column="indicator_id"/>
+        <result property="facility" column="facility"/>
+        <result property="facilityType" column="facility_type"/>
+        <result property="category" column="category"/>
+        <result property="subCategory" column="sub_category"/>
+        <result property="indicatorCode" column="indicator_code"/>
+        <result property="title" column="title"/>
+        <result property="year" column="reporting_year"/>
+        <result property="period" column="period"/>
+        <result property="periodType" column="period_type"/>
+        <result property="periodValue" column="period_value"/>
+        <result property="activityValue" column="activity_value"/>
+        <result property="value" column="numerical_value"/>
+        <result property="shipmentAmountMillionKrw" column="shipment_amount_million_krw"/>
+        <result property="textValue" column="text_value"/>
+        <result property="unit" column="unit"/>
+        <result property="source" column="source"/>
+        <result property="method" column="data_source_type"/>
+        <result property="status" column="status"/>
+        <result property="evidence" column="evidence_file_url"/>
+        <result property="assignee" column="assignee"/>
+        <result property="approver" column="approver"/>
+        <result property="rejectReason" column="reject_reason"/>
+        <result property="additionalInfo" column="additional_info"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <resultMap id="HistoryMap" type="com.esg.platform.domain.metric.dto.MetricHistoryDto">
+        <id property="id" column="id"/>
+        <result property="actionType" column="action_type"/>
+        <result property="fromStatus" column="from_status"/>
+        <result property="toStatus" column="to_status"/>
+        <result property="comment" column="comment"/>
+        <result property="actorName" column="actor_name"/>
+        <result property="actedAt" column="acted_at"/>
+    </resultMap>
+
+    <sql id="metricBaseSelect">
+        SELECT
+            m.id,
+            m.company_id,
+            m.facility_id,
+            m.indicator_id,
+            COALESCE(f.facility_name, '기업 전체') AS facility,
+            f.facility_type,
+            i.category::text AS category,
+            i.sub_category,
+            i.indicator_code,
+            i.title,
+            m.reporting_year,
+            m.period_type::text AS period_type,
+            m.period_value,
+            m.reporting_year || '-' || LPAD(m.period_value::text, 2, '0') AS period,
+            m.activity_value,
+            m.numerical_value,
+            m.shipment_amount_million_krw,
+            m.text_value,
+            i.unit,
+            COALESCE(m.additional_info -&gt;&gt; 'sourceSystem', m.data_source_type) AS source,
+            m.data_source_type,
+            m.status::text AS status,
+            m.evidence_file_url,
+            input_user.name AS assignee,
+            approver.name AS approver,
+            m.reject_reason,
+            m.additional_info::text AS additional_info,
+            m.created_at,
+            m.updated_at
+        FROM esg_metric_data m
+        JOIN esg_indicators i ON i.id = m.indicator_id
+        LEFT JOIN company_facilities f ON f.id = m.facility_id
+        LEFT JOIN users input_user ON input_user.id = m.input_user_id
+        LEFT JOIN users approver ON approver.id = m.approver_user_id
+    </sql>
+
+    <select id="findMetrics" resultMap="MetricMap">
+        <include refid="metricBaseSelect"/>
+        WHERE m.company_id = #{companyId}
+        <if test="year != null">AND m.reporting_year = #{year}</if>
+        <if test="period != null and period != ''">
+            AND m.reporting_year = SUBSTRING(#{period}, 1, 4)::INT
+            AND m.period_value = SUBSTRING(#{period}, 6, 2)::INT
+        </if>
+        <if test="category != null and category != ''">AND i.category::text = #{category}</if>
+        <if test="status != null and status != '' and status != 'ALL'">AND m.status::text = #{status}</if>
+        <if test="facilityId != null">AND m.facility_id = #{facilityId}</if>
+        <if test="search != null and search != ''">
+            AND (i.title ILIKE '%' || #{search} || '%'
+                 OR i.indicator_code ILIKE '%' || #{search} || '%'
+                 OR COALESCE(f.facility_name, '') ILIKE '%' || #{search} || '%')
+        </if>
+        <if test="approvedOnly">AND m.status = 'APPROVED'</if>
+        ORDER BY m.reporting_year DESC, m.period_value DESC,
+                 i.category, i.indicator_code,
+                 CASE WHEN f.facility_type = 'HQ' THEN 0 ELSE 1 END,
+                 f.facility_name
+    </select>
+
+    <select id="findById" resultMap="MetricMap">
+        <include refid="metricBaseSelect"/>
+        WHERE m.company_id = #{companyId} AND m.id = #{id}
+    </select>
+
+    <select id="findHistory" resultMap="HistoryMap">
+        SELECT h.id, h.action_type, h.from_status::text AS from_status,
+               h.to_status::text AS to_status, h.comment,
+               COALESCE(u.name, '시스템') AS actor_name, h.acted_at
+        FROM esg_approval_history h
+        LEFT JOIN users u ON u.id = h.actor_user_id
+        WHERE h.metric_data_id = #{metricId}
+        ORDER BY h.acted_at DESC, h.id DESC
+    </select>
+
+    <select id="findEntityById" resultType="com.esg.platform.domain.metric.entity.EsgMetricData">
+        SELECT id, company_id, facility_id, indicator_id, reporting_year, period_type,
+               period_value, activity_value, energy_cost, toe_value, peak_demand_kw,
+               emission_factor_id, numerical_value, shipment_amount_million_krw, text_value, evidence_file_url,
+               status, data_source_type, input_user_id, approver_user_id, reject_reason,
+               hash_signature, additional_info::text AS additional_info, created_at, updated_at
+        FROM esg_metric_data
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insertMetricData" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO esg_metric_data (
+            company_id, facility_id, indicator_id, reporting_year, period_type, period_value,
+            numerical_value, shipment_amount_million_krw, text_value, evidence_file_url, status, data_source_type, input_user_id
+        ) VALUES (
+            #{companyId}, #{facilityId}, #{indicatorId}, #{reportingYear},
+            CAST(#{periodType} AS period_type_enum), #{periodValue}, #{numericalValue},
+            #{shipmentAmountMillionKrw}, #{textValue}, #{evidenceFileUrl}, CAST(#{status} AS data_status_enum),
+            #{dataSourceType}, #{inputUserId}
+        )
+    </insert>
+
+    <update id="updateMetricData">
+        UPDATE esg_metric_data
+        SET indicator_id = #{indicatorId},
+            facility_id = #{facilityId},
+            reporting_year = #{reportingYear},
+            period_type = CAST(#{periodType} AS period_type_enum),
+            period_value = #{periodValue},
+            numerical_value = #{numericalValue},
+            shipment_amount_million_krw = #{shipmentAmountMillionKrw},
+            text_value = #{textValue},
+            evidence_file_url = #{evidenceFileUrl},
+            status = CAST(#{status} AS data_status_enum),
+            input_user_id = #{inputUserId},
+            approver_user_id = NULL,
+            reject_reason = #{rejectReason},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteRejectedMetric">
+        DELETE FROM esg_metric_data
+        WHERE id = #{id} AND status = 'REJECTED'
+    </delete>
+
+    <select id="findActiveIndicators" resultType="com.esg.platform.domain.metric.dto.IndicatorResponse">
+        SELECT id, category, sub_category AS subCategory, indicator_code AS indicatorCode,
+               title, value_type AS valueType, unit
+        FROM esg_indicators
+        WHERE is_active = TRUE
+        ORDER BY category, indicator_code
+    </select>
+
+    <select id="findIndicatorIdByCode" resultType="int">
+        SELECT id FROM esg_indicators WHERE indicator_code = #{indicatorCode} AND is_active = TRUE
+    </select>
+
+    <select id="findIndicatorCodeById" resultType="string">
+        SELECT indicator_code FROM esg_indicators WHERE id = #{indicatorId} AND is_active = TRUE
+    </select>
+
+    <select id="findHeadquartersFacilityId" resultType="int">
+        SELECT id FROM company_facilities
+        WHERE company_id = #{companyId} AND facility_type = 'HQ'
+        ORDER BY id LIMIT 1
+    </select>
+
+    <update id="updateMetricStatus">
+        UPDATE esg_metric_data
+        SET status = CAST(#{toStatus} AS data_status_enum),
+            approver_user_id = CASE WHEN #{toStatus} = 'APPROVED' THEN #{userId} ELSE NULL END,
+            reject_reason = #{rejectReason},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE company_id = #{companyId}
+          AND id = #{id}
+          AND status::text IN
+          <foreach collection="fromStatuses" item="status" open="(" separator="," close=")">
+              #{status}
+          </foreach>
+    </update>
+
+    <insert id="insertHistory">
+        INSERT INTO esg_approval_history (
+            metric_data_id, action_type, from_status, to_status, comment, actor_user_id, acted_at
+        ) VALUES (
+            #{metricId}, #{actionType},
+            <choose>
+                <when test="fromStatus != null">CAST(#{fromStatus} AS data_status_enum)</when>
+                <otherwise>NULL</otherwise>
+            </choose>,
+            CAST(#{toStatus} AS data_status_enum), #{comment}, #{userId}, CURRENT_TIMESTAMP
+        )
+    </insert>
+
+    <select id="findMetricIdsForBatch" resultType="long">
+        SELECT m.id
+        FROM esg_metric_data m
+        JOIN esg_indicators i ON i.id = m.indicator_id
+        WHERE m.company_id = #{companyId}
+          AND m.reporting_year = SUBSTRING(#{period}, 1, 4)::INT
+          AND m.period_value = SUBSTRING(#{period}, 6, 2)::INT
+        <if test="category != null and category != ''">AND i.category::text = #{category}</if>
+          AND m.status::text IN
+          <foreach collection="statuses" item="status" open="(" separator="," close=")">
+              #{status}
+          </foreach>
+        ORDER BY m.id
+    </select>
+
+    <select id="countApprovedForPeriod" resultType="int">
+        SELECT COUNT(*) FROM esg_metric_data
+        WHERE company_id = #{companyId}
+          AND reporting_year = SUBSTRING(#{period}, 1, 4)::INT
+          AND period_value = SUBSTRING(#{period}, 6, 2)::INT
+          AND status = 'APPROVED'
+    </select>
+
+    <select id="findScoreValues" resultType="com.esg.platform.domain.metric.dto.MetricScoreValueDto">
+        SELECT i.indicator_code,
+               AVG(m.numerical_value) AS average_value,
+               SUM(m.numerical_value) AS total_value
+        FROM esg_metric_data m
+        JOIN esg_indicators i ON i.id = m.indicator_id
+        WHERE m.company_id = #{companyId}
+          AND m.reporting_year = SUBSTRING(#{period}, 1, 4)::INT
+          AND m.period_value = SUBSTRING(#{period}, 6, 2)::INT
+          AND m.status = 'APPROVED'
+        GROUP BY i.indicator_code
+    </select>
+
+    <select id="findPreviousApprovedTotal" resultType="java.math.BigDecimal">
+        SELECT SUM(m.numerical_value)
+        FROM esg_metric_data m
+        JOIN esg_indicators i ON i.id = m.indicator_id
+        WHERE m.company_id = #{companyId}
+          AND i.indicator_code = #{indicatorCode}
+          AND m.status = 'APPROVED'
+          AND (m.reporting_year * 100 + m.period_value) = (
+              SELECT MAX(m2.reporting_year * 100 + m2.period_value)
+              FROM esg_metric_data m2
+              JOIN esg_indicators i2 ON i2.id = m2.indicator_id
+              WHERE m2.company_id = #{companyId}
+                AND i2.indicator_code = #{indicatorCode}
+                AND m2.status = 'APPROVED'
+                AND (m2.reporting_year * 100 + m2.period_value) &lt; (SUBSTRING(#{period}, 1, 4)::INT * 100 + SUBSTRING(#{period}, 6, 2)::INT)
+          )
+    </select>
+
+    <insert id="upsertScore">
+        INSERT INTO esg_scores (
+            company_id, reporting_year, reporting_period, period_value,
+            total_score, e_score, s_score, g_score, calculated_at
+        ) VALUES (
+            #{companyId}, #{year}, 'MONTHLY', #{month},
+            #{totalScore}, #{eScore}, #{sScore}, #{gScore}, CURRENT_TIMESTAMP
+        )
+        ON CONFLICT (company_id, reporting_year, reporting_period, period_value) DO UPDATE
+        SET total_score = EXCLUDED.total_score,
+            e_score = EXCLUDED.e_score,
+            s_score = EXCLUDED.s_score,
+            g_score = EXCLUDED.g_score,
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <delete id="deleteScore">
+        DELETE FROM esg_scores
+        WHERE company_id = #{companyId} AND reporting_year = #{year}
+          AND reporting_period = 'MONTHLY' AND period_value = #{month}
+    </delete>
+</mapper>

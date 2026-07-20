@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.esg.platform.domain.metric.mapper.ApprovalMapper">
+
+    <!-- 1. 단건 데이터의 현재 결재 상태를 문자열로 조회 -->
+    <select id="findStatusById" resultType="string">
+        SELECT status::text 
+        FROM esg_metric_data 
+        WHERE id = #{id}
+    </select>
+
+    <!-- 2. 단건 데이터의 결재 상태 및 총괄관리자의 ID, 반려사유를 업데이트 -->
+    <update id="updateApprovalStatus">
+        UPDATE esg_metric_data
+        SET 
+            status = #{status}::data_status_enum,
+            approver_user_id = #{approverId},
+            reject_reason = #{rejectReason},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+</mapper>

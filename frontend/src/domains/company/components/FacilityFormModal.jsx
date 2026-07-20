@@ -1,178 +1,152 @@
-import React, { useState } from "react";
+import { useMemo, useState } from "react";
 import Button from "../../../shared/components/Button";
-import { COLORS, FONT_SIZE, RADIUS } from "./companyStyles";
-import { CustomInput, CustomSelect } from "./CompanyUI";
 import AddressSearchField from "./AddressSearchField";
+import { CustomInput, CustomSelect } from "./CompanyUI";
+import { normalizeFacility } from "../utils/facilityData";
 
-const overlayStyle = {
-  position: "fixed",
-  top: 0,
-  left: 0,
-  width: "100%",
-  height: "100%",
-  backgroundColor: "rgba(0, 0, 0, 0.4)",
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  zIndex: 1000,
-  backdropFilter: "blur(2px)",
-};
+const createInitialForm = (facility) => {
+  if (!facility) {
+    return {
+      facility_name: "",
+      facility_type: "FACTORY",
+      address: "",
+      contract_power_kw: 0,
+      manager_name: "",
+      manager_phone: "",
+      is_active: true,
+      latitude: null,
+      longitude: null,
+    };
+  }
 
-const contentStyle = {
-  backgroundColor: COLORS.white,
-  width: "600px",
-  borderRadius: RADIUS.lg,
-  boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-  overflow: "hidden",
-  display: "flex",
-  flexDirection: "column",
-};
-
-const headerStyle = {
-  padding: "20px 24px",
-  borderBottom: `1px solid ${COLORS.border}`,
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  backgroundColor: COLORS.white,
-};
-
-const titleStyle = {
-  margin: 0,
-  fontSize: FONT_SIZE.xl,
-  fontWeight: "700",
-  color: COLORS.textPrimary,
-};
-
-const closeBtnStyle = {
-  background: "none",
-  border: "none",
-  fontSize: "24px",
-  cursor: "pointer",
-  color: COLORS.textSecondary,
-  lineHeight: 1,
-  padding: "4px",
-  borderRadius: RADIUS.sm,
-  transition: "background-color 0.2s",
-};
-
-const footerStyle = {
-  padding: "16px 24px",
-  borderTop: `1px solid ${COLORS.border}`,
-  display: "flex",
-  justifyContent: "flex-end",
-  gap: "12px",
-  backgroundColor: COLORS.bgHover,
-};
-
-const formGridStyle = {
-  padding: "24px",
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: "20px 24px",
+  const normalized = normalizeFacility(facility);
+  return {
+    id: normalized.id,
+    facility_name: normalized.facilityName,
+    facility_type: normalized.facilityType,
+    address: normalized.address === "주소 미등록" ? "" : normalized.address,
+    contract_power_kw: normalized.contractPowerKw,
+    manager_name: normalized.managerName === "담당자 미지정" ? "" : normalized.managerName,
+    manager_phone: normalized.managerPhone,
+    is_active: normalized.active,
+    latitude: normalized.latitude,
+    longitude: normalized.longitude,
+  };
 };
 
 export default function FacilityFormModal({ facility, onClose, onSave }) {
-  const isEdit = !!facility?.id;
-  const [formData, setFormData] = useState(
-    facility || {
-      facility_name: "",
-      facility_type: "공장",
-      address: "",
-      contract_power_kw: 0,
-      latitude: null,
-      longitude: null,
-    }
-  );
+  const initialForm = useMemo(() => createInitialForm(facility), [facility]);
+  const [formData, setFormData] = useState(initialForm);
+  const isEdit = Boolean(formData.id);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  const handleChange = (event) => {
+    const { name, value, type, checked } = event.target;
+    setFormData((current) => ({
+      ...current,
+      [name]: type === "checkbox"
+        ? checked
+        : name === "contract_power_kw"
+          ? Number(value)
+          : value,
+    }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = (event) => {
+    event.preventDefault();
     onSave(formData);
   };
 
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={contentStyle} onClick={(e) => e.stopPropagation()}>
-        <div style={headerStyle}>
-          <h2 style={titleStyle}>{isEdit ? "사업장 정보 수정" : "신규 사업장 등록"}</h2>
-          <button 
-            style={closeBtnStyle} 
-            onClick={onClose}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = COLORS.bgHover}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-          >
-            &times;
-          </button>
-        </div>
+    <div className="modal-overlay" onClick={onClose}>
+      <section className="form-modal" onClick={(event) => event.stopPropagation()}>
+        <header className="form-modal-header">
+          <div>
+            <span className="section-kicker">FACILITY MASTER DATA</span>
+            <h2>{isEdit ? "사업장 정보 수정" : "신규 사업장 등록"}</h2>
+            <p>ESG 실적이 연결될 사업장 기준정보를 입력합니다.</p>
+          </div>
+          <button type="button" className="modal-close-button" onClick={onClose} aria-label="닫기">×</button>
+        </header>
 
         <form onSubmit={handleSubmit}>
-          <div style={formGridStyle}>
-            <div style={{ gridColumn: "span 2" }}>
+          <div className="form-modal-grid">
+            <div className="field-span-two">
               <CustomInput
                 label="사업장명"
                 name="facility_name"
-                value={formData.facility_name || ""}
+                value={formData.facility_name}
                 onChange={handleChange}
                 placeholder="사업장 이름을 입력하세요"
                 required
               />
             </div>
-            
+
             <CustomSelect
               label="사업장 유형"
               name="facility_type"
-              value={formData.facility_type || ""}
+              value={formData.facility_type}
               onChange={handleChange}
               required
               options={[
-                { value: "본사", label: "본사" },
-                { value: "공장", label: "공장" },
-                { value: "사무실", label: "사무실" },
-                { value: "창고", label: "창고" },
-                { value: "기타", label: "기타" },
+                { value: "HQ", label: "본사" },
+                { value: "FACTORY", label: "공장" },
+                { value: "OFFICE", label: "사무실" },
+                { value: "WAREHOUSE", label: "창고" },
+                { value: "ETC", label: "기타" },
               ]}
             />
 
             <CustomInput
               label="한전 계약전력 (kW)"
               type="number"
+              min="0"
               name="contract_power_kw"
-              value={formData.contract_power_kw || 0}
+              value={formData.contract_power_kw}
               onChange={handleChange}
               placeholder="0"
               required
             />
 
-           <div style={{ gridColumn: "span 2" }}>
-            <AddressSearchField
-              address={formData.address}
-              required
-              onChange={({ address, latitude, longitude }) => {
-                setFormData((prev) => ({ ...prev, address, latitude, longitude }));
-              }}
+            <CustomInput
+              label="사업장 담당자"
+              name="manager_name"
+              value={formData.manager_name}
+              onChange={handleChange}
+              placeholder="담당자명"
             />
-          </div>
+
+            <CustomInput
+              label="담당자 연락처"
+              name="manager_phone"
+              value={formData.manager_phone}
+              onChange={handleChange}
+              placeholder="010-0000-0000"
+            />
+
+            <div className="field-span-two">
+              <AddressSearchField
+                address={formData.address}
+                required
+                onChange={({ address, latitude, longitude }) => {
+                  setFormData((current) => ({ ...current, address, latitude, longitude }));
+                }}
+              />
+            </div>
+
+            <label className="facility-active-check field-span-two">
+              <input type="checkbox" name="is_active" checked={formData.is_active} onChange={handleChange} />
+              <span>운영 중인 사업장으로 표시</span>
+            </label>
           </div>
 
-          <div style={{ padding: "0 24px 24px", fontSize: FONT_SIZE.xs, color: COLORS.textSecondary }}>
-            <span style={{ color: COLORS.danger }}>*</span> 표시는 필수 입력 항목입니다.
-          </div>
+          <p className="form-required-note"><span>*</span> 표시는 필수 입력 항목입니다.</p>
 
-          <div style={footerStyle}>
-            <Button variant="secondary" onClick={onClose}>
-              취소
-            </Button>
-            <Button type="submit" style={{ backgroundColor: COLORS.primary }}>
-              {isEdit ? "변경사항 저장" : "사업장 등록 완료"}
-            </Button>
-          </div>
+          <footer className="form-modal-footer">
+            <Button type="button" variant="outline" onClick={onClose}>취소</Button>
+            <Button type="submit">{isEdit ? "변경사항 저장" : "사업장 등록"}</Button>
+          </footer>
         </form>
-      </div>
+      </section>
     </div>
   );
 }

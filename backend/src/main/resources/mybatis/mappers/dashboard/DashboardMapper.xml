@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.esg.platform.domain.dashboard.mapper.DashboardMapper">
+
+    <resultMap id="ScoreMap" type="com.esg.platform.domain.dashboard.dto.DashboardScoreDto">
+        <result property="period" column="period"/>
+        <result property="totalScore" column="total_score"/>
+        <result property="environmentScore" column="e_score"/>
+        <result property="socialScore" column="s_score"/>
+        <result property="governanceScore" column="g_score"/>
+        <result property="grade" column="grade"/>
+        <result property="calculatedAt" column="calculated_at"/>
+    </resultMap>
+
+    <resultMap id="KpiMap" type="com.esg.platform.domain.dashboard.dto.DashboardKpiDto">
+        <result property="category" column="category"/>
+        <result property="indicatorCode" column="indicator_code"/>
+        <result property="title" column="title"/>
+        <result property="unit" column="unit"/>
+        <result property="value" column="value"/>
+        <result property="previousValue" column="previous_value"/>
+    </resultMap>
+
+    <resultMap id="FacilityMap" type="com.esg.platform.domain.dashboard.dto.DashboardFacilityDto">
+        <id property="facilityId" column="facility_id"/>
+        <result property="facilityName" column="facility_name"/>
+        <result property="facilityType" column="facility_type"/>
+        <result property="address" column="address"/>
+        <result property="latitude" column="latitude"/>
+        <result property="longitude" column="longitude"/>
+        <result property="electricityUsageKwh" column="electricity_usage_kwh"/>
+        <result property="scope2Tco2eq" column="scope2_tco2eq"/>
+        <result property="injuryRate" column="injury_rate"/>
+        <result property="trainingCompletionRate" column="training_completion_rate"/>
+        <result property="hazardActionRate" column="hazard_action_rate"/>
+        <result property="turnoverRate" column="turnover_rate"/>
+    </resultMap>
+
+    <sql id="scoreSelect">
+        SELECT reporting_year || '-' || LPAD(period_value::text, 2, '0') AS period,
+               total_score, e_score, s_score, g_score,
+               CASE
+                   WHEN total_score &gt;= 90 THEN 'S'
+                   WHEN total_score &gt;= 85 THEN 'A+'
+                   WHEN total_score &gt;= 80 THEN 'A'
+                   WHEN total_score &gt;= 75 THEN 'B+'
+                   WHEN total_score &gt;= 65 THEN 'B'
+                   WHEN total_score &gt;= 50 THEN 'C'
+                   ELSE 'D'
+               END AS grade,
+               calculated_at,
+               period_value
+        FROM esg_scores
+        WHERE company_id = #{companyId}
+          AND reporting_year = #{year}
+          AND reporting_period = 'MONTHLY'
+    </sql>
+
+    <select id="findScore" resultMap="ScoreMap">
+        <include refid="scoreSelect"/>
+        <if test="month != null">AND period_value = #{month}</if>
+        ORDER BY period_value DESC
+        LIMIT 1
+    </select>
+
+    <select id="findScoreTrend" resultMap="ScoreMap">
+        <include refid="scoreSelect"/>
+        <if test="month != null">AND period_value &lt;= #{month}</if>
+        ORDER BY period_value
+    </select>
+
+    <select id="findApprovedPeriod" resultType="string">
+        SELECT MAX(m.reporting_year || '-' || LPAD(m.period_value::text, 2, '0'))
+        FROM esg_metric_data m
+        WHERE m.company_id = #{companyId}
+          AND m.reporting_year = #{year}
+          AND m.status = 'APPROVED'
+          <if test="month != null">AND m.period_value = #{month}</if>
+          <if test="facilityId != null">AND m.facility_id = #{facilityId}</if>
+    </select>
+
+    <select id="findLatestRegisteredPeriod" resultType="string">
+        SELECT MAX(m.reporting_year || '-' || LPAD(m.period_value::text, 2, '0'))
+        FROM esg_metric_data m
+        WHERE m.company_id = #{companyId}
+          AND m.reporting_year = #{year}
+          <if test="facilityId != null">AND m.facility_id = #{facilityId}</if>
+    </select>
+
+    <select id="findPendingPeriod" resultType="string">
+        SELECT MAX(m.reporting_year || '-' || LPAD(m.period_value::text, 2, '0'))
+        FROM esg_metric_data m
+        WHERE m.company_id = #{companyId}
+          AND m.reporting_year = #{year}
+          AND m.status IN ('DRAFT', 'PENDING', 'REJECTED')
+          <if test="facilityId != null">AND m.facility_id = #{facilityId}</if>
+    </select>
+
+    <select id="countPendingApprovals" resultType="int">
+        SELECT COUNT(*)
+        FROM esg_metric_data
+        WHERE company_id = #{companyId}
+          AND status = 'PENDING'
+          <if test="facilityId != null">AND facility_id = #{facilityId}</if>
+    </select>
+
+    <select id="findKpis" resultMap="KpiMap">
+        WITH current_values AS (
+            SELECT i.category::text AS category, i.indicator_code, i.title, i.unit,
+                   CASE WHEN i.indicator_code IN ('IND_E_ELEC', 'IND_E_SCOPE2')
+                        THEN SUM(m.numerical_value)
+                        ELSE AVG(m.numerical_value) END AS value
+            FROM esg_metric_data m
+            JOIN esg_indicators i ON i.id = m.indicator_id
+            WHERE m.company_id = #{companyId}
+              AND m.reporting_year = SUBSTRING(#{period}, 1, 4)::INT
+              AND m.period_value = SUBSTRING(#{period}, 6, 2)::INT
+              AND m.status = 'APPROVED'
+              <if test="facilityId != null">AND m.facility_id = #{facilityId}</if>
+            GROUP BY i.category, i.indicator_code, i.title, i.unit
+        ), previous_period AS (
+            SELECT MAX(m2.reporting_year * 100 + m2.period_value) AS period_key
+            FROM esg_metric_data m2
+            WHERE m2.company_id = #{companyId}
+              AND m2.status = 'APPROVED'
+              AND (m2.reporting_year * 100 + m2.period_value)
+                  &lt; (SUBSTRING(#{period}, 1, 4)::INT * 100 + SUBSTRING(#{period}, 6, 2)::INT)
+              <if test="facilityId != null">AND m2.facility_id = #{facilityId}</if>
+        ), previous_values AS (
+            SELECT i.indicator_code,
+                   CASE WHEN i.indicator_code IN ('IND_E_ELEC', 'IND_E_SCOPE2')
+                        THEN SUM(m.numerical_value)
+                        ELSE AVG(m.numerical_value) END AS previous_value
+            FROM esg_metric_data m
+            JOIN esg_indicators i ON i.id = m.indicator_id
+            WHERE m.company_id = #{companyId}
+              AND (m.reporting_year * 100 + m.period_value) = (SELECT period_key FROM previous_period)
+              AND m.status = 'APPROVED'
+              <if test="facilityId != null">AND m.facility_id = #{facilityId}</if>
+            GROUP BY i.indicator_code
+        )
+        SELECT c.category, c.indicator_code, c.title, c.unit, c.value, p.previous_value
+        FROM current_values c
+        LEFT JOIN previous_values p ON p.indicator_code = c.indicator_code
+        ORDER BY CASE c.category WHEN 'ENVIRONMENT' THEN 1 WHEN 'SOCIAL' THEN 2 ELSE 3 END,
+                 c.indicator_code
+    </select>
+
+    <select id="findFacilityComparison" resultMap="FacilityMap">
+        SELECT f.id AS facility_id, f.facility_name, f.facility_type, f.address,
+               ST_Y(f.facility_center::geometry) AS latitude,
+               ST_X(f.facility_center::geometry) AS longitude,
+               MAX(CASE WHEN i.indicator_code = 'IND_E_ELEC' THEN m.numerical_value END) AS electricity_usage_kwh,
+               MAX(CASE WHEN i.indicator_code = 'IND_E_SCOPE2' THEN m.numerical_value END) AS scope2_tco2eq,
+               MAX(CASE WHEN i.indicator_code = 'IND_S_INJURY_RATE' THEN m.numerical_value END) AS injury_rate,
+               MAX(CASE WHEN i.indicator_code = 'IND_S_SAFETY_EDU' THEN m.numerical_value END) AS training_completion_rate,
+               MAX(CASE WHEN i.indicator_code = 'IND_S_RISK_ACTION' THEN m.numerical_value END) AS hazard_action_rate,
+               MAX(CASE WHEN i.indicator_code = 'IND_S_TURNOVER' THEN m.numerical_value END) AS turnover_rate
+        FROM company_facilities f
+        LEFT JOIN esg_metric_data m ON m.facility_id = f.id
+             AND m.reporting_year = SUBSTRING(#{period}, 1, 4)::INT
+             AND m.period_value = SUBSTRING(#{period}, 6, 2)::INT
+             AND m.status = 'APPROVED'
+        LEFT JOIN esg_indicators i ON i.id = m.indicator_id
+        WHERE f.company_id = #{companyId}
+          <if test="facilityId != null">AND f.id = #{facilityId}</if>
+        GROUP BY f.id, f.facility_name, f.facility_type, f.address, f.facility_center
+        ORDER BY CASE WHEN f.facility_type = 'HQ' THEN 0 ELSE 1 END, f.facility_name
+    </select>
+
+    <select id="findEvaluationName" resultType="string">
+        SELECT evaluation_name FROM esg_evaluation_configs
+        WHERE company_id = #{companyId} AND reporting_year = #{year}
+        ORDER BY id DESC LIMIT 1
+    </select>
+
+    <select id="findEvaluationVersion" resultType="string">
+        SELECT evaluation_version FROM esg_evaluation_configs
+        WHERE company_id = #{companyId} AND reporting_year = #{year}
+        ORDER BY id DESC LIMIT 1
+    </select>
+
+    <select id="findEvaluationDisclaimer" resultType="string">
+        SELECT disclaimer FROM esg_evaluation_configs
+        WHERE company_id = #{companyId} AND reporting_year = #{year}
+        ORDER BY id DESC LIMIT 1
+    </select>
+</mapper>

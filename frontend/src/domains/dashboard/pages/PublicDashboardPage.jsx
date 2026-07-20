@@ -26,7 +26,7 @@ export default function PublicDashboardPage() {
 
   return (
     <div className="page-stack">
-      <PageHeader breadcrumbs={["공개 ESG 정보", "대시보드"]} title="공개 ESG 대시보드" description="최종 승인된 ESG 확정값만 제공합니다. 수집 중 잠정값은 공개되지 않습니다." />
+      <PageHeader breadcrumbs={["공개 ESG 정보", "대시보드"]} title="공개 ESG 대시보드" description="최종 승인된 ESG 확정값만 제공합니다. 승인 대기 또는 반려 데이터는 공개되지 않습니다." />
       <div className="public-hero"><div><span>2026 ESG SCORE</span><strong>{overallScore}</strong><p>에코모빌리티 파츠 주식회사</p></div><div className="public-score-items"><article><b>{eScore}</b><span>환경(E)</span></article><article><b>{sScore}</b><span>사회(S)</span></article><article><b>{gScore}</b><span>거버넌스(G)</span></article></div></div>
       <div className="summary-grid four">
         <StatCard label="승인 공개 지표" value={`${approved.length}건`} helper="검증 완료 데이터" icon="✓" />

@@ -2,66 +2,106 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper
-	namespace="com.esg.platform.domain.company.mapper.FacilityMapper">
+<mapper namespace="com.esg.platform.domain.company.mapper.FacilityMapper">
 
-	<resultMap id="FacilityResultMap"
-		type="com.esg.platform.domain.company.dto.FacilityDto">
-		<id property="id" column="id" />
-		<result property="facilityName" column="facility_name" />
-		<result property="facilityType" column="facility_type" />
-		<result property="address" column="address" />
-		<result property="contractPowerKw" column="contract_power_kw" />
-		<result property="createdAt" column="created_at" />
-		<result property="latitude" column="latitude" />
-		<result property="longitude" column="longitude" />
-	</resultMap>
+    <resultMap id="FacilityResultMap" type="com.esg.platform.domain.company.dto.FacilityDto">
+        <id property="id" column="id" />
+        <result property="facilityName" column="facility_name" />
+        <result property="facilityType" column="facility_type" />
+        <result property="address" column="address" />
+        <result property="contractPowerKw" column="contract_power_kw" />
+        <result property="managerName" column="manager_name" />
+        <result property="managerPhone" column="manager_phone" />
+        <result property="active" column="is_active" />
+        <result property="createdAt" column="created_at" />
+        <result property="latitude" column="latitude" />
+        <result property="longitude" column="longitude" />
+    </resultMap>
 
-	<select id="findAllByCompanyId" resultMap="FacilityResultMap">
-		SELECT id,
-		facility_name, facility_type, address, contract_power_kw,
-		created_at,
-		ST_Y(facility_center::geometry) AS latitude,
-		ST_X(facility_center::geometry) AS longitude
-		FROM company_facilities
-		WHERE company_id = #{companyId}
-		ORDER BY created_at ASC
-	</select>
+    <sql id="facilityColumns">
+        id,
+        facility_name,
+        facility_type,
+        address,
+        contract_power_kw,
+        manager_name,
+        manager_phone,
+        is_active,
+        created_at,
+        ST_Y(facility_center::geometry) AS latitude,
+        ST_X(facility_center::geometry) AS longitude
+    </sql>
 
-	<select id="findById" resultMap="FacilityResultMap">
-		SELECT id, facility_name,
-		facility_type, address, contract_power_kw,
-		created_at,
-		ST_Y(facility_center::geometry) AS latitude,
-		ST_X(facility_center::geometry) AS longitude
-		FROM company_facilities
-		WHERE id = #{id}
-	</select>
+    <select id="findAllByCompanyId" resultMap="FacilityResultMap">
+        SELECT
+            <include refid="facilityColumns" />
+        FROM company_facilities
+        WHERE company_id = #{companyId}
+        ORDER BY
+            CASE WHEN facility_type = 'HQ' OR facility_name LIKE '%본사%' THEN 0 ELSE 1 END,
+            created_at ASC
+    </select>
 
-	<insert id="insert" useGeneratedKeys="true" keyProperty="dto.id">
-		INSERT INTO company_facilities (company_id, facility_name, facility_type,
-		address, contract_power_kw, facility_center, created_at)
-		VALUES (
-		#{companyId}, #{dto.facilityName}, #{dto.facilityType}, #{dto.address},
-		#{dto.contractPowerKw},
-		ST_SetSRID(ST_MakePoint(#{dto.longitude}, #{dto.latitude}), 4326),
-		NOW()
-		)
-	</insert>
+    <select id="findByIdAndCompanyId" resultMap="FacilityResultMap">
+        SELECT
+            <include refid="facilityColumns" />
+        FROM company_facilities
+        WHERE id = #{id}
+          AND company_id = #{companyId}
+    </select>
 
-	<update id="update">
-		UPDATE company_facilities
-		SET facility_name = #{facilityName},
-		facility_type = #{facilityType},
-		address = #{address},
-		contract_power_kw = #{contractPowerKw},
-		facility_center = ST_SetSRID(ST_MakePoint(#{longitude}, #{latitude}), 4326)
-		WHERE id = #{id}
-	</update>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="dto.id">
+        INSERT INTO company_facilities (
+            company_id,
+            facility_name,
+            facility_type,
+            address,
+            contract_power_kw,
+            manager_name,
+            manager_phone,
+            is_active,
+            facility_center,
+            created_at
+        ) VALUES (
+            #{companyId},
+            #{dto.facilityName},
+            #{dto.facilityType},
+            #{dto.address},
+            #{dto.contractPowerKw},
+            #{dto.managerName},
+            #{dto.managerPhone},
+            COALESCE(#{dto.active}, TRUE),
+            CASE
+                WHEN #{dto.longitude} IS NOT NULL AND #{dto.latitude} IS NOT NULL
+                    THEN ST_SetSRID(ST_MakePoint(#{dto.longitude}, #{dto.latitude}), 4326)
+                ELSE NULL
+            END,
+            CURRENT_TIMESTAMP
+        )
+    </insert>
 
-	<delete id="delete" parameterType="Long">
-		DELETE FROM company_facilities
-		WHERE id = #{id}
-	</delete>
+    <update id="update">
+        UPDATE company_facilities
+        SET facility_name = #{dto.facilityName},
+            facility_type = #{dto.facilityType},
+            address = #{dto.address},
+            contract_power_kw = #{dto.contractPowerKw},
+            manager_name = #{dto.managerName},
+            manager_phone = #{dto.managerPhone},
+            is_active = COALESCE(#{dto.active}, is_active),
+            facility_center = CASE
+                WHEN #{dto.longitude} IS NOT NULL AND #{dto.latitude} IS NOT NULL
+                    THEN ST_SetSRID(ST_MakePoint(#{dto.longitude}, #{dto.latitude}), 4326)
+                ELSE facility_center
+            END
+        WHERE id = #{dto.id}
+          AND company_id = #{companyId}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM company_facilities
+        WHERE id = #{id}
+          AND company_id = #{companyId}
+    </delete>
 
 </mapper>

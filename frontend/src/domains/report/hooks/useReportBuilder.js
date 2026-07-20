@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react';
 import { reportApi } from '../api/reportApi';
 
-export function useReportBuilder() {
+export function useReportBuilder(initialYear = "2026") {
   const [title, setTitle] = useState("에코모빌리티 파츠 ESG 보고서");
-  const [year, setYear] = useState("2026");
+  const [year, setYear] = useState(initialYear);
   const [scope, setScope] = useState("전체 사업장");
   const [content, setContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);

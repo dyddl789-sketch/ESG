@@ -19,6 +19,7 @@ const companyApi = {
     return response.data;
   },
 
+
   // 사업장 등록
   createFacility: async (data) => {
     const response = await axios.post("/companies/me/facilities", data);

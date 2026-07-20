@@ -1,8 +1,5 @@
 package com.esg.platform.global.exception;
 
-import lombok.Getter;
-
-@Getter
 public class BusinessException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
@@ -16,5 +13,9 @@ public class BusinessException extends RuntimeException {
     public BusinessException(ErrorCode errorCode, String message) {
         super(message);
         this.errorCode = errorCode;
+    }
+
+    public ErrorCode getErrorCode() {
+        return errorCode;
     }
 }
