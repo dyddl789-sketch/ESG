@@ -14,6 +14,7 @@ public record MetricCreateRequest(
     String periodType,        // MONTHLY | QUARTERLY | HALFYEARLY | YEARLY (기본 MONTHLY)
     Integer periodValue,      // 필수: 월(1~12) 또는 분기(1~4) 등
     BigDecimal value,         // 정량 수치 (numerical_value)
+    BigDecimal shipmentAmount, // 환경 전력 데이터의 출하액(백만원)
     String textValue,         // 정성 텍스트
     String evidenceFileUrl,   // 증빙 파일 URL
     Boolean submitForApproval // true면 등록 즉시 PENDING(승인 요청), false/null이면 DRAFT

@@ -30,7 +30,7 @@ const maskBusinessNumber = (value) => {
 };
 const formatMetricValue = (metric) => {
   if (metric?.value === null || metric?.value === undefined) return metric?.textValue || "-";
-  const digits = metric.unit === "%" || metric.indicatorCode === "IND_E_SCOPE2" ? 2 : 0;
+  const digits = metric.unit === "%" || metric.indicatorCode === "IND_E_SCOPE2" || metric.derived ? 2 : 0;
   return `${formatNumber(metric.value, digits)} ${metric.unit || ""}`.trim();
 };
 
@@ -106,11 +106,23 @@ export default function CompanyProfilePage() {
   }), [facilities, filters.search, filters.type]);
 
   const headquarters = facilities.find((facility) => facility.facilityType === "HQ") || facilities[0];
-  const groupedMetrics = useMemo(() => Object.entries(categoryMeta).map(([category, meta]) => ({
-    category,
-    ...meta,
-    metrics: selectedMetrics.filter((metric) => metric.category === category),
-  })), [selectedMetrics]);
+  const groupedMetrics = useMemo(() => {
+    const electricity = selectedMetrics.find((metric) => metric.indicatorCode === "IND_E_ELEC");
+    const scope2 = selectedMetrics.find((metric) => metric.indicatorCode === "IND_E_SCOPE2");
+    const shipmentMillion = Number(electricity?.shipmentAmountMillionKrw || 0);
+    const shipmentEok = shipmentMillion / 100;
+    const environmentDerived = shipmentMillion > 0 ? [
+      { id: `shipment-${electricity.id}`, category: "ENVIRONMENT", indicatorCode: "SHIPMENT_AMOUNT", title: "출하액", value: shipmentMillion, unit: "백만원", derived: true },
+      { id: `electricity-intensity-${electricity.id}`, category: "ENVIRONMENT", indicatorCode: "ELECTRICITY_INTENSITY", title: "전력 원단위", value: shipmentEok > 0 ? (Number(electricity.value || 0) / 1000) / shipmentEok : null, unit: "MWh/억원", derived: true },
+      { id: `carbon-intensity-${electricity.id}`, category: "ENVIRONMENT", indicatorCode: "CARBON_INTENSITY", title: "탄소 원단위", value: scope2 && shipmentEok > 0 ? Number(scope2.value || 0) / shipmentEok : null, unit: "tCO₂eq/억원", derived: true },
+    ] : [];
+    const displayMetrics = [...selectedMetrics, ...environmentDerived];
+    return Object.entries(categoryMeta).map(([category, meta]) => ({
+      category,
+      ...meta,
+      metrics: displayMetrics.filter((metric) => metric.category === category),
+    }));
+  }, [selectedMetrics]);
   const latestApprovedAt = selectedMetrics.map((metric) => metric.updatedAt).filter(Boolean).sort().at(-1);
   const evidence = selectedMetrics.map((metric) => metric.evidence).find(Boolean);
 

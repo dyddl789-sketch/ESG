@@ -58,6 +58,9 @@ export default function IntegrationPage() {
         facilityName: facilityNameOf(facility),
         facilityType: facilityTypeOf(facility),
         electricity: metricNumber(values.IND_E_ELEC),
+        shipment: values.IND_E_ELEC?.shipmentAmountMillionKrw == null
+          ? null
+          : Number(values.IND_E_ELEC.shipmentAmountMillionKrw),
         scope2: metricNumber(values.IND_E_SCOPE2),
         approvedAt: latestApprovalDate(related),
         evidence: firstEvidence(related),
@@ -71,12 +74,14 @@ export default function IntegrationPage() {
 
   const totals = useMemo(() => ({
     electricity: rows.reduce((sum, row) => sum + Number(row.electricity || 0), 0),
+    shipment: rows.reduce((sum, row) => sum + Number(row.shipment || 0), 0),
     scope2: rows.reduce((sum, row) => sum + Number(row.scope2 || 0), 0),
   }), [rows]);
 
   const columns = [
     { key: "facilityName", label: "사업장", render: (value, row) => <div><strong>{value}</strong><small className="cell-sub">{row.facilityType === "HQ" ? "본사" : "공장"}</small></div> },
     { key: "electricity", label: "전력 사용량", render: (value) => value === null ? "-" : `${formatNumber(value)} kWh` },
+    { key: "shipment", label: "출하액", render: (value) => value === null ? "-" : `${formatNumber(value, 2)} 백만원` },
     { key: "scope2", label: "Scope 2", render: (value) => value === null ? "-" : `${formatNumber(value, 2)} tCO₂eq` },
     { key: "approvedAt", label: "최종 승인일", render: (value) => formatDateTime(value) },
     { key: "evidence", label: "증빙 PDF", render: (value) => value ? <button type="button" className="text-link" onClick={(event) => { event.stopPropagation(); fileApi.open(value); }}>보기</button> : "-" },
@@ -101,8 +106,8 @@ export default function IntegrationPage() {
       <div className="summary-card-grid four">
         <article><span>승인 사업장</span><strong>{rows.length}</strong><small>{period} 기준</small></article>
         <article className={selectedIndicator === "IND_E_ELEC" ? "is-highlighted" : ""}><span>전력 사용량</span><strong>{formatNumber(totals.electricity)}</strong><small>kWh</small></article>
+        <article><span>출하액</span><strong>{formatNumber(totals.shipment, 2)}</strong><small>백만원</small></article>
         <article className={selectedIndicator === "IND_E_SCOPE2" ? "is-highlighted" : ""}><span>Scope 2</span><strong>{formatNumber(totals.scope2, 2)}</strong><small>tCO₂eq</small></article>
-        <article><span>조회 상태</span><strong>확정</strong><small>APPROVED 데이터만 표시</small></article>
       </div>
       <Card title={`${period} 환경 확정 실적`} description="ESG 데이터 관리에서 등록되어 최종 승인된 값만 표시됩니다.">
         {loading ? <div className="data-loading">환경 확정 실적을 불러오는 중입니다.</div> : <DataTable rows={rows} columns={columns} emptyText="선택한 기간에 승인 완료된 환경 데이터가 없습니다." />}

@@ -41,6 +41,7 @@ export default function MetricDetailPanel({ metric }) {
           <div><span>등록값</span><strong>{actual}</strong></div>
           <div><span>승인 상태</span><StatusBadge status={metric.status} /></div>
           <div><span>최종 승인자</span><strong>{metric.approver || "-"}</strong></div>
+          {metric.indicatorCode === "IND_E_ELEC" && <div><span>출하액</span><strong>{metric.shipmentAmountMillionKrw == null ? "-" : `${formatNumber(metric.shipmentAmountMillionKrw, 2)} 백만원`}</strong></div>}
         </div>
         {metric.textValue && <div className="reject-reason"><b>등록 메모</b><p>{metric.textValue}</p></div>}
         {metric.rejectReason && <div className="reject-reason"><b>반려 사유</b><p>{metric.rejectReason}</p></div>}

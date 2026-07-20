@@ -27,9 +27,13 @@ export default function MetricFormPage() {
     periodType: "MONTHLY",
     periodValue: new Date().getMonth() + 1,
     value: "",
+    shipmentAmount: "",
     textValue: "",
     evidenceFileUrl: ""
   });
+
+  const selectedIndicator = indicators.find((indicator) => String(indicator.id) === String(formData.indicatorId));
+  const isElectricityMetric = selectedIndicator?.indicatorCode === "IND_E_ELEC";
 
   useEffect(() => {
     const fetchData = async () => {
@@ -81,6 +85,7 @@ export default function MetricFormPage() {
             periodType: String(d.periodType || "MONTHLY"),
             periodValue: d.periodValue !== undefined ? Number(d.periodValue) : 1,
             value: extractedValue !== "" ? String(extractedValue) : "",
+            shipmentAmount: d.shipmentAmountMillionKrw !== null && d.shipmentAmountMillionKrw !== undefined ? String(d.shipmentAmountMillionKrw) : "",
             textValue: d.textValue || "",
             evidenceFileUrl: d.evidence || d.evidenceFileUrl || ""
           });
@@ -144,14 +149,22 @@ export default function MetricFormPage() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value
-    }));
+    setFormData(prev => {
+      const next = {
+        ...prev,
+        [name]: type === "checkbox" ? checked : value
+      };
+      if (name === "indicatorId") {
+        const nextIndicator = indicators.find((indicator) => String(indicator.id) === String(value));
+        if (nextIndicator?.indicatorCode !== "IND_E_ELEC") next.shipmentAmount = "";
+      }
+      return next;
+    });
   };
 
   const handleProcessSubmit = async (isApprovalClick = false) => {
     if (!formData.indicatorId) return Swal.fire("알림", "지표를 선택해주세요.", "warning");
+    if (isElectricityMetric && (!formData.shipmentAmount || Number(formData.shipmentAmount) <= 0)) return Swal.fire("알림", "전력 사용량 등록 시 출하액(백만원)을 입력해주세요.", "warning");
     if (!formData.evidenceFileUrl) return Swal.fire("알림", "사업장 ESG 내역 PDF를 첨부해주세요.", "warning");
 
     setLoading(true);
@@ -163,6 +176,7 @@ export default function MetricFormPage() {
       reportingYear: Number(formData.reportingYear),
       periodValue: Number(formData.periodValue),
       value: formData.value !== "" ? Number(formData.value) : null,
+      shipmentAmount: isElectricityMetric && formData.shipmentAmount !== "" ? Number(formData.shipmentAmount) : null,
       submitForApproval: isApprovalClick
     };
 
@@ -288,6 +302,23 @@ export default function MetricFormPage() {
                     placeholder="수치 데이터가 있는 경우 입력"
                   />
                 </div>
+
+                {isElectricityMetric && (
+                  <div className="form-group shipment-input-group">
+                    <label>출하액 (백만원) *</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      name="shipmentAmount"
+                      value={formData.shipmentAmount}
+                      onChange={handleChange}
+                      placeholder="같은 사업장·기준월의 출하액"
+                      required
+                    />
+                    <small>전력 원단위 계산에 사용되며 전력 사용량과 동일한 승인 상태로 처리됩니다.</small>
+                  </div>
+                )}
 
                 <div className="form-group">
                   <label>정성 내용 / 비고</label>

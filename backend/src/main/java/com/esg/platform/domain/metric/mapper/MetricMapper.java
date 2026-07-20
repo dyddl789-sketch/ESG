@@ -41,6 +41,8 @@ public interface MetricMapper {
 
     Integer findIndicatorIdByCode(@Param("indicatorCode") String indicatorCode);
 
+    String findIndicatorCodeById(@Param("indicatorId") Integer indicatorId);
+
     Integer findHeadquartersFacilityId(@Param("companyId") Long companyId);
 
     int updateMetricStatus(

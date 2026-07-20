@@ -55,6 +55,8 @@ public class DocumentAnalysisService {
     private static final Pattern DATE_PATTERN = Pattern.compile("(20\\d{2})[.\\-/년\\s]+(0?[1-9]|1[0-2])[.\\-/월\\s]+(0?[1-9]|[12]\\d|3[01])");
     private static final Pattern TOTAL_PATTERN = Pattern.compile("(?:전체|총)\\s*(?:이사)?\\s*(\\d+)\\s*명");
     private static final Pattern ATTENDED_PATTERN = Pattern.compile("(?:참석|출석)\\s*(?:이사)?\\s*(\\d+)\\s*명");
+    private static final Pattern ELECTRICITY_PATTERN = Pattern.compile("(?:전력\\s*사용량|사용전력량|전력량)\\s*[:：]?\\s*([\\d,]+(?:\\.\\d+)?)\\s*(kWh|MWh|천kWh)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SHIPMENT_PATTERN = Pattern.compile("(?:출하액(?:\\s*계)?)\\s*[:：]?\\s*([\\d,]+(?:\\.\\d+)?)\\s*(억원|백만원|천원|원)");
 
     private final MetricMapper metricMapper;
     private final MetricService metricService;
@@ -95,21 +97,48 @@ public class DocumentAnalysisService {
             DocumentAnalysisResponse request,
             Integer companyId,
             Integer inputUserId) {
-        if (request == null || request.getRate() == null) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT, "최종 등록할 ESG 수치가 필요합니다.");
+        if (request == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "최종 등록할 분석 결과가 필요합니다.");
         }
 
-        Integer indicatorId = request.getIndicatorId();
-        if (indicatorId == null) {
-            indicatorId = metricMapper.findIndicatorIdByCode("IND_G_ATTENDANCE");
-        }
-        if (indicatorId == null) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT, "이사회 참석률 지표를 찾을 수 없습니다.");
-        }
+        boolean environmentDocument = "ENVIRONMENT".equalsIgnoreCase(request.getDetectedCategory())
+                || isPositive(request.getElectricityUsageKwh())
+                || isPositive(request.getShipmentAmountMillionKrw());
 
+        Integer indicatorId;
         Integer facilityId = request.getFacilityId();
-        if (facilityId == null) {
-            facilityId = metricMapper.findHeadquartersFacilityId(companyId.longValue());
+        BigDecimal value;
+        BigDecimal shipmentAmount = null;
+        String text;
+
+        if (environmentDocument) {
+            if (!isPositive(request.getElectricityUsageKwh())) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT, "환경 문서 등록에는 전력 사용량이 필요합니다.");
+            }
+            if (!isPositive(request.getShipmentAmountMillionKrw())) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT, "환경 문서 등록에는 출하액(백만원)이 필요합니다.");
+            }
+            indicatorId = metricMapper.findIndicatorIdByCode("IND_E_ELEC");
+            value = request.getElectricityUsageKwh();
+            shipmentAmount = request.getShipmentAmountMillionKrw();
+            text = buildEnvironmentFinalText(request);
+        } else {
+            if (request.getRate() == null) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT, "최종 등록할 ESG 수치가 필요합니다.");
+            }
+            indicatorId = request.getIndicatorId();
+            if (indicatorId == null) {
+                indicatorId = metricMapper.findIndicatorIdByCode("IND_G_ATTENDANCE");
+            }
+            value = request.getRate();
+            text = buildFinalText(request);
+            if (facilityId == null) {
+                facilityId = metricMapper.findHeadquartersFacilityId(companyId.longValue());
+            }
+        }
+
+        if (indicatorId == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "등록할 ESG 지표를 찾을 수 없습니다.");
         }
 
         int year = request.getReportingYear() == null ? LocalDate.now().getYear() : request.getReportingYear();
@@ -117,7 +146,6 @@ public class DocumentAnalysisService {
         String periodType = request.getPeriodType() == null || request.getPeriodType().isBlank()
                 ? "MONTHLY"
                 : request.getPeriodType();
-        String text = buildFinalText(request);
 
         MetricCreateRequest metricRequest = new MetricCreateRequest(
                 indicatorId,
@@ -125,7 +153,8 @@ public class DocumentAnalysisService {
                 year,
                 periodType,
                 periodValue,
-                request.getRate(),
+                value,
+                shipmentAmount,
                 text,
                 request.getFileUrl(),
                 false);
@@ -133,8 +162,9 @@ public class DocumentAnalysisService {
         if (Boolean.TRUE.equals(request.getSubmitForApproval())) {
             workflowService.requestApproval(metricId, inputUserId.longValue());
         }
-        log.info("[DOCUMENT_AI] 분석 결과 ESG 등록 metricId={} companyId={} userId={} submit={}",
-                metricId, companyId, inputUserId, Boolean.TRUE.equals(request.getSubmitForApproval()));
+        log.info("[DOCUMENT_AI] 분석 결과 ESG 등록 metricId={} companyId={} userId={} category={} submit={}",
+                metricId, companyId, inputUserId, environmentDocument ? "ENVIRONMENT" : "GOVERNANCE",
+                Boolean.TRUE.equals(request.getSubmitForApproval()));
         return metricId;
     }
 
@@ -144,9 +174,12 @@ public class DocumentAnalysisService {
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setBearerAuth(apiKey);
 
-            String systemPrompt = "대한민국 ESG 증빙문서 감사 보조자다. 제공 문서에서 이사회 또는 ESG 핵심 수치를 추출하고 JSON만 반환한다. "
-                    + "형식: {\"date\":\"YYYY-MM-DD\",\"total\":정수,\"attended\":정수,\"rate\":숫자,"
-                    + "\"agenda\":\"핵심 안건\",\"aiExplanation\":\"한글 3문장 요약\",\"confidence\":0~100}.";
+            String systemPrompt = "대한민국 ESG 증빙문서 감사 보조자다. 문서가 환경 전력·출하 실적 자료인지 이사회 자료인지 분류하고 JSON만 반환한다. "
+                    + "형식: {\"detectedCategory\":\"ENVIRONMENT 또는 GOVERNANCE\",\"date\":\"YYYY-MM-DD\","
+                    + "\"electricityUsageKwh\":숫자 또는 null,\"shipmentAmountMillionKrw\":숫자 또는 null,"
+                    + "\"total\":정수,\"attended\":정수,\"rate\":숫자,\"agenda\":\"핵심 안건\","
+                    + "\"aiExplanation\":\"한글 3문장 요약\",\"confidence\":0~100}. "
+                    + "전력은 kWh, 출하액은 백만원으로 변환해서 반환한다. 매출액과 출하액은 구분한다.";
 
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("model", model);
@@ -177,11 +210,25 @@ public class DocumentAnalysisService {
         int total = Math.max(result.path("total").asInt(0), 0);
         int attended = Math.max(result.path("attended").asInt(0), 0);
         BigDecimal rate = parseDecimal(result.path("rate").asText(), calculateRate(total, attended));
+        BigDecimal electricity = parseNullableDecimal(result.path("electricityUsageKwh"));
+        BigDecimal shipment = parseNullableDecimal(result.path("shipmentAmountMillionKrw"));
+        String category = result.path("detectedCategory").asText();
+        if (category == null || category.isBlank()) {
+            category = isPositive(electricity) || isPositive(shipment) ? "ENVIRONMENT" : "GOVERNANCE";
+        }
+        Integer indicatorId = "ENVIRONMENT".equalsIgnoreCase(category)
+                ? metricMapper.findIndicatorIdByCode("IND_E_ELEC")
+                : metricMapper.findIndicatorIdByCode("IND_G_ATTENDANCE");
         return baseResponse(extension, fileUrl)
+                .detectedCategory(category.toUpperCase())
+                .indicatorId(indicatorId)
                 .date(result.path("date").asText(LocalDate.now().toString()))
                 .total(total)
                 .attended(attended)
                 .rate(rate)
+                .electricityUsageKwh(electricity)
+                .shipmentAmountMillionKrw(shipment)
+                .shipmentUnit("백만원")
                 .confidence(parseDecimal(result.path("confidence").asText(), BigDecimal.valueOf(90)))
                 .agenda(result.path("agenda").asText("ESG 증빙자료 검토"))
                 .aiExplanation(result.path("aiExplanation").asText("문서에서 ESG 핵심 항목을 추출했습니다. 담당자의 최종 검토가 필요합니다."))
@@ -196,16 +243,28 @@ public class DocumentAnalysisService {
             attended = total;
         }
         BigDecimal rate = calculateRate(total, attended);
+        BigDecimal electricity = matchElectricityKwh(text);
+        BigDecimal shipment = matchShipmentMillionKrw(text);
+        boolean environment = isPositive(electricity) || isPositive(shipment);
         String agenda = firstMeaningfulLine(text);
-        String explanation = "문서에서 날짜, 인원 및 핵심 안건을 로컬 규칙으로 추출했습니다. "
-                + "OpenAI 키가 설정되면 문맥 기반 AI 요약이 추가됩니다. "
-                + "등록 전 담당자가 추출값과 증빙 원문을 반드시 확인해 주세요.";
+        String explanation = environment
+                ? "문서에서 전력 사용량과 출하액 후보값을 로컬 규칙으로 추출했습니다. "
+                    + "출하액은 백만원, 전력 사용량은 kWh 기준으로 변환했습니다. "
+                    + "등록 전 담당자가 추출값과 증빙 원문을 반드시 확인해 주세요."
+                : "문서에서 날짜, 인원 및 핵심 안건을 로컬 규칙으로 추출했습니다. "
+                    + "OpenAI 키가 설정되면 문맥 기반 AI 요약이 추가됩니다. "
+                    + "등록 전 담당자가 추출값과 증빙 원문을 반드시 확인해 주세요.";
         return baseResponse(extension, fileUrl)
+                .detectedCategory(environment ? "ENVIRONMENT" : "GOVERNANCE")
+                .indicatorId(metricMapper.findIndicatorIdByCode(environment ? "IND_E_ELEC" : "IND_G_ATTENDANCE"))
                 .date(date)
                 .total(total)
                 .attended(attended)
                 .rate(rate)
-                .confidence(BigDecimal.valueOf(total > 0 ? 78 : 55))
+                .electricityUsageKwh(electricity)
+                .shipmentAmountMillionKrw(shipment)
+                .shipmentUnit("백만원")
+                .confidence(BigDecimal.valueOf(environment ? 72 : (total > 0 ? 78 : 55)))
                 .agenda(agenda)
                 .aiExplanation(explanation)
                 .build();
@@ -214,6 +273,7 @@ public class DocumentAnalysisService {
     private DocumentAnalysisResponse.DocumentAnalysisResponseBuilder baseResponse(String extension, String fileUrl) {
         return DocumentAnalysisResponse.builder()
                 .type(extension.toUpperCase() + " ESG 증빙문서")
+                .detectedCategory("GOVERNANCE")
                 .indicatorId(metricMapper.findIndicatorIdByCode("IND_G_ATTENDANCE"))
                 .reportingYear(LocalDate.now().getYear())
                 .periodType("MONTHLY")
@@ -334,6 +394,61 @@ public class DocumentAnalysisService {
                 .findFirst()
                 .map(line -> truncate(line, 120))
                 .orElse("ESG 증빙자료 검토");
+    }
+
+    private BigDecimal matchElectricityKwh(String text) {
+        Matcher matcher = ELECTRICITY_PATTERN.matcher(text);
+        if (!matcher.find()) {
+            return null;
+        }
+        BigDecimal value = decimalWithComma(matcher.group(1));
+        String unit = matcher.group(2).toLowerCase();
+        if (unit.equals("mwh") || unit.equals("천kwh")) {
+            return value.multiply(BigDecimal.valueOf(1000));
+        }
+        return value;
+    }
+
+    private BigDecimal matchShipmentMillionKrw(String text) {
+        Matcher matcher = SHIPMENT_PATTERN.matcher(text);
+        if (!matcher.find()) {
+            return null;
+        }
+        BigDecimal value = decimalWithComma(matcher.group(1));
+        return switch (matcher.group(2)) {
+            case "억원" -> value.multiply(BigDecimal.valueOf(100));
+            case "백만원" -> value;
+            case "천원" -> value.divide(BigDecimal.valueOf(1000), 2, RoundingMode.HALF_UP);
+            case "원" -> value.divide(BigDecimal.valueOf(1_000_000), 2, RoundingMode.HALF_UP);
+            default -> value;
+        };
+    }
+
+    private BigDecimal decimalWithComma(String value) {
+        return new BigDecimal(value.replace(",", ""));
+    }
+
+    private BigDecimal parseNullableDecimal(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull() || node.asText().isBlank()) {
+            return null;
+        }
+        try {
+            return new BigDecimal(node.asText().replace(",", ""));
+        } catch (RuntimeException exception) {
+            return null;
+        }
+    }
+
+    private boolean isPositive(BigDecimal value) {
+        return value != null && value.signum() > 0;
+    }
+
+    private String buildEnvironmentFinalText(DocumentAnalysisResponse request) {
+        String explanation = request.getAiExplanation() == null ? "" : request.getAiExplanation().trim();
+        return "문서일자: " + (request.getDate() == null ? "-" : request.getDate())
+                + "\n전력 사용량: " + request.getElectricityUsageKwh() + " kWh"
+                + "\n출하액: " + request.getShipmentAmountMillionKrw() + " 백만원"
+                + "\n분석 요약: " + explanation;
     }
 
     private String buildFinalText(DocumentAnalysisResponse request) {

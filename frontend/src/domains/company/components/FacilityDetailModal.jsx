@@ -14,12 +14,24 @@ export default function FacilityDetailModal({ facility: facilitySource, metrics 
   const [activeTab, setActiveTab] = useState("overview");
   const facility = normalizeFacility(facilitySource || {});
   const [year, month] = String(period || "2026-05").split("-").map(Number);
-  const approvedRows = useMemo(() => metrics.map((metric) => ({
-    ...metric,
-    id: metric.id,
-    categoryName: categoryName[metric.category] || metric.category,
-    displayValue: metric.value === null || metric.value === undefined ? metric.textValue || "-" : `${formatNumber(metric.value, metric.unit === "%" ? 2 : metric.indicatorCode === "IND_E_SCOPE2" ? 2 : 0)} ${metric.unit || ""}`.trim(),
-  })), [metrics]);
+  const approvedRows = useMemo(() => {
+    const rows = metrics.map((metric) => ({
+      ...metric,
+      id: metric.id,
+      categoryName: categoryName[metric.category] || metric.category,
+      displayValue: metric.value === null || metric.value === undefined ? metric.textValue || "-" : `${formatNumber(metric.value, metric.unit === "%" ? 2 : metric.indicatorCode === "IND_E_SCOPE2" ? 2 : 0)} ${metric.unit || ""}`.trim(),
+    }));
+    const electricity = metrics.find((metric) => metric.indicatorCode === "IND_E_ELEC");
+    const scope2 = metrics.find((metric) => metric.indicatorCode === "IND_E_SCOPE2");
+    const shipmentMillion = Number(electricity?.shipmentAmountMillionKrw || 0);
+    const shipmentEok = shipmentMillion / 100;
+    if (shipmentMillion > 0) {
+      rows.push({ id: `shipment-${electricity.id}`, category: "ENVIRONMENT", categoryName: "환경", title: "출하액", displayValue: `${formatNumber(shipmentMillion, 2)} 백만원`, updatedAt: electricity.updatedAt, evidence: electricity.evidence });
+      rows.push({ id: `electricity-intensity-${electricity.id}`, category: "ENVIRONMENT", categoryName: "환경", title: "전력 원단위", displayValue: `${formatNumber((Number(electricity.value || 0) / 1000) / shipmentEok, 2)} MWh/억원`, updatedAt: electricity.updatedAt, evidence: electricity.evidence });
+      if (scope2) rows.push({ id: `carbon-intensity-${electricity.id}`, category: "ENVIRONMENT", categoryName: "환경", title: "탄소 원단위", displayValue: `${formatNumber(Number(scope2.value || 0) / shipmentEok, 2)} tCO₂eq/억원`, updatedAt: scope2.updatedAt, evidence: scope2.evidence });
+    }
+    return rows;
+  }, [metrics]);
   const environmentCount = approvedRows.filter((row) => row.category === "ENVIRONMENT").length;
   const socialCount = approvedRows.filter((row) => row.category === "SOCIAL").length;
   const governanceCount = approvedRows.filter((row) => row.category === "GOVERNANCE").length;

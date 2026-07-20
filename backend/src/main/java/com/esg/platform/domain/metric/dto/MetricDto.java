@@ -24,6 +24,7 @@ public class MetricDto {
     private Integer periodValue;
     private BigDecimal activityValue;
     private BigDecimal value;
+    private BigDecimal shipmentAmountMillionKrw;
     private String textValue;
     private String unit;
     private String source;

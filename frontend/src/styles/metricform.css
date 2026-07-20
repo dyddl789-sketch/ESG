@@ -117,3 +117,5 @@
     grid-template-columns: 1fr !important;
   }
 }
+
+.shipment-input-group small { display: block; margin-top: 6px; color: var(--text-muted, #6b7280); line-height: 1.5; }

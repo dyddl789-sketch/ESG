@@ -30,6 +30,8 @@ public class MetricService {
     @Transactional
     public Long createMetric(MetricCreateRequest request, Integer companyId, Integer inputUserId) {
         validate(request);
+        String indicatorCode = metricMapper.findIndicatorCodeById(request.indicatorId());
+        validateShipment(indicatorCode, request.shipmentAmount());
         EsgMetricData data = EsgMetricData.builder()
                 .companyId(companyId)
                 .facilityId(request.facilityId())
@@ -38,6 +40,7 @@ public class MetricService {
                 .periodType(parsePeriodType(request.periodType()))
                 .periodValue(request.periodValue())
                 .numericalValue(request.value())
+                .shipmentAmountMillionKrw(normalizeShipment(indicatorCode, request.shipmentAmount()))
                 .textValue(trimToNull(request.textValue()))
                 .evidenceFileUrl(trimToNull(request.evidenceFileUrl()))
                 .status(DataStatus.DRAFT)
@@ -55,6 +58,8 @@ public class MetricService {
     @Transactional
     public void updateMetric(Long id, MetricCreateRequest request, Integer inputUserId) {
         validate(request);
+        String indicatorCode = metricMapper.findIndicatorCodeById(request.indicatorId());
+        validateShipment(indicatorCode, request.shipmentAmount());
         EsgMetricData current = requireEntity(id);
         if (current.getStatus() == DataStatus.PENDING || current.getStatus() == DataStatus.APPROVED) {
             throw new BusinessException(ErrorCode.INVALID_WORKFLOW_STATUS,
@@ -67,6 +72,7 @@ public class MetricService {
         current.setPeriodType(parsePeriodType(request.periodType()));
         current.setPeriodValue(request.periodValue());
         current.setNumericalValue(request.value());
+        current.setShipmentAmountMillionKrw(normalizeShipment(indicatorCode, request.shipmentAmount()));
         current.setTextValue(trimToNull(request.textValue()));
         current.setEvidenceFileUrl(trimToNull(request.evidenceFileUrl()));
         current.setStatus(DataStatus.DRAFT);
@@ -113,6 +119,22 @@ public class MetricService {
         if (request.value() == null && trimToNull(request.textValue()) == null) {
             throw new BusinessException(ErrorCode.INVALID_INPUT, "정량 수치 또는 정성 내용을 입력해 주세요.");
         }
+    }
+
+    private void validateShipment(String indicatorCode, java.math.BigDecimal shipmentAmount) {
+        if ("IND_E_ELEC".equals(indicatorCode)
+                && (shipmentAmount == null || shipmentAmount.signum() <= 0)) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_INPUT,
+                    "전력 사용량 등록 시 해당 사업장·기간의 출하액(백만원)을 입력해 주세요.");
+        }
+    }
+
+    private java.math.BigDecimal normalizeShipment(String indicatorCode, java.math.BigDecimal shipmentAmount) {
+        if (!"IND_E_ELEC".equals(indicatorCode) || shipmentAmount == null) {
+            return null;
+        }
+        return shipmentAmount.stripTrailingZeros();
     }
 
     private PeriodType parsePeriodType(String value) {

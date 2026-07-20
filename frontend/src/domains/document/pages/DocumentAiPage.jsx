@@ -65,6 +65,9 @@ export default function DocumentAiPage() {
   };
 
   const update = (key, value) => setResult((current) => ({ ...current, [key]: value }));
+  const isEnvironmentDocument = result?.detectedCategory === "ENVIRONMENT"
+    || Number(result?.electricityUsageKwh || 0) > 0
+    || Number(result?.shipmentAmountMillionKrw || 0) > 0;
 
   return (
     <div className="page-stack">
@@ -86,7 +89,7 @@ export default function DocumentAiPage() {
             />
             <Icon name="upload" size={30} />
             <strong>{file?.name || "분석할 문서를 선택하세요."}</strong>
-            <span>이사회 회의록, 안전보고서, 전력 고지서</span>
+            <span>이사회 회의록, 안전보고서, 전력 고지서·출하 실적</span>
           </label>
           <Button className="full" disabled={!file || loading} onClick={analyze}>
             <Icon name="ai" size={17} /> {loading ? "문서 분석 진행 중..." : "AI 분석 실행"}
@@ -99,6 +102,7 @@ export default function DocumentAiPage() {
           ) : (
             <div className="analysis-status">
               <article><span>문서 유형</span><strong>{result.type}</strong></article>
+              <article><span>분석 영역</span><strong>{isEnvironmentDocument ? "환경" : "거버넌스"}</strong></article>
               <article><span>신뢰도</span><strong>{Number(result.confidence || 0).toFixed(0)}%</strong></article>
               <article><span>상태</span><strong className="success-text">분석 완료</strong></article>
             </div>
@@ -113,10 +117,16 @@ export default function DocumentAiPage() {
             <div className="form-group"><label>기준연도</label><select value={result.reportingYear} onChange={(event) => update("reportingYear", Number(event.target.value))}><option value={2026}>2026년</option><option value={2025}>2025년</option></select></div>
             <div className="form-group"><label>기준월</label><select value={result.periodValue} onChange={(event) => update("periodValue", Number(event.target.value))}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}월</option>)}</select></div>
             <div className="form-group"><label>문서일자</label><input value={result.date || ""} onChange={(event) => update("date", event.target.value)} /></div>
-            <div className="form-group"><label>전체 이사</label><input type="number" value={result.total ?? 0} onChange={(event) => update("total", Number(event.target.value))} /></div>
-            <div className="form-group"><label>참석 이사</label><input type="number" value={result.attended ?? 0} onChange={(event) => update("attended", Number(event.target.value))} /></div>
-            <div className="form-group"><label>참석률</label><input type="number" step="0.1" value={result.rate ?? 0} onChange={(event) => update("rate", Number(event.target.value))} /></div>
-            <div className="form-group form-span-2"><label>핵심 ESG 안건</label><input value={result.agenda || ""} onChange={(event) => update("agenda", event.target.value)} /></div>
+            {isEnvironmentDocument ? <>
+              <div className="form-group"><label>전력 사용량 (kWh) *</label><input type="number" min="0" step="0.01" value={result.electricityUsageKwh ?? ""} onChange={(event) => update("electricityUsageKwh", event.target.value === "" ? null : Number(event.target.value))} /></div>
+              <div className="form-group"><label>출하액 (백만원) *</label><input type="number" min="0" step="0.01" value={result.shipmentAmountMillionKrw ?? ""} onChange={(event) => update("shipmentAmountMillionKrw", event.target.value === "" ? null : Number(event.target.value))} /></div>
+              <div className="form-group form-span-2"><label>추출 기준</label><input value="전력 kWh · 출하액 백만원" readOnly /></div>
+            </> : <>
+              <div className="form-group"><label>전체 이사</label><input type="number" value={result.total ?? 0} onChange={(event) => update("total", Number(event.target.value))} /></div>
+              <div className="form-group"><label>참석 이사</label><input type="number" value={result.attended ?? 0} onChange={(event) => update("attended", Number(event.target.value))} /></div>
+              <div className="form-group"><label>참석률</label><input type="number" step="0.1" value={result.rate ?? 0} onChange={(event) => update("rate", Number(event.target.value))} /></div>
+              <div className="form-group form-span-2"><label>핵심 ESG 안건</label><input value={result.agenda || ""} onChange={(event) => update("agenda", event.target.value)} /></div>
+            </>}
             <div className="form-group form-span-2"><label>AI 분석 요약</label><textarea value={result.aiExplanation || ""} onChange={(event) => update("aiExplanation", event.target.value)} /></div>
           </div>
           <div className="card-actions">

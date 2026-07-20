@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.esg.platform.domain.benchmark.mapper.ExternalBenchmarkMapper">
+
+    <insert id="insertSyncRun" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO external_benchmark_sync_runs (
+            company_id, base_year, industry_code, status, triggered_by, started_at
+        ) VALUES (
+            #{companyId}, #{baseYear}, #{industryCode}, #{status}, #{triggeredBy}, CURRENT_TIMESTAMP
+        )
+    </insert>
+
+    <update id="completeSyncRun">
+        UPDATE external_benchmark_sync_runs
+        SET status = #{status},
+            completed_at = CURRENT_TIMESTAMP,
+            error_message = #{errorMessage}
+        WHERE id = #{id}
+    </update>
+
+    <insert id="upsertValue">
+        INSERT INTO external_benchmark_values (
+            company_id, source_code, dataset_code, metric_code, base_year,
+            industry_code, industry_name, original_value, original_unit,
+            normalized_value, normalized_unit, source_updated_at, raw_payload,
+            synced_at, sync_run_id
+        ) VALUES (
+            #{companyId}, #{sourceCode}, #{datasetCode}, #{metricCode}, #{baseYear},
+            #{industryCode}, #{industryName}, #{originalValue}, #{originalUnit},
+            #{normalizedValue}, #{normalizedUnit}, #{sourceUpdatedAt},
+            CAST(#{rawPayload} AS JSONB), CURRENT_TIMESTAMP, #{syncRunId}
+        )
+        ON CONFLICT (company_id, source_code, metric_code, base_year, industry_code)
+        DO UPDATE SET
+            dataset_code = EXCLUDED.dataset_code,
+            industry_name = EXCLUDED.industry_name,
+            original_value = EXCLUDED.original_value,
+            original_unit = EXCLUDED.original_unit,
+            normalized_value = EXCLUDED.normalized_value,
+            normalized_unit = EXCLUDED.normalized_unit,
+            source_updated_at = EXCLUDED.source_updated_at,
+            raw_payload = EXCLUDED.raw_payload,
+            synced_at = CURRENT_TIMESTAMP,
+            sync_run_id = EXCLUDED.sync_run_id
+    </insert>
+
+    <select id="findValue" resultType="com.esg.platform.domain.benchmark.dto.ExternalBenchmarkValue">
+        SELECT id, company_id, source_code, dataset_code, metric_code, base_year,
+               industry_code, industry_name, original_value, original_unit,
+               normalized_value, normalized_unit, source_updated_at,
+               raw_payload::text AS raw_payload, synced_at, sync_run_id
+        FROM external_benchmark_values
+        WHERE company_id = #{companyId}
+          AND base_year = #{baseYear}
+          AND industry_code = #{industryCode}
+          AND metric_code = #{metricCode}
+        ORDER BY synced_at DESC
+        LIMIT 1
+    </select>
+
+    <select id="findLatestRun" resultType="com.esg.platform.domain.benchmark.dto.ExternalBenchmarkSyncRun">
+        SELECT id, company_id, base_year, industry_code, status, triggered_by,
+               started_at, completed_at, error_message
+        FROM external_benchmark_sync_runs
+        WHERE company_id = #{companyId}
+        ORDER BY started_at DESC, id DESC
+        LIMIT 1
+    </select>
+
+    <select id="findLatestInternalYear" resultType="int">
+        SELECT MAX(m.reporting_year)
+        FROM esg_metric_data m
+        JOIN esg_indicators i ON i.id = m.indicator_id
+        WHERE m.company_id = #{companyId}
+          AND m.status = 'APPROVED'
+          AND i.indicator_code = 'IND_E_ELEC'
+          AND m.shipment_amount_million_krw &gt; 0
+    </select>
+
+    <select id="findLatestComparableMonth" resultType="int">
+        WITH active_facilities AS (
+            SELECT COUNT(*)::INT AS facility_count
+            FROM company_facilities
+            WHERE company_id = #{companyId}
+              AND is_active = TRUE
+        ), matched AS (
+            SELECT electricity.period_value,
+                   COUNT(DISTINCT electricity.facility_id)::INT AS matched_count
+            FROM esg_metric_data electricity
+            JOIN esg_indicators electricity_indicator
+              ON electricity_indicator.id = electricity.indicator_id
+             AND electricity_indicator.indicator_code = 'IND_E_ELEC'
+            JOIN esg_metric_data scope2
+              ON scope2.company_id = electricity.company_id
+             AND scope2.facility_id = electricity.facility_id
+             AND scope2.reporting_year = electricity.reporting_year
+             AND scope2.period_type = electricity.period_type
+             AND scope2.period_value = electricity.period_value
+             AND scope2.status = 'APPROVED'
+            JOIN esg_indicators scope_indicator
+              ON scope_indicator.id = scope2.indicator_id
+             AND scope_indicator.indicator_code = 'IND_E_SCOPE2'
+            WHERE electricity.company_id = #{companyId}
+              AND electricity.reporting_year = #{year}
+              AND electricity.period_type = 'MONTHLY'
+              AND electricity.status = 'APPROVED'
+              AND electricity.shipment_amount_million_krw &gt; 0
+            GROUP BY electricity.period_value
+        )
+        SELECT MAX(matched.period_value)
+        FROM matched
+        CROSS JOIN active_facilities
+        WHERE matched.matched_count = active_facilities.facility_count
+    </select>
+
+    <select id="findInternalAggregate" resultType="com.esg.platform.domain.benchmark.dto.InternalBenchmarkAggregate">
+        WITH electricity AS (
+            SELECT m.facility_id, m.period_value, m.numerical_value,
+                   m.shipment_amount_million_krw
+            FROM esg_metric_data m
+            JOIN esg_indicators i ON i.id = m.indicator_id
+            WHERE m.company_id = #{companyId}
+              AND m.reporting_year = #{year}
+              AND m.period_type = 'MONTHLY'
+              AND m.period_value BETWEEN 1 AND #{throughMonth}
+              AND m.status = 'APPROVED'
+              AND i.indicator_code = 'IND_E_ELEC'
+              AND m.shipment_amount_million_krw &gt; 0
+        ), scope2 AS (
+            SELECT m.facility_id, m.period_value, m.numerical_value
+            FROM esg_metric_data m
+            JOIN esg_indicators i ON i.id = m.indicator_id
+            WHERE m.company_id = #{companyId}
+              AND m.reporting_year = #{year}
+              AND m.period_type = 'MONTHLY'
+              AND m.period_value BETWEEN 1 AND #{throughMonth}
+              AND m.status = 'APPROVED'
+              AND i.indicator_code = 'IND_E_SCOPE2'
+        )
+        SELECT COALESCE(SUM(electricity.numerical_value) / 1000.0, 0) AS electricity_mwh,
+               COALESCE(SUM(electricity.shipment_amount_million_krw) / 100.0, 0) AS shipment_hundred_million_krw,
+               COALESCE(SUM(scope2.numerical_value), 0) AS scope2_tco2eq,
+               COUNT(*)::INT AS matched_facility_months
+        FROM electricity
+        JOIN scope2
+          ON scope2.facility_id = electricity.facility_id
+         AND scope2.period_value = electricity.period_value
+    </select>
+</mapper>

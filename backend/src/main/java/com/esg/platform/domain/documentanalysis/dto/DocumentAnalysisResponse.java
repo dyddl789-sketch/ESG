@@ -21,10 +21,14 @@ public class DocumentAnalysisResponse {
     private String periodType;
     private Integer periodValue;
     private String type;
+    private String detectedCategory;
     private String date;
     private Integer total;
     private Integer attended;
     private BigDecimal rate;
+    private BigDecimal electricityUsageKwh;
+    private BigDecimal shipmentAmountMillionKrw;
+    private String shipmentUnit;
     private BigDecimal confidence;
     private String agenda;
     private String aiExplanation;

@@ -23,6 +23,7 @@ public class EsgMetricData {
     private BigDecimal peakDemandKw;
     private Integer emissionFactorId;
     private BigDecimal numericalValue;
+    private BigDecimal shipmentAmountMillionKrw;
     private String textValue;
     private String evidenceFileUrl;
     private DataStatus status;

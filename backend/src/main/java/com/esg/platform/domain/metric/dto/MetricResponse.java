@@ -25,6 +25,7 @@ public class MetricResponse {
     private Integer year;
     private String period;
     private BigDecimal value;
+    private BigDecimal shipmentAmountMillionKrw;
     private String unit;
     private String source;
     private String method;
