@@ -7,19 +7,43 @@ import Icon from "../../../shared/components/Icon";
 import { fileApi } from "../../../shared/api/fileApi";
 import companyApi from "../../company/api/companyApi";
 import { documentApi } from "../api/documentApi";
+import { metricApi } from "../../metric/api/metricApi";
 import { apiErrorMessage } from "../../../shared/utils/esgFormat";
+import { tokenStorage } from "../../../shared/auth/tokenStorage";
+import "../../../styles/metricform.css"; // 👈 [수정] 누락되었던 스타일 파일 명시적 임포트 추가
 
 export default function DocumentAiPage() {
   const [file, setFile] = useState(null);
   const [result, setResult] = useState(null);
   const [facilities, setFacilities] = useState([]);
+  const [indicators, setIndicators] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [userRole, setUserRole] = useState("");
 
   useEffect(() => {
-    companyApi.getFacilities()
-      .then((response) => setFacilities(response?.data || []))
-      .catch(() => setFacilities([]));
+    Promise.all([
+      companyApi.getFacilities(),
+      metricApi.getIndicators()
+    ])
+      .then(([facRes, indRes]) => {
+        setFacilities(facRes?.data?.data || facRes?.data || []);
+        setIndicators(Array.isArray(indRes) ? indRes : []);
+      })
+      .catch(() => {
+        setFacilities([]);
+        setIndicators([]);
+      });
+
+    try {
+      const token = tokenStorage.getAccessToken();
+      if (token) {
+        const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+        setUserRole(payload?.role || payload?.roles || payload?.auth || "");
+      }
+    } catch (e) {
+      setUserRole("");
+    }
   }, []);
 
   const analyze = async () => {
@@ -29,13 +53,18 @@ export default function DocumentAiPage() {
       const uploadResponse = await fileApi.upload(file);
       const fileUrl = uploadResponse.data?.data?.fileUrl || uploadResponse.data?.fileUrl;
       const analysis = await documentApi.helper(fileUrl);
-      const hq = facilities.find((facility) => facility.facility_type === "HQ") || facilities[0];
+      const hq = facilities.find((facility) => facility.facility_type === "HQ") || facilities;
+      
       setResult({
-        ...analysis,
+        indicatorId: analysis?.indicatorId || "",
         facilityId: analysis?.facilityId || hq?.id || "",
-        reportingYear: analysis?.reportingYear || 2026,
+        reportingYear: analysis?.reportingYear || new Date().getFullYear(),
         periodType: "MONTHLY",
-        periodValue: analysis?.periodValue || 6,
+        periodValue: analysis?.periodValue || new Date().getMonth() + 1,
+        value: analysis?.value !== undefined && analysis?.value !== null ? String(analysis.value) : "",
+        textValue: analysis?.textValue || analysis?.aiExplanation || "",
+        type: analysis?.type || "분석 문서",
+        confidence: analysis?.confidence || 100,
         fileUrl,
       });
     } catch (error) {
@@ -49,7 +78,18 @@ export default function DocumentAiPage() {
     if (!result) return;
     setSubmitting(true);
     try {
-      const response = await documentApi.submit({ ...result, submitForApproval });
+      const payload = {
+        indicatorId: Number(result.indicatorId),
+        facilityId: result.facilityId ? Number(result.facilityId) : null,
+        reportingYear: Number(result.reportingYear),
+        periodType: result.periodType,
+        periodValue: Number(result.periodValue),
+        value: result.value !== "" ? Number(result.value) : null,
+        textValue: result.textValue,
+        evidenceFileUrl: result.fileUrl,
+        submitForApproval
+      };
+      const response = await documentApi.submit(payload);
       await Swal.fire(
         submitForApproval ? "승인 요청 완료" : "임시저장 완료",
         response?.message || "문서 분석 결과가 ESG 데이터로 등록되었습니다.",
@@ -111,27 +151,38 @@ export default function DocumentAiPage() {
       </div>
 
       {result && (
-        <Card title="AI 추출 결과 최종 검토" description="AI 결과를 확인·수정한 후 임시저장하거나 승인 요청합니다.">
-          <div className="form-grid">
-            <div className="form-group"><label>사업장</label><select value={result.facilityId || ""} onChange={(event) => update("facilityId", Number(event.target.value))}><option value="">사업장 선택</option>{facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.facility_name}</option>)}</select></div>
-            <div className="form-group"><label>기준연도</label><select value={result.reportingYear} onChange={(event) => update("reportingYear", Number(event.target.value))}><option value={2026}>2026년</option><option value={2025}>2025년</option></select></div>
-            <div className="form-group"><label>기준월</label><select value={result.periodValue} onChange={(event) => update("periodValue", Number(event.target.value))}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}월</option>)}</select></div>
-            <div className="form-group"><label>문서일자</label><input value={result.date || ""} onChange={(event) => update("date", event.target.value)} /></div>
-            {isEnvironmentDocument ? <>
-              <div className="form-group"><label>전력 사용량 (kWh) *</label><input type="number" min="0" step="0.01" value={result.electricityUsageKwh ?? ""} onChange={(event) => update("electricityUsageKwh", event.target.value === "" ? null : Number(event.target.value))} /></div>
-              <div className="form-group"><label>출하액 (백만원) *</label><input type="number" min="0" step="0.01" value={result.shipmentAmountMillionKrw ?? ""} onChange={(event) => update("shipmentAmountMillionKrw", event.target.value === "" ? null : Number(event.target.value))} /></div>
-              <div className="form-group form-span-2"><label>추출 기준</label><input value="전력 kWh · 출하액 백만원" readOnly /></div>
-            </> : <>
-              <div className="form-group"><label>전체 이사</label><input type="number" value={result.total ?? 0} onChange={(event) => update("total", Number(event.target.value))} /></div>
-              <div className="form-group"><label>참석 이사</label><input type="number" value={result.attended ?? 0} onChange={(event) => update("attended", Number(event.target.value))} /></div>
-              <div className="form-group"><label>참석률</label><input type="number" step="0.1" value={result.rate ?? 0} onChange={(event) => update("rate", Number(event.target.value))} /></div>
-              <div className="form-group form-span-2"><label>핵심 ESG 안건</label><input value={result.agenda || ""} onChange={(event) => update("agenda", event.target.value)} /></div>
-            </>}
-            <div className="form-group form-span-2"><label>AI 분석 요약</label><textarea value={result.aiExplanation || ""} onChange={(event) => update("aiExplanation", event.target.value)} /></div>
+        <Card title="AI 추출 결과 최종 검토" description={userRole === "COMPANY_MANAGER" ? "AI 결과를 확인·수정한 후 임시저장하거나 승인 요청합니다." : "AI가 매핑한 추출 결과를 검토합니다. (읽기 전용)"}>
+          {/* ⭕ [구조 변경]: 수동 등록 폼 CSS 컴포넌트와 완벽히 격리 연동되도록 하이퍼 래퍼 컴포넌트 추가 */}
+          <div className="card-internal-wrapper">
+            <div className="form-grid">
+              <div className="form-group">
+                <label>매핑된 ESG 지표 *</label>
+                <select value={result.indicatorId} onChange={(event) => update("indicatorId", event.target.value)} disabled={userRole !== "COMPANY_MANAGER"} required>
+                  <option value="">지표 자동 매핑 실패 시 선택</option>
+                  {indicators.map(ind => (
+                    <option key={ind.id} value={ind.id}>[{ind.category}] {ind.title} ({ind.unit})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group"><label>사업장</label><select value={result.facilityId || ""} onChange={(event) => update("facilityId", Number(event.target.value))} disabled={userRole !== "COMPANY_MANAGER"}><option value="">사업장 선택</option>{facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.facility_name}</option>)}</select></div>
+              <div className="form-group"><label>기준연도</label><select value={result.reportingYear} onChange={(event) => update("reportingYear", Number(event.target.value))} disabled={userRole !== "COMPANY_MANAGER"}><option value={2026}>2026년</option><option value={2025}>2025년</option></select></div>
+              <div className="form-group"><label>기준월</label><select value={result.periodValue} onChange={(event) => update("periodValue", Number(event.target.value))} disabled={userRole !== "COMPANY_MANAGER"}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}월</option>)}</select></div>
+              <div className="form-group"><label>정량 수치 (숫자)</label><input type="number" step="any" value={result.value} onChange={(event) => update("value", event.target.value)} readOnly={userRole !== "COMPANY_MANAGER"} placeholder="추출된 수치 데이터가 표시됩니다." /></div>
+              <div className="form-group form-span-2"><label>AI 분석 요약 / 정성 내용</label><textarea value={result.textValue} onChange={(event) => update("textValue", event.target.value)} readOnly={userRole !== "COMPANY_MANAGER"} rows={5} placeholder="문서 요약 및 정성적 분석 내용이 표시됩니다." /></div>
+            </div>
           </div>
           <div className="card-actions">
-            <Button variant="outline" disabled={submitting} onClick={() => submit(false)}>임시저장</Button>
-            <Button disabled={submitting} onClick={() => submit(true)}>ESG 데이터 승인 요청</Button>
+            {/* COMPANY_MANAGER 권한을 가진 사용자에게만 버튼 노출 */}
+            {userRole === 'COMPANY_MANAGER' && (
+              <>
+                <Button variant="outline" disabled={submitting} onClick={() => submit(false)}>
+                  임시저장
+                </Button>
+                <Button disabled={submitting} onClick={() => submit(true)}>
+                  ESG 데이터 승인 요청
+                </Button>
+              </>
+            )}
           </div>
         </Card>
       )}
