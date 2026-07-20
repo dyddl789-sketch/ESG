@@ -52,7 +52,7 @@ import lombok.extern.slf4j.Slf4j;
 @Transactional(readOnly = true)
 public class DocumentAnalysisService {
 
-    private static final Pattern DATE_PATTERN = Pattern.compile("(20\\d{2})[.\\-/년\\s]+(0?[1-9]|1[0-2])[.\\-/월\\s]+(0?[1-9]|[12]\\d|3[01])");
+    private static final Pattern DATE_PATTERN = Pattern.compile("(20\\d{2})[.\\-/년\\s]+(0?[1-9]|1[0-2])[.\\-/월\\s]+(0?[1-9]|\\d|3)");
     private static final Pattern TOTAL_PATTERN = Pattern.compile("(?:전체|총)\\s*(?:이사)?\\s*(\\d+)\\s*명");
     private static final Pattern ATTENDED_PATTERN = Pattern.compile("(?:참석|출석)\\s*(?:이사)?\\s*(\\d+)\\s*명");
 
@@ -68,13 +68,20 @@ public class DocumentAnalysisService {
     @Value("${openai.api.key:}")
     private String apiKey;
 
-    @Value("${openai.api.url:https://api.openai.com/v1/chat/completions}")
+    @Value("${openai.api.url:https://openai.com}")
     private String apiUrl;
 
     @Value("${openai.api.model:gpt-4o-mini}")
     private String model;
 
     public DocumentAnalysisResponse generateAiHelperData(String fileUrl) {
+        if (apiKey != null && apiKey.length() > 10) {
+            log.info("[KEY_CHECK] 주입된 키 길이: {}, 앞4자리: {}, 뒤4자리: {}", 
+                     apiKey.length(), apiKey.substring(0, 4), apiKey.substring(apiKey.length() - 4));
+        } else {
+            log.error("[KEY_CHECK] 위험! API 키가 비어있거나 너무 짧습니다. 현재값: {}", apiKey);
+        }
+        
         Path uploadedFile = resolveUploadedFile(fileUrl);
         String extension = extensionOf(uploadedFile.getFileName().toString());
         String extractedText = extractText(uploadedFile, extension);
@@ -95,16 +102,13 @@ public class DocumentAnalysisService {
             DocumentAnalysisResponse request,
             Integer companyId,
             Integer inputUserId) {
-        if (request == null || request.getRate() == null) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT, "최종 등록할 ESG 수치가 필요합니다.");
+        if (request == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "최종 등록할 ESG 데이터가 필요합니다.");
         }
 
         Integer indicatorId = request.getIndicatorId();
         if (indicatorId == null) {
-            indicatorId = metricMapper.findIndicatorIdByCode("IND_G_ATTENDANCE");
-        }
-        if (indicatorId == null) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT, "이사회 참석률 지표를 찾을 수 없습니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "ESG 지표가 매핑되거나 선택되어야 합니다.");
         }
 
         Integer facilityId = request.getFacilityId();
@@ -125,7 +129,7 @@ public class DocumentAnalysisService {
                 year,
                 periodType,
                 periodValue,
-                request.getRate(),
+                request.getValue(),
                 text,
                 request.getFileUrl(),
                 false);
@@ -137,16 +141,31 @@ public class DocumentAnalysisService {
                 metricId, companyId, inputUserId, Boolean.TRUE.equals(request.getSubmitForApproval()));
         return metricId;
     }
-
     private DocumentAnalysisResponse callOpenAi(String text, String extension, String fileUrl) {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(apiKey);
+            headers.set("Authorization", "Bearer " + apiKey.trim());
 
-            String systemPrompt = "대한민국 ESG 증빙문서 감사 보조자다. 제공 문서에서 이사회 또는 ESG 핵심 수치를 추출하고 JSON만 반환한다. "
-                    + "형식: {\"date\":\"YYYY-MM-DD\",\"total\":정수,\"attended\":정수,\"rate\":숫자,"
-                    + "\"agenda\":\"핵심 안건\",\"aiExplanation\":\"한글 3문장 요약\",\"confidence\":0~100}.";
+            List<com.esg.platform.domain.metric.dto.IndicatorResponse> allIndicators = metricMapper.findActiveIndicators();
+            StringBuilder indicatorContext = new StringBuilder();
+            if (allIndicators != null) {
+                for (com.esg.platform.domain.metric.dto.IndicatorResponse ind : allIndicators) {
+                    indicatorContext.append(String.format("- 지표ID [%d]: [%s] %s (%s)\n", 
+                        ind.id(), ind.category() != null ? ind.category().name() : "", ind.title(), ind.unit()));
+                }
+            }
+
+            // ⭕ [400 에러 해결]: 지시문 양식에 영문 소문자 'json' 단어를 추가하여 OpenAI 엔진의 validation 규격을 통과시킵니다.
+            String systemPrompt = "대한민국 ESG 감사 법인 도우미 엔진이다. 업로드된 문서 본문을 읽고 표준 ESG 데이터 규격으로 추출 매핑해라. "
+                    + "제공된 문서 본문을 읽고, 아래 [ESG 지표 마스터 목록]에서 가장 맥락이 일치하는 지표의 ID(indicatorId)를 스스로 식별하여 매핑해라. "
+                    + "추출 규칙: 1.해당 실적이 실제 발생한 연도(reportingYear)와 월(periodValue)을 숫자로 파싱할 것. "
+                    + "2.문서 내 핵심 수치 실적값(value)을 정교하게 추출하여 숫자로 표기할 것(수치가 없다면 null). "
+                    + "3.문서의 종류를 식별하여 '이사회 회의록', '전력 고지서' 등으로 분류할 것(type). "
+                    + "4.전체 문맥을 파악해 3문장 이내의 정성 분석 및 AI 요약문(textValue)을 작성할 것. "
+                    + "형식: Output must be a pure json object with the following structure: {\"indicatorId\":정수,\"reportingYear\":정수,\"periodValue\":정수,\"value\":숫자 또는 null,"
+                    + "\"textValue\":\"한글 요약 및 비고\",\"type\":\"문서 종류\",\"confidence\":0~100}.\n\n"
+                    + "[ESG 지표 마스터 목록]\n" + indicatorContext.toString();
 
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("model", model);
@@ -165,6 +184,7 @@ public class DocumentAnalysisService {
                 throw new IllegalStateException("AI 응답에 choices가 없습니다.");
             }
             String content = choices.get(0).path("message").path("content").asText();
+            System.out.println("====== [OPENAI API RESP BODY] ======\n" + content);
             JsonNode result = objectMapper.readTree(content);
             return responseFromJson(result, extension, fileUrl);
         } catch (Exception exception) {
@@ -174,54 +194,43 @@ public class DocumentAnalysisService {
     }
 
     private DocumentAnalysisResponse responseFromJson(JsonNode result, String extension, String fileUrl) {
-        int total = Math.max(result.path("total").asInt(0), 0);
-        int attended = Math.max(result.path("attended").asInt(0), 0);
-        BigDecimal rate = parseDecimal(result.path("rate").asText(), calculateRate(total, attended));
+        JsonNode valNode = result.path("value");
+        BigDecimal extractedValue = (valNode.isNull() || valNode.isMissingNode()) ? null : new BigDecimal(valNode.asText());
+        Integer indicatorId = result.has("indicatorId") && !result.path("indicatorId").isNull() ? result.path("indicatorId").asInt() : null;
+        
         return baseResponse(extension, fileUrl)
-                .date(result.path("date").asText(LocalDate.now().toString()))
-                .total(total)
-                .attended(attended)
-                .rate(rate)
+                .indicatorId(indicatorId)
+                .reportingYear(result.path("reportingYear").asInt(LocalDate.now().getYear()))
+                .periodValue(result.path("periodValue").asInt(LocalDate.now().getMonthValue()))
+                .value(extractedValue)
+                .textValue(result.path("textValue").asText("문서 내용 검토 필요."))
+                .type(result.path("type").asText(extension.toUpperCase() + " 증빙문서"))
                 .confidence(parseDecimal(result.path("confidence").asText(), BigDecimal.valueOf(90)))
-                .agenda(result.path("agenda").asText("ESG 증빙자료 검토"))
-                .aiExplanation(result.path("aiExplanation").asText("문서에서 ESG 핵심 항목을 추출했습니다. 담당자의 최종 검토가 필요합니다."))
                 .build();
     }
 
     private DocumentAnalysisResponse createLocalFallback(String text, String extension, String fileUrl) {
-        String date = matchDate(text);
-        int total = matchInt(TOTAL_PATTERN, text);
-        int attended = matchInt(ATTENDED_PATTERN, text);
-        if (total > 0 && attended > total) {
-            attended = total;
-        }
-        BigDecimal rate = calculateRate(total, attended);
-        String agenda = firstMeaningfulLine(text);
-        String explanation = "문서에서 날짜, 인원 및 핵심 안건을 로컬 규칙으로 추출했습니다. "
-                + "OpenAI 키가 설정되면 문맥 기반 AI 요약이 추가됩니다. "
-                + "등록 전 담당자가 추출값과 증빙 원문을 반드시 확인해 주세요.";
+        String explanation = "OpenAI 통신 장애로 인해 로컬 시스템 규칙으로 기본 메타데이터만 구성했습니다. "
+                + "실적 수치 및 지표 분류를 위해 담당자가 직접 확인하고 값을 입력해 주세요.";
         return baseResponse(extension, fileUrl)
-                .date(date)
-                .total(total)
-                .attended(attended)
-                .rate(rate)
-                .confidence(BigDecimal.valueOf(total > 0 ? 78 : 55))
-                .agenda(agenda)
-                .aiExplanation(explanation)
+                .reportingYear(LocalDate.now().getYear())
+                .periodValue(LocalDate.now().getMonthValue())
+                .value(null)
+                .textValue(explanation)
+                .confidence(BigDecimal.valueOf(50))
                 .build();
     }
 
     private DocumentAnalysisResponse.DocumentAnalysisResponseBuilder baseResponse(String extension, String fileUrl) {
         return DocumentAnalysisResponse.builder()
                 .type(extension.toUpperCase() + " ESG 증빙문서")
-                .indicatorId(metricMapper.findIndicatorIdByCode("IND_G_ATTENDANCE"))
+                .indicatorId(null) 
                 .reportingYear(LocalDate.now().getYear())
                 .periodType("MONTHLY")
                 .periodValue(LocalDate.now().getMonthValue())
                 .fileUrl(fileUrl)
                 .submitForApproval(false);
     }
-
     private Path resolveUploadedFile(String fileUrl) {
         if (fileUrl == null || fileUrl.isBlank()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT, "분석할 파일 경로가 필요합니다.");
@@ -337,11 +346,7 @@ public class DocumentAnalysisService {
     }
 
     private String buildFinalText(DocumentAnalysisResponse request) {
-        String explanation = request.getAiExplanation() == null ? "" : request.getAiExplanation().trim();
-        String agenda = request.getAgenda() == null ? "" : request.getAgenda().trim();
-        return "문서일자: " + (request.getDate() == null ? "-" : request.getDate())
-                + "\n핵심 안건: " + agenda
-                + "\n분석 요약: " + explanation;
+        return request.getTextValue() == null ? "" : request.getTextValue().trim();
     }
 
     private String truncate(String value, int maxLength) {

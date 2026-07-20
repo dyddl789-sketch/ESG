@@ -117,3 +117,50 @@
     grid-template-columns: 1fr !important;
   }
 }
+/* ==========================================================================
+   DocumentAiPage - 최종 검토 카드 2열 그리드 교정 및 찌그러짐 박멸 (완성판)
+   ========================================================================== */
+
+/* 1. 하단 카드의 form-grid를 1열 세로 배열에서 수동 폼의 결을 유지한 채 2열 격자로 강제 튜닝 */
+.page-stack div:not(.two-cols) > .card-internal-wrapper .form-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important; /* 무조건 균등한 50% 가로 분할 */
+  gap: 20px 24px !important;                         /* 수동 입력 폼의 gap 규격 이식 */
+}
+
+/* 2. 첫 번째 지표 매핑 선택창 한 줄 통째로(2칸) 차지하도록 제어 */
+.page-stack div:not(.two-cols) > .card-internal-wrapper .form-grid .form-group:nth-child(1) {
+  grid-column: span 2 !important;
+}
+
+/* 3. 마지막 정성 내용 textarea 블록도 한 줄 통째로(2칸) 완벽 병합 */
+.page-stack div:not(.two-cols) > .card-internal-wrapper .form-grid .form-span-2 {
+  grid-column: span 2 !important;
+}
+
+/* 4. AI 분석 요약 큰 텍스트 박스 고정 제어 */
+.page-stack div:not(.two-cols) > .card-internal-wrapper .form-group textarea {
+  min-height: 120px !important;
+  resize: none !important;
+}
+
+/* 5. 읽기 전용(SYSTEM_ADMIN) 상태일 때 미려한 미색 락다운 룩앤필 연출 */
+.card-internal-wrapper .form-group input[readonly],
+.card-internal-wrapper .form-group select[disabled],
+.card-internal-wrapper .form-group textarea[readonly] {
+  background-color: #f8fafc !important; /* 은은한 연회색 미색 배경 */
+  color: #475569 !important;            /* 글자색 투명화 방지 가독성 확보 */
+  border-color: #cbd5e1 !important;
+  cursor: not-allowed !important;       /* 마우스 금지 표시 */
+}
+
+/* 6. 하단 버튼 영역 간격 및 패딩 동기화 */
+.card-actions {
+  margin-top: 24px !important;
+  display: flex !important;
+  gap: 8px !important;
+  justify-content: flex-end !important;
+  border-top: 1px solid #f1f5f9 !important;
+  padding-top: 20px !important;
+  width: 100% !important;
+}

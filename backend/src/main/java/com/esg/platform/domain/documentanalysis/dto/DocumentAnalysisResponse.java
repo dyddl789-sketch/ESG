@@ -30,4 +30,6 @@ public class DocumentAnalysisResponse {
     private String aiExplanation;
     private String fileUrl;
     private Boolean submitForApproval;
+    private BigDecimal value;
+    private String textValue;
 }
