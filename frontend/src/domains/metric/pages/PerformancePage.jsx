@@ -1,92 +1,177 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Line } from "react-chartjs-2";
-import Swal from "sweetalert2";
+import { useNavigate } from "react-router-dom";
 import PageHeader from "../../../shared/components/PageHeader";
 import Card from "../../../shared/components/Card";
 import Button from "../../../shared/components/Button";
 import Tabs from "../../../shared/components/Tabs";
 import DataTable from "../../../shared/components/DataTable";
 import StatusBadge from "../../../shared/components/StatusBadge";
-import { metricApi } from "../api/metricApi";
-import { apiErrorMessage, formatNumber } from "../../../shared/utils/esgFormat";
+import { performanceApi } from "../api/performanceApi";
+
+const YEAR_OPTIONS = [2026, 2025, 2024];
 
 const configs = {
-  ENVIRONMENT: { label: "환경(E)", aggregate: "sum" },
-  SOCIAL: { label: "사회(S)", aggregate: "average" },
-  GOVERNANCE: { label: "거버넌스(G)", aggregate: "average" },
+  ENVIRONMENT: { label: "환경(E)", codes: ["IND_E_ELEC", "IND_E_SCOPE2"] },
+  SOCIAL: {
+    label: "사회(S)",
+    codes: ["IND_S_INJURY_RATE", "IND_S_SAFETY_EDU", "IND_S_RISK_ACTION", "IND_S_TURNOVER"],
+  },
+  GOVERNANCE: { label: "거버넌스(G)", codes: ["IND_G_ATTENDANCE", "IND_G_OUTSIDE", "IND_G_ETHICS_EDU"] },
 };
 
-const aggregateRows = (rows, mode) => {
-  const grouped = new Map();
-  rows.forEach((row) => {
-    const key = `${row.period}:${row.indicatorCode}`;
-    const current = grouped.get(key) || { ...row, values: [] };
-    if (row.value !== null && row.value !== undefined) current.values.push(Number(row.value));
-    grouped.set(key, current);
-  });
-  return [...grouped.values()].map((row) => {
-    const value = row.values.length === 0
-      ? null
-      : mode === "sum"
-        ? row.values.reduce((sum, item) => sum + item, 0)
-        : row.values.reduce((sum, item) => sum + item, 0) / row.values.length;
-    return { ...row, value };
-  });
+const latestByCode = (metrics, codes) =>
+  codes.map((code) => metrics.find((item) => item.indicatorCode === code)).filter(Boolean);
+
+const formatValue = (metric) => {
+  if (metric?.value === null || metric?.value === undefined) return "-";
+  return `${Number(metric.value).toLocaleString("ko-KR", { maximumFractionDigits: 2 })} ${metric.unit || ""}`.trim();
 };
+
+function CopyIcon({ onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="실적 텍스트 복사"
+      aria-label="실적 텍스트 복사"
+      style={{ border: 0, background: "transparent", padding: 2, cursor: "pointer", color: "#94a3b8" }}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+      </svg>
+    </button>
+  );
+}
 
 export default function PerformancePage() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState("ENVIRONMENT");
   const [year, setYear] = useState(2026);
-  const [search, setSearch] = useState("");
-  const [rows, setRows] = useState([]);
-  const [selectedCode, setSelectedCode] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [metrics, setMetrics] = useState([]);
+  const [prevYearMetrics, setPrevYearMetrics] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await metricApi.list({ year, category: tab, status: "APPROVED", ...(search.trim() ? { search: search.trim() } : {}) });
-      setRows(data || []);
-    } catch (error) {
-      Swal.fire("조회 실패", apiErrorMessage(error), "error");
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    let active = true;
+
+    const fetchMetrics = async () => {
+      setIsLoading(true);
+      setErrorMessage("");
+      try {
+        const [currentResponse, previousResponse] = await Promise.all([
+          performanceApi.getPerformanceMetrics(year),
+          performanceApi.getPerformanceMetrics(year - 1),
+        ]);
+
+        if (!active) return;
+        setMetrics(currentResponse.data?.data || currentResponse.data || []);
+        setPrevYearMetrics(previousResponse.data?.data || previousResponse.data || []);
+      } catch (error) {
+        if (!active) return;
+        console.error("ESG 승인 실적 조회 실패", error);
+        setErrorMessage("최종 승인된 ESG 실적을 불러오지 못했습니다.");
+        setMetrics([]);
+        setPrevYearMetrics([]);
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+
+    void fetchMetrics();
+    return () => {
+      active = false;
+    };
+  }, [year]);
+
+  const categoryMetrics = useMemo(
+    () => metrics.filter((item) => item.category === tab && item.status === "APPROVED"),
+    [metrics, tab],
+  );
+
+  const latest = useMemo(
+    () => latestByCode(categoryMetrics, configs[tab].codes),
+    [categoryMetrics, tab],
+  );
+
+  const selected = latest[0];
+  const chart = selected?.months
+    ? {
+        labels: selected.months.map((_, index) => `${index + 1}월`),
+        datasets: [
+          {
+            label: `${selected.title} (${selected.unit || ""})`,
+            data: selected.months,
+            borderColor: "#2a7d55",
+            backgroundColor: "rgba(42,125,85,.12)",
+            fill: true,
+            tension: 0.3,
+            spanGaps: false,
+          },
+        ],
+      }
+    : null;
+
+  const getYoY = (indicatorCode, currentMonths) => {
+    if (!currentMonths) return null;
+
+    let latestMonthIndex = -1;
+    for (let index = 11; index >= 0; index -= 1) {
+      if (currentMonths[index] !== null && currentMonths[index] !== undefined) {
+        latestMonthIndex = index;
+        break;
+      }
     }
-  }, [search, tab, year]);
+    if (latestMonthIndex < 0) return null;
 
-  useEffect(() => { void Promise.resolve().then(load); }, [load]);
+    const previousMetric = prevYearMetrics.find(
+      (item) => item.indicatorCode === indicatorCode && item.status === "APPROVED",
+    );
+    const previousValue = previousMetric?.months?.[latestMonthIndex];
+    const currentValue = currentMonths[latestMonthIndex];
+    if (previousValue === null || previousValue === undefined || Number(previousValue) === 0) return null;
 
-  const aggregated = useMemo(() => aggregateRows(rows, configs[tab].aggregate), [rows, tab]);
-  const indicators = useMemo(() => {
-    const map = new Map();
-    aggregated.forEach((row) => map.set(row.indicatorCode, { code: row.indicatorCode, title: row.title, unit: row.unit }));
-    return [...map.values()];
-  }, [aggregated]);
+    const rate = ((Number(currentValue) - Number(previousValue)) / Number(previousValue)) * 100;
+    const lowerIsBetter = ["IND_E_ELEC", "IND_E_SCOPE2", "IND_S_INJURY_RATE", "IND_S_TURNOVER"].includes(indicatorCode);
+    const improved = lowerIsBetter ? rate < 0 : rate > 0;
+    const color = rate === 0 ? "#64748b" : improved ? "#2563eb" : "#dc2626";
+    const symbol = rate > 0 ? "▲" : rate < 0 ? "▼" : "-";
 
-  const activeSelectedCode = indicators.some((indicator) => indicator.code === selectedCode)
-    ? selectedCode
-    : indicators[0]?.code || "";
+    return (
+      <span style={{ fontSize: "13px", fontWeight: 600, color, marginLeft: "12px" }}>
+        {symbol} {Math.abs(rate).toFixed(1)}% <small style={{ color: "#94a3b8" }}>전년 동월 대비</small>
+      </span>
+    );
+  };
 
-  const latestCards = useMemo(() => indicators.map((indicator) => {
-    const values = aggregated.filter((row) => row.indicatorCode === indicator.code).sort((a, b) => a.period.localeCompare(b.period));
-    return values.at(-1);
-  }).filter(Boolean), [aggregated, indicators]);
+  const handleCopy = async (metric) => {
+    const text = `[${metric.period}] ${metric.title}: ${formatValue(metric)}`;
+    await navigator.clipboard.writeText(text);
+    window.alert(`클립보드에 복사되었습니다.\n\n${text}`);
+  };
 
-  const selectedRows = useMemo(() => aggregated
-    .filter((row) => row.indicatorCode === activeSelectedCode)
-    .sort((a, b) => a.period.localeCompare(b.period)), [activeSelectedCode, aggregated]);
-
-  const chart = selectedRows.length ? {
-    labels: selectedRows.map((row) => `${Number(row.period.slice(5))}월`),
-    datasets: [{
-      label: `${selectedRows[0].title} (${selectedRows[0].unit || ""})`,
-      data: selectedRows.map((row) => row.value),
-      borderColor: "#2a7d55",
-      backgroundColor: "rgba(42,125,85,.12)",
-      fill: true,
-      tension: 0.3,
-    }],
-  } : null;
+  const handleExportCsv = () => {
+    const headers = ["지표코드", "지표명", "기준기간", "원천 시스템", "실적", "상태"];
+    const rows = categoryMetrics.map((row) => [
+      row.indicatorCode,
+      row.title,
+      row.period,
+      row.source,
+      formatValue(row),
+      row.status,
+    ]);
+    const escape = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+    const csv = `\uFEFF${[headers, ...rows].map((row) => row.map(escape).join(",")).join("\n")}`;
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `ESG_승인실적_${year}_${tab}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="page-stack">
@@ -94,45 +179,83 @@ export default function PerformancePage() {
         breadcrumbs={["성과·보고", "ESG 실적 조회"]}
         eyebrow="APPROVED ESG PERFORMANCE"
         title="ESG 실적 조회"
-        description="최종 승인된 DB 데이터만 월별 공식 실적으로 조회합니다."
+        description="최종 승인된 DB 데이터만 연도별·월별 공식 실적으로 조회합니다."
+        actions={(
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <Button variant="outline" onClick={handleExportCsv} disabled={!categoryMetrics.length}>CSV 다운로드</Button>
+            <Button onClick={() => navigate(`/manager/reports?year=${year}`)}>리포트 작성</Button>
+          </div>
+        )}
       />
 
-      <Tabs value={tab} onChange={setTab} items={Object.entries(configs).map(([value, config]) => ({ value, label: config.label }))} />
-
-      <Card className="filter-card" title="조회 조건" description="연도·지표·검색어로 승인 완료 실적을 조회할 수 있습니다.">
-        <div className="esg-filter-grid">
-          <label><span>기준연도</span><select value={year} onChange={(event) => setYear(Number(event.target.value))}><option value={2026}>2026년</option><option value={2025}>2025년</option></select></label>
-          <label><span>추이 지표</span><select value={activeSelectedCode} onChange={(event) => setSelectedCode(event.target.value)}><option value="">전체</option>{indicators.map((indicator) => <option key={indicator.code} value={indicator.code}>{indicator.title}</option>)}</select></label>
-          <label className="filter-search"><span>검색</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="지표명·코드·사업장" /></label>
-          <div className="filter-actions"><Button variant="outline" onClick={() => { setYear(2026); setSearch(""); }}>초기화</Button><Button onClick={load}>검색</Button></div>
-        </div>
-      </Card>
-
-      <div className={`performance-cards performance-${tab.toLowerCase()}`}>
-        {latestCards.map((metric) => (
-          <article key={metric.indicatorCode}>
-            <div className="performance-card-head"><span>{metric.title}</span><StatusBadge status="APPROVED" /></div>
-            <strong>{metric.value === null ? metric.textValue || "-" : `${formatNumber(metric.value, 2)} ${metric.unit || ""}`}</strong>
-            <small>{metric.period} · 최종 승인 확정값</small>
-          </article>
-        ))}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+        <Tabs
+          value={tab}
+          onChange={setTab}
+          items={Object.entries(configs).map(([value, config]) => ({ value, label: config.label }))}
+        />
+        <label style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 600 }}>
+          <span>기준연도</span>
+          <select value={year} onChange={(event) => setYear(Number(event.target.value))}>
+            {YEAR_OPTIONS.map((option) => <option key={option} value={option}>{option}년 실적</option>)}
+          </select>
+        </label>
       </div>
 
-      <Card title={selectedRows[0] ? `${selectedRows[0].title} 월별 추이` : "핵심 지표 월별 추이"} description="사업장 합계 또는 평균으로 집계한 승인 완료 데이터입니다.">
-        <div className="chart-box">{loading ? <p>데이터를 불러오는 중입니다.</p> : chart ? <Line data={chart} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }} /> : <p>승인 완료 데이터가 없습니다.</p>}</div>
-      </Card>
+      {isLoading ? (
+        <div className="page-loading">승인 완료 실적을 집계하는 중입니다.</div>
+      ) : errorMessage ? (
+        <Card><p className="warning-text">{errorMessage}</p></Card>
+      ) : (
+        <>
+          <div className={`performance-cards performance-${tab.toLowerCase()}`}>
+            {latest.map((metric) => (
+              <article key={metric.indicatorCode}>
+                <div className="performance-card-head">
+                  <span style={{ display: "flex", alignItems: "center" }}>
+                    {metric.title}
+                    <CopyIcon onClick={() => void handleCopy(metric)} />
+                  </span>
+                  <StatusBadge status="APPROVED" />
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", marginTop: "6px" }}>
+                  <strong>{formatValue(metric)}</strong>
+                  {getYoY(metric.indicatorCode, metric.months)}
+                </div>
+                <small>{metric.period} · 최종 승인 확정값</small>
+              </article>
+            ))}
+          </div>
 
-      <Card title="승인 완료 지표 상세" description="사업장별 실제값과 승인 상태를 확인합니다.">
-        <DataTable rows={rows} columns={[
-          { key: "period", label: "기준월" },
-          { key: "indicatorCode", label: "지표코드" },
-          { key: "title", label: "지표명" },
-          { key: "facility", label: "사업장" },
-          { key: "source", label: "원천 시스템" },
-          { key: "value", label: "실제값", render: (value, row) => value === null || value === undefined ? row.textValue || "-" : `${formatNumber(value, 2)} ${row.unit || ""}` },
-          { key: "status", label: "상태", render: (value) => <StatusBadge status={value} /> },
-        ]} emptyText="조건에 맞는 승인 완료 데이터가 없습니다." />
-      </Card>
+          <Card
+            title={selected ? `${year}년 ${selected.title} 승인 실적 추이` : `${year}년 핵심 지표 추이`}
+            description="승인 완료된 월만 차트에 반영됩니다."
+          >
+            <div className="chart-box">
+              {chart ? (
+                <Line data={chart} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }} />
+              ) : (
+                <p className="empty-copy">해당 연도에 승인 완료된 월별 데이터가 없습니다.</p>
+              )}
+            </div>
+          </Card>
+
+          <Card title="지표별 최종 승인 데이터" description="이 목록과 동일한 확정 실적만 리포트 빌더로 전달됩니다.">
+            <DataTable
+              rows={categoryMetrics}
+              columns={[
+                { key: "indicatorCode", label: "지표코드" },
+                { key: "title", label: "지표명" },
+                { key: "period", label: "최신 승인기간" },
+                { key: "source", label: "원천 시스템" },
+                { key: "value", label: "실적", render: (_, row) => formatValue(row) },
+                { key: "status", label: "상태", render: () => <StatusBadge status="APPROVED" /> },
+              ]}
+              emptyText={`${year}년 ${configs[tab].label} 승인 완료 실적이 없습니다.`}
+            />
+          </Card>
+        </>
+      )}
     </div>
   );
 }

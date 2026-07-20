@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.esg.platform.domain.integration.mapper.IntegrationMapper">
+
+    <select id="selectIntegrationSystems" resultType="com.esg.platform.domain.integration.dto.response.IntegrationDashboardResponse$SystemStatus">
+        SELECT 
+            data_source_type AS "id",
+            CASE data_source_type
+                WHEN 'EMS' THEN 'EMS'
+                WHEN 'HR_SYSTEM' THEN '인사 시스템'
+                WHEN 'ERP' THEN '안전/교육 시스템'
+                ELSE data_source_type
+            END AS "name",
+            '기존 실적 데이터 실시간 집계' AS "description",
+            '스케줄 정보 없음' AS "schedule",
+            TO_CHAR(MAX(created_at), 'YYYY-MM-DD HH24:MI') AS "lastRun",
+            COUNT(id) AS "newCount",
+            0 AS "duplicateCount",
+            0 AS "errorCount",
+            'NORMAL' AS "status"
+        FROM esg_metric_data
+        WHERE data_source_type != 'MANUAL' 
+        GROUP BY data_source_type
+        ORDER BY MAX(created_at) DESC
+    </select>
+
+    <select id="selectRunHistories" resultType="com.esg.platform.domain.integration.dto.response.IntegrationDashboardResponse$RunHistory">
+        SELECT 
+            'RUN-' || TO_CHAR(DATE_TRUNC('minute', created_at), 'YYYYMMDD-HH24MI') || '-' || data_source_type AS "id",
+            data_source_type AS "source",
+            MAX(reporting_year || '-' || LPAD(period_value::text, 2, '0')) AS "basePeriod",
+            'AUTO' AS "triggerType",
+            TO_CHAR(MIN(created_at), 'YYYY-MM-DD HH24:MI') AS "startedAt",
+            TO_CHAR(MAX(created_at), 'YYYY-MM-DD HH24:MI') AS "completedAt",
+            COUNT(id) AS "success",
+            0 AS "error",
+            'SUCCESS' AS "status"
+        FROM esg_metric_data
+        WHERE data_source_type != 'MANUAL'
+        GROUP BY data_source_type, DATE_TRUNC('minute', created_at)
+        ORDER BY MAX(created_at) DESC
+        LIMIT 50
+    </select>
+
+</mapper>
