@@ -1,17 +1,24 @@
 package com.esg.platform.domain.performance.controller;
 
-import com.esg.platform.domain.performance.dto.response.PerformanceResponse;
-import com.esg.platform.domain.performance.service.PerformanceService;
-import lombok.RequiredArgsConstructor;
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.Map;
+import com.esg.platform.domain.performance.dto.response.PerformanceResponse;
+import com.esg.platform.domain.performance.service.PerformanceService;
+import com.esg.platform.global.security.EsgUserPrincipal;
 
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @RestController
 @RequestMapping("/api/performance")
 @RequiredArgsConstructor
@@ -20,14 +27,19 @@ public class PerformanceController {
     private final PerformanceService performanceService;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'COMPANY_MANAGER')")
     public ResponseEntity<Map<String, Object>> getPerformanceList(
-            @RequestParam(name = "year", defaultValue = "2026") int year) {
-        
-        // 향후 JWT/SecurityContext에서 현재 로그인한 회원의 companyId 추출 연동 예정
-        Long companyId = 1L;
-        
+            @RequestParam(name = "year", defaultValue = "2026") int year,
+            @AuthenticationPrincipal EsgUserPrincipal principal) {
+
+        Long companyId = principal.getUser().getCompanyId() == null
+                ? 1L
+                : principal.getUser().getCompanyId();
+
+        log.info("[PERFORMANCE] 승인 실적 조회 companyId={} year={} loginId={}",
+                companyId, year, principal.getUsername());
+
         List<PerformanceResponse> data = performanceService.getPerformanceList(companyId, year);
-        
         return ResponseEntity.ok(Map.of("data", data));
     }
 }

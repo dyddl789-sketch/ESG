@@ -13,11 +13,12 @@
             m.data_source_type AS "dataSourceType",
             m.status AS "status"
         FROM esg_indicators i
-        LEFT JOIN esg_metric_data m 
-               ON i.id = m.indicator_id 
-              AND m.company_id = #{companyId} 
-              AND m.reporting_year = #{year}
-              AND m.period_type = 'MONTHLY'
+        JOIN esg_metric_data m
+          ON i.id = m.indicator_id
+         AND m.company_id = #{companyId}
+         AND m.reporting_year = #{year}
+         AND m.period_type = 'MONTHLY'
+         AND m.status = 'APPROVED'
         WHERE i.is_active = true
         ORDER BY i.indicator_code ASC, m.period_value ASC
     </select>

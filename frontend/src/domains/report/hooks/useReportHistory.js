@@ -49,6 +49,7 @@ export function useReportHistory() {
       await reportApi.deleteReport(id);
       await fetchReports(); // 갱신
     } catch (error) {
+      console.error("보고서 삭제 실패:", error);
       alert("보고서 삭제 처리 중 오류가 발생했습니다.");
     }
   };
