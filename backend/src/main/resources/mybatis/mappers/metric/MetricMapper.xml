@@ -106,6 +106,44 @@
                  f.facility_name
     </select>
 
+    <select id="findAvailablePeriods" resultType="string">
+        SELECT DISTINCT m.reporting_year::text || '-' || LPAD(m.period_value::text, 2, '0')
+        FROM esg_metric_data m
+        JOIN esg_indicators i ON i.id = m.indicator_id
+        WHERE m.company_id = #{companyId}
+        <if test="category != null and category != ''">AND i.category::text = #{category}</if>
+        <if test="status != null and status != '' and status != 'ALL'">AND m.status::text = #{status}</if>
+        <if test="facilityId != null">AND m.facility_id = #{facilityId}</if>
+        <if test="approvedOnly or benchmarkReady">AND m.status = 'APPROVED'</if>
+        <if test="benchmarkReady">
+            AND EXISTS (
+                SELECT 1
+                FROM esg_metric_data electricity
+                JOIN esg_indicators electricity_indicator ON electricity_indicator.id = electricity.indicator_id
+                WHERE electricity.company_id = m.company_id
+                  AND electricity.reporting_year = m.reporting_year
+                  AND electricity.period_value = m.period_value
+                  AND electricity.status = 'APPROVED'
+                  AND electricity_indicator.indicator_code = 'IND_E_ELEC'
+                  AND electricity.shipment_amount_million_krw IS NOT NULL
+                  AND electricity.shipment_amount_million_krw &gt; 0
+                  <if test="facilityId != null">AND electricity.facility_id = #{facilityId}</if>
+            )
+            AND EXISTS (
+                SELECT 1
+                FROM esg_metric_data scope2
+                JOIN esg_indicators scope2_indicator ON scope2_indicator.id = scope2.indicator_id
+                WHERE scope2.company_id = m.company_id
+                  AND scope2.reporting_year = m.reporting_year
+                  AND scope2.period_value = m.period_value
+                  AND scope2.status = 'APPROVED'
+                  AND scope2_indicator.indicator_code = 'IND_E_SCOPE2'
+                  <if test="facilityId != null">AND scope2.facility_id = #{facilityId}</if>
+            )
+        </if>
+        ORDER BY 1 DESC
+    </select>
+
     <select id="findById" resultMap="MetricMap">
         <include refid="metricBaseSelect"/>
         WHERE m.company_id = #{companyId} AND m.id = #{id}

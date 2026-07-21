@@ -54,6 +54,25 @@ public class MetricController {
                 year, period, category, status, facilityId, search, isExternal(principal)));
     }
 
+    @GetMapping("/periods")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'COMPANY_MANAGER', 'EXTERNAL_USER')")
+    public ApiResponse<List<String>> getAvailablePeriods(
+            @RequestParam(name = "category", required = false) String category,
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "facilityId", required = false) Long facilityId,
+            @RequestParam(name = "approvedOnly", defaultValue = "false") boolean approvedOnly,
+            @RequestParam(name = "benchmarkReady", defaultValue = "false") boolean benchmarkReady,
+            @AuthenticationPrincipal EsgUserPrincipal principal) {
+        boolean resolvedApprovedOnly = approvedOnly || isExternal(principal);
+        return ApiResponse.ok(workflowService.getAvailablePeriods(
+                resolveCompanyId(principal),
+                category,
+                status,
+                facilityId,
+                resolvedApprovedOnly,
+                benchmarkReady));
+    }
+
     @GetMapping("/indicators")
     @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'COMPANY_MANAGER')")
     public ApiResponse<List<IndicatorResponse>> getIndicators() {
@@ -124,6 +143,13 @@ public class MetricController {
             @RequestParam(name = "category", required = false) String category,
             @AuthenticationPrincipal EsgUserPrincipal principal) {
         return ApiResponse.ok(workflowService.requestApprovalBatch(period, category, principal.getUser().getId()));
+    }
+
+    private Long resolveCompanyId(EsgUserPrincipal principal) {
+        if (principal == null || principal.getUser() == null || principal.getUser().getCompanyId() == null) {
+            return 1L;
+        }
+        return principal.getUser().getCompanyId();
     }
 
     private boolean isExternal(EsgUserPrincipal principal) {

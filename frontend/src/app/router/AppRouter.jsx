@@ -26,7 +26,6 @@ const PublicReportsPage = lazy(() => import("../../domains/report/pages/PublicRe
 const CompanyProfilePage = lazy(() => import("../../domains/company/pages/CompanyProfilePage"));
 const PublicComparePage = lazy(() => import("../../domains/company/pages/PublicComparePage"));
 const UserAdminPage = lazy(() => import("../../domains/admin/pages/UserAdminPage"));
-const IndicatorAdminPage = lazy(() => import("../../domains/admin/pages/IndicatorAdminPage"));
 const AuditLogPage = lazy(() => import("../../domains/admin/pages/AuditLogPage"));
 
 const layout = (roles) => (
@@ -78,7 +77,6 @@ export default function AppRouter() {
           <Route path="approvals" element={<ApprovalListPage />} />
           <Route path="approvals/:metricId" element={<ApprovalDetailPage />} />
           <Route path="users" element={<UserAdminPage />} />
-          <Route path="indicators" element={<IndicatorAdminPage />} />
           <Route path="audit" element={<AuditLogPage />} />
         </Route>
 

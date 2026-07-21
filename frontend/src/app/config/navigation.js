@@ -43,7 +43,6 @@ export const NAVIGATION = Object.freeze({
     { label: "플랫폼 관리", items: [
       { to: "/admin/companies", icon: "company", label: "기업 관리" },
       { to: "/admin/users", icon: "users", label: "사용자·권한 관리" },
-      { to: "/admin/indicators", icon: "indicator", label: "ESG 지표 관리" },
     ]},
     { label: "운영 관리", items: [
       { to: "/admin/audit", icon: "audit", label: "감사 로그" },
