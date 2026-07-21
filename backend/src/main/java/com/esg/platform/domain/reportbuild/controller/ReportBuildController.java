@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.esg.platform.domain.reportbuild.dto.request.ReportCreateRequest;
 import com.esg.platform.domain.reportbuild.dto.response.ReportBuildResponse;
+import com.esg.platform.domain.reportbuild.dto.response.ReportMetricResponse;
 import com.esg.platform.domain.reportbuild.dto.response.ReportTemplateResponse;
 import com.esg.platform.domain.reportbuild.service.ReportBuildService;
 import com.esg.platform.global.exception.BusinessException;
@@ -61,6 +62,14 @@ public class ReportBuildController {
     public ResponseEntity<List<String>> getFacilities(
             @AuthenticationPrincipal EsgUserPrincipal principal) {
         return ResponseEntity.ok(reportService.getFacilities(requireCompanyId(principal)));
+    }
+
+    // [신규 추가] 리포트 전용 실적 데이터를 내려주는 API 엔드포인트 매핑
+    @GetMapping("/metrics")
+    public ResponseEntity<List<ReportMetricResponse>> getReportMetrics(
+            @RequestParam(name = "year", defaultValue = "2026") int year,
+            @AuthenticationPrincipal EsgUserPrincipal principal) {
+        return ResponseEntity.ok(reportService.getReportMetrics(requireCompanyId(principal), year));
     }
 
     @GetMapping

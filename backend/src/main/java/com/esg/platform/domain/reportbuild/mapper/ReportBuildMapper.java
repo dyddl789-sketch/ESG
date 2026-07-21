@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import com.esg.platform.domain.reportbuild.dto.response.ReportMetricResponse;
 import com.esg.platform.domain.reportbuild.entity.GeneratedReport;
 import com.esg.platform.domain.reportbuild.entity.ReportTemplate;
 
@@ -32,4 +33,6 @@ public interface ReportBuildMapper {
             @Param("companyId") Long companyId);
 
     List<String> selectFacilityNamesByCompanyId(@Param("companyId") Long companyId);
+
+    List<ReportMetricResponse> selectRawMetricsForReport(@Param("companyId") Long companyId, @Param("year") int year);
 }
