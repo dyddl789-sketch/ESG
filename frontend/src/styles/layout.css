@@ -505,3 +505,29 @@
   font-size: 10px;
   text-align: center;
 }
+
+/* Approval notification list */
+.notification-item {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+  padding: 14px 18px;
+  border: 0;
+  border-bottom: 1px solid #edf1ef;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+.notification-item:hover { background: #f7faf8; }
+.notification-item.is-unread { background: #f2f8f4; }
+.notification-item.is-read { opacity: .7; }
+.notification-item > div { min-width: 0; flex: 1; }
+.notification-item strong,
+.notification-item p,
+.notification-item small { display: block; }
+.notification-item strong { font-size: 10px; }
+.notification-item p { margin: 4px 0; color: #526059; font-size: 9px; line-height: 1.5; }
+.notification-item small { color: #909b95; font-size: 8px; }
+.notification-dot.status-esg_approval_requested { background: #d59231; }
+.notification-dot.status-esg_approved { background: var(--green-600); }
+.notification-dot.status-esg_rejected { background: var(--red); }

@@ -7,18 +7,27 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 
 import com.esg.platform.global.config.AppProperties;
 
-import lombok.RequiredArgsConstructor;
 
 @Configuration
 @EnableWebSocket
-@RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketConfigurer {
     private final EsgWebSocketHandler handler;
+    private final JwtWebSocketHandshakeInterceptor handshakeInterceptor;
     private final AppProperties properties;
+
+    public WebSocketConfig(
+            EsgWebSocketHandler handler,
+            JwtWebSocketHandshakeInterceptor handshakeInterceptor,
+            AppProperties properties) {
+        this.handler = handler;
+        this.handshakeInterceptor = handshakeInterceptor;
+        this.properties = properties;
+    }
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(handler, "/ws/esg")
+                .addInterceptors(handshakeInterceptor)
                 .setAllowedOrigins(properties.cors().allowedOrigins().toArray(String[]::new));
     }
 }

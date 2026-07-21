@@ -42,4 +42,21 @@ public class PerformanceController {
         List<PerformanceResponse> data = performanceService.getPerformanceList(companyId, year);
         return ResponseEntity.ok(Map.of("data", data));
     }
+    @GetMapping("/governance-targets")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'COMPANY_MANAGER', 'EXTERNAL_USER')")
+    public ResponseEntity<Map<String, Object>> getGovernanceTargets(
+            @RequestParam(name = "year", defaultValue = "2026") int year,
+            @AuthenticationPrincipal EsgUserPrincipal principal) {
+
+        Long companyId = principal.getUser().getCompanyId() == null
+                ? 1L
+                : principal.getUser().getCompanyId();
+
+        log.info("[PERFORMANCE_TARGET] 거버넌스 목표 API companyId={} year={} loginId={}",
+                companyId, year, principal.getUsername());
+
+        List<Map<String, Object>> data = performanceService.getGovernanceTargets(companyId, year);
+        return ResponseEntity.ok(Map.of("data", data));
+    }
+
 }

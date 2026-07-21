@@ -23,4 +23,23 @@
         ORDER BY i.indicator_code ASC, m.period_value ASC
     </select>
 
+    <select id="selectGovernanceTargets" resultType="map">
+        SELECT
+            i.indicator_code AS "indicatorCode",
+            t.target_year AS "targetYear",
+            t.target_value AS "targetValue"
+        FROM esg_targets t
+        JOIN esg_indicators i
+          ON i.id = t.indicator_id
+        WHERE t.company_id = #{companyId}
+          AND t.target_year = #{year}
+          AND i.is_active = true
+          AND i.indicator_code IN (
+              'IND_G_ATTENDANCE',
+              'IND_G_OUTSIDE',
+              'IND_G_ETHICS_EDU'
+          )
+        ORDER BY i.indicator_code ASC
+    </select>
+
 </mapper>

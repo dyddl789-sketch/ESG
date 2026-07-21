@@ -26,6 +26,10 @@ public class EsgMetricData {
     private BigDecimal shipmentAmountMillionKrw;
     private String textValue;
     private String evidenceFileUrl;
+    private String evidenceOriginalFilename;
+    private String evidenceContentType;
+    private Long evidenceFileSize;
+    private OffsetDateTime evidenceUploadedAt;
     private DataStatus status;
     private String dataSourceType;
     private Integer inputUserId;

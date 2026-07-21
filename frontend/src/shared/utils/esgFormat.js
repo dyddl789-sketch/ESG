@@ -22,3 +22,20 @@ export const categoryLabel = (category) => ({
 
 export const apiErrorMessage = (error, fallback = "처리 중 오류가 발생했습니다.") =>
   error?.response?.data?.message || error?.response?.data?.error?.message || error?.message || fallback;
+
+export const formatFileSize = (value) => {
+  const size = Number(value);
+  if (!Number.isFinite(size) || size < 0) return "-";
+  if (size < 1024) return `${size.toLocaleString("ko-KR")} B`;
+  const units = ["KB", "MB", "GB"];
+  let resolved = size / 1024;
+  let unitIndex = 0;
+  while (resolved >= 1024 && unitIndex < units.length - 1) {
+    resolved /= 1024;
+    unitIndex += 1;
+  }
+  return `${resolved.toLocaleString("ko-KR", {
+    minimumFractionDigits: resolved < 10 ? 1 : 0,
+    maximumFractionDigits: resolved < 10 ? 1 : 0,
+  })} ${units[unitIndex]}`;
+};
