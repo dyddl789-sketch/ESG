@@ -52,6 +52,27 @@ public class MetricWorkflowService {
     }
 
     @Transactional(readOnly = true)
+    public List<String> getAvailablePeriods(
+            Long companyId,
+            String category,
+            String status,
+            Long facilityId,
+            boolean approvedOnly,
+            boolean benchmarkReady) {
+        Long resolvedCompanyId = companyId == null ? COMPANY_ID : companyId;
+        List<String> periods = metricMapper.findAvailablePeriods(
+                resolvedCompanyId,
+                normalizeOptional(category),
+                normalizeOptional(status),
+                facilityId,
+                approvedOnly,
+                benchmarkReady);
+        log.debug("[ESG_PERIOD] 조회 companyId={} category={} status={} facilityId={} approvedOnly={} benchmarkReady={} count={}",
+                resolvedCompanyId, category, status, facilityId, approvedOnly, benchmarkReady, periods.size());
+        return periods;
+    }
+
+    @Transactional(readOnly = true)
     public MetricDto getMetric(Long id, boolean approvedOnly) {
         MetricDto metric = requireMetric(id);
         if (approvedOnly && !"APPROVED".equals(metric.getStatus())) {

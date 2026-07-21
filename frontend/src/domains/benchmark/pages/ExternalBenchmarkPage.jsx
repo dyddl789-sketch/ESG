@@ -9,8 +9,8 @@ import Button from "../../../shared/components/Button";
 import StatusBadge from "../../../shared/components/StatusBadge";
 import { apiErrorMessage, formatDateTime } from "../../../shared/utils/esgFormat";
 import { externalBenchmarkApi } from "../api/externalBenchmarkApi";
+import { useMetricPeriods } from "../../metric/hooks/useMetricPeriods";
 
-const YEAR_OPTIONS = [2026, 2025, 2024];
 
 const number = (value, digits = 2) => value == null ? "-" : Number(value).toLocaleString("ko-KR", {
   minimumFractionDigits: digits,
@@ -25,21 +25,34 @@ const comparisonText = (value) => {
 export default function ExternalBenchmarkPage() {
   const { user } = useAuth();
   const canSync = [ROLES.SYSTEM_ADMIN, ROLES.COMPANY_MANAGER].includes(user?.role);
-  const [selectedYear, setSelectedYear] = useState(2026);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [benchmark, setBenchmark] = useState(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const {
+    years,
+    loading: periodLoading,
+  } = useMetricPeriods({
+    approvedOnly: true,
+    benchmarkReady: true,
+  });
+
+  const effectiveYear = years.includes(selectedYear)
+    ? selectedYear
+    : (years[0] || selectedYear);
+
 
   const load = useCallback(async () => {
+    if (periodLoading) return;
     setLoading(true);
     try {
-      setBenchmark(await externalBenchmarkApi.get(selectedYear));
+      setBenchmark(await externalBenchmarkApi.get(effectiveYear));
     } catch (error) {
       Swal.fire("조회 실패", apiErrorMessage(error, "외부 비교 데이터를 불러오지 못했습니다."), "error");
     } finally {
       setLoading(false);
     }
-  }, [selectedYear]);
+  }, [effectiveYear, periodLoading]);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -59,7 +72,7 @@ export default function ExternalBenchmarkPage() {
     setSyncing(true);
     try {
       await externalBenchmarkApi.sync();
-      setBenchmark(await externalBenchmarkApi.get(selectedYear));
+      setBenchmark(await externalBenchmarkApi.get(effectiveYear));
       await Swal.fire("동기화 완료", "공공데이터 원본과 변환값을 PostgreSQL에 저장했습니다.", "success");
     } catch (error) {
       Swal.fire("동기화 실패", apiErrorMessage(error), "error");
@@ -68,7 +81,7 @@ export default function ExternalBenchmarkPage() {
     }
   };
 
-  const internalChartLabel = benchmark?.internalPeriodLabel || `${selectedYear}년 승인 누적`;
+  const internalChartLabel = benchmark?.internalPeriodLabel || `${effectiveYear}년 승인 누적`;
 
   const electricityChart = useMemo(() => ({
     labels: [internalChartLabel, "2021년 동일 업종"],
@@ -98,17 +111,17 @@ export default function ExternalBenchmarkPage() {
         breadcrumbs={["데이터 관리", "외부 데이터 비교"]}
         eyebrow="PUBLIC DATA BENCHMARK"
         title="외부 공공데이터 비교"
-        description={`${selectedYear}년 승인 완료 내부 실적을 2021년 C303 공공통계 원단위와 비교합니다.`}
+        description={`${effectiveYear}년 승인 완료 내부 실적을 2021년 C303 공공통계 원단위와 비교합니다.`}
         actions={(
           <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
             <label style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 600 }}>
               <span>내부 기준연도</span>
               <select
-                value={selectedYear}
+                value={effectiveYear}
                 onChange={(event) => setSelectedYear(Number(event.target.value))}
-                disabled={loading || syncing}
+                disabled={loading || syncing || periodLoading || !years.length}
               >
-                {YEAR_OPTIONS.map((year) => <option key={year} value={year}>{year}년</option>)}
+                {years.map((year) => <option key={year} value={year}>{year}년</option>)}
               </select>
             </label>
             {canSync
@@ -119,14 +132,14 @@ export default function ExternalBenchmarkPage() {
       />
 
       {loading ? (
-        <div className="page-loading">{selectedYear}년 외부 공공데이터 비교값을 불러오는 중입니다.</div>
+        <div className="page-loading">{effectiveYear}년 외부 공공데이터 비교값을 불러오는 중입니다.</div>
       ) : (
         <>
           <div className="benchmark-source-strip">
             <div><span>동기화 상태</span><StatusBadge status={synced ? "NORMAL" : benchmark?.status || "NOT_SYNCED"} label={synced ? "동기화 완료" : benchmark?.status === "FAILED" ? "동기화 실패" : "동기화 필요"} /></div>
             <div><span>최근 갱신</span><b>{formatDateTime(benchmark?.lastSyncedAt)}</b></div>
             <div><span>외부 기준</span><b>{benchmark?.externalPeriodLabel || "2021년 연간 공공통계"}</b></div>
-            <div><span>내부 기준</span><b>{benchmark?.internalPeriodLabel || `${selectedYear}년 비교 가능한 승인 데이터 없음`}</b></div>
+            <div><span>내부 기준</span><b>{benchmark?.internalPeriodLabel || `${effectiveYear}년 비교 가능한 승인 데이터 없음`}</b></div>
           </div>
 
           {!synced && (
@@ -144,7 +157,7 @@ export default function ExternalBenchmarkPage() {
           </div>
 
           <div className="two-cols benchmark-charts">
-            <Card title="출하액 기준 전력 원단위 비교" description={`${benchmark?.internalPeriodLabel || `${selectedYear}년 승인 누적`} · ${benchmark?.industryName || "자동차 신품 부품 제조업"}`}>
+            <Card title="출하액 기준 전력 원단위 비교" description={`${benchmark?.internalPeriodLabel || `${effectiveYear}년 승인 누적`} · ${benchmark?.industryName || "자동차 신품 부품 제조업"}`}>
               <div className="chart-box"><Bar data={electricityChart} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, title: { display: true, text: benchmark?.electricityUnit } } } }} /></div>
               <p className="source-caption">출처: {benchmark?.sourceLabel || "한국에너지공단 · KOSIS"}</p>
             </Card>
@@ -156,7 +169,7 @@ export default function ExternalBenchmarkPage() {
 
           <Card title="비교 데이터 구성" description="공공데이터는 내부 ESG 원본이 아니라 동일 업종 기준선으로 사용합니다.">
             <div className="data-role-grid">
-              <article><span className="role-number">01</span><div><b>내부 승인 데이터</b><p>{selectedYear}년 전력·Scope 2·출하액이 모두 승인된 최신 월까지 누적 계산합니다.</p></div></article>
+              <article><span className="role-number">01</span><div><b>내부 승인 데이터</b><p>{effectiveYear}년 전력·Scope 2·출하액이 모두 승인된 최신 월까지 누적 계산합니다.</p></div></article>
               <article><span className="role-number">02</span><div><b>한국에너지공단</b><p>2021년 C303 업종 전체 전력 사용량과 전력 관련 온실가스 배출량을 사용합니다.</p></div></article>
               <article><span className="role-number">03</span><div><b>KOSIS</b><p>2021년 전국 자동차 신품 부품 제조업의 출하액 계를 사용합니다.</p></div></article>
             </div>

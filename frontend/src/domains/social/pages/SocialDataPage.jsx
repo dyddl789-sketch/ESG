@@ -7,11 +7,13 @@ import Button from "../../../shared/components/Button";
 import DataTable from "../../../shared/components/DataTable";
 import companyApi from "../../company/api/companyApi";
 import { metricApi } from "../../metric/api/metricApi";
+import { resolvePeriodSelection, useMetricPeriods } from "../../metric/hooks/useMetricPeriods";
 import { firstEvidence, latestApprovalDate, metricNumber, metricValueMap, facilityNameOf, facilityTypeOf } from "../../metric/utils/approvedMetricView";
 import { apiErrorMessage, formatDateTime, formatNumber, periodOf } from "../../../shared/utils/esgFormat";
 import { fileApi } from "../../../shared/api/fileApi";
 
-const defaultFilters = { year: 2026, month: 5, facilityId: "", search: "" };
+const now = new Date();
+const defaultFilters = { year: now.getFullYear(), month: now.getMonth() + 1, facilityId: "", search: "" };
 const indicatorLabels = {
   IND_S_INJURY_RATE: "산업재해율",
   IND_S_SAFETY_EDU: "안전교육 이수율",
@@ -32,9 +34,24 @@ export default function SocialDataPage() {
   const [facilities, setFacilities] = useState([]);
   const [metrics, setMetrics] = useState([]);
   const [loading, setLoading] = useState(true);
-  const period = periodOf(filters.year, filters.month);
+  const {
+    years,
+    monthsByYear,
+    latestPeriod,
+    loading: periodLoading,
+  } = useMetricPeriods({
+    approvedOnly: true,
+    category: "SOCIAL",
+    facilityId: filters.facilityId,
+  });
+  const resolvedPeriod = resolvePeriodSelection(filters, years, monthsByYear);
+  const selectedYear = periodLoading ? filters.year : resolvedPeriod.year;
+  const selectedMonth = periodLoading ? filters.month : resolvedPeriod.month;
+  const period = periodOf(selectedYear, selectedMonth);
+
 
   const load = useCallback(async () => {
+    if (periodLoading) return;
     setLoading(true);
     try {
       const [facilityResponse, approvedMetrics] = await Promise.all([
@@ -48,7 +65,7 @@ export default function SocialDataPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters.facilityId, period]);
+  }, [filters.facilityId, period, periodLoading]);
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
@@ -86,6 +103,24 @@ export default function SocialDataPage() {
     { key: "evidence", label: "증빙 PDF", render: (value) => value ? <button type="button" className="text-link" onClick={() => fileApi.open(value)}>보기</button> : "-" },
   ];
 
+  const handleYearChange = (event) => {
+    const nextYear = Number(event.target.value);
+    const months = monthsByYear[nextYear] || [];
+    setFilters((current) => ({
+      ...current,
+      year: nextYear,
+      month: months.at(-1) || current.month,
+    }));
+  };
+
+  const resetFilters = () => {
+    const fallback = latestPeriod || {
+      year: defaultFilters.year,
+      month: defaultFilters.month,
+    };
+    setFilters({ ...defaultFilters, ...fallback });
+  };
+
   return (
     <div className="page-stack esg-domain-page">
       <PageHeader breadcrumbs={["ESG 실적", "사회"]} eyebrow="SOCIAL PERFORMANCE" title="사회 실적" description="최종 승인된 사업장별 사회 ESG 핵심지표를 조회합니다." />
@@ -93,11 +128,11 @@ export default function SocialDataPage() {
       <section className="workflow-strip"><span>ESG 데이터 등록</span><i>→</i><span>승인 요청</span><i>→</i><strong>최종 승인</strong><i>→</i><span>사회 실적 자동 반영</span></section>
       <Card className="filter-card" title="조회 조건" description="기준 기간과 사업장을 선택해 승인 완료된 실적을 조회합니다.">
         <div className="esg-filter-grid">
-          <label><span>기준연도</span><select value={filters.year} onChange={(event) => setFilters({ ...filters, year: Number(event.target.value) })}><option value={2026}>2026년</option><option value={2025}>2025년</option></select></label>
-          <label><span>기준월</span><select value={filters.month} onChange={(event) => setFilters({ ...filters, month: Number(event.target.value) })}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}월</option>)}</select></label>
+          <label><span>기준연도</span><select value={selectedYear} onChange={handleYearChange} disabled={periodLoading || !years.length}>{years.map((year) => <option key={year} value={year}>{year}년</option>)}</select></label>
+          <label><span>기준월</span><select value={selectedMonth} onChange={(event) => setFilters({ ...filters, year: selectedYear, month: Number(event.target.value) })} disabled={periodLoading || !(monthsByYear[selectedYear] || []).length}>{(monthsByYear[selectedYear] || []).map((month) => <option key={month} value={month}>{month}월</option>)}</select></label>
           <label><span>사업장</span><select value={filters.facilityId} onChange={(event) => setFilters({ ...filters, facilityId: event.target.value })}><option value="">전체 사업장</option>{facilities.map((facility) => <option key={facility.id} value={facility.id}>{facilityNameOf(facility)}</option>)}</select></label>
           <label className="filter-search"><span>검색</span><input value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="사업장명" /></label>
-          <div className="filter-actions"><Button variant="outline" onClick={() => setFilters(defaultFilters)}>초기화</Button><Button onClick={load}>조회</Button></div>
+          <div className="filter-actions"><Button variant="outline" onClick={resetFilters}>초기화</Button><Button onClick={load} disabled={periodLoading}>조회</Button></div>
         </div>
       </Card>
       <div className="summary-card-grid four">

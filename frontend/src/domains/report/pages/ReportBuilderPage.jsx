@@ -10,13 +10,13 @@ import Card from "../../../shared/components/Card";
 import Button from "../../../shared/components/Button";
 import DataTable from "../../../shared/components/DataTable";
 import { useReportBuilder } from "../hooks/useReportBuilder";
+import { useMetricPeriods } from "../../metric/hooks/useMetricPeriods";
 import { useSlashMenu } from "../hooks/useSlashMenu";
 import { useReportHistory } from "../hooks/useReportHistory";
 import { downloadPdf, downloadWord } from "../utils/reportExportUtils";
 import ReportSettingsModal from "../components/ReportSettingsModal";
 import ReportFAB from "../components/ReportFAB";
 
-const VALID_YEARS = [2026, 2025, 2024];
 
 const formatValue = (metric) => {
   if (metric?.value === null || metric?.value === undefined) return "-";
@@ -58,7 +58,9 @@ const buildApprovedPerformanceHtml = (metrics, year, scope) => {
 export default function ReportBuilderPage() {
   const [searchParams] = useSearchParams();
   const requestedYear = Number(searchParams.get("year"));
-  const initialYear = VALID_YEARS.includes(requestedYear) ? String(requestedYear) : "2026";
+  const initialYear = Number.isInteger(requestedYear) && requestedYear > 0
+    ? String(requestedYear)
+    : String(new Date().getFullYear());
   const previewRef = useRef(null);
   const quillRef = useRef(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -67,6 +69,16 @@ export default function ReportBuilderPage() {
   const [approvedError, setApprovedError] = useState("");
 
   const builderState = useReportBuilder(initialYear);
+  const {
+    years: availableYears,
+    loading: periodLoading,
+  } = useMetricPeriods({ approvedOnly: true });
+
+  const reportYear = availableYears.includes(Number(builderState.year))
+    ? String(builderState.year)
+    : String(availableYears[0] || builderState.year);
+
+
   const { slashMenu, insertSlashCommand } = useSlashMenu(quillRef, builderState.setContent);
   const historyState = useReportHistory();
 
@@ -84,10 +96,11 @@ export default function ReportBuilderPage() {
   useEffect(() => {
     let active = true;
     const loadApprovedMetrics = async () => {
+      if (periodLoading) return;
       setIsApprovedLoading(true);
       setApprovedError("");
       try {
-        const response = await performanceApi.getPerformanceMetrics(Number(builderState.year));
+        const response = await performanceApi.getPerformanceMetrics(Number(reportYear));
         if (!active) return;
         const rows = response.data?.data || response.data || [];
         setApprovedMetrics(rows.filter((row) => row.status === "APPROVED"));
@@ -105,21 +118,21 @@ export default function ReportBuilderPage() {
     return () => {
       active = false;
     };
-  }, [builderState.year]);
+  }, [periodLoading, reportYear]);
 
   const approvedMonth = useMemo(() => latestApprovedMonth(approvedMetrics), [approvedMetrics]);
   const approvedPeriodLabel = approvedMonth > 0
-    ? `${builderState.year}년 1~${approvedMonth}월 승인완료`
-    : `${builderState.year}년 승인완료 데이터 없음`;
+    ? `${reportYear}년 1~${approvedMonth}월 승인완료`
+    : `${reportYear}년 승인완료 데이터 없음`;
 
   const handleImportApprovedMetrics = () => {
     if (!approvedMetrics.length) {
-      window.alert(`${builderState.year}년에 리포트로 불러올 승인 완료 실적이 없습니다.`);
+      window.alert(`${reportYear}년에 리포트로 불러올 승인 완료 실적이 없습니다.`);
       return;
     }
     if (builderState.content && !window.confirm("현재 편집 중인 본문을 승인 실적 기반 초안으로 교체하시겠습니까?")) return;
-    builderState.setContent(buildApprovedPerformanceHtml(approvedMetrics, builderState.year, builderState.scope));
-    builderState.setTitle(`${builderState.year}년 에코모빌리티 파츠 ESG 보고서`);
+    builderState.setContent(buildApprovedPerformanceHtml(approvedMetrics, reportYear, builderState.scope));
+    builderState.setTitle(`${reportYear}년 에코모빌리티 파츠 ESG 보고서`);
   };
 
   const handleEditLoad = (row) => {
@@ -134,7 +147,7 @@ export default function ReportBuilderPage() {
   const handleCreateNew = () => {
     if (!window.confirm("현재 에디터의 내용이 초기화됩니다. 새 보고서를 작성하시겠습니까?")) return;
     builderState.setTitle("새 ESG 보고서");
-    builderState.setYear(initialYear);
+    builderState.setYear(String(availableYears[0] || initialYear));
     builderState.setScope("전체 사업장");
     builderState.setContent("");
     if (builderState.templates?.length) {
@@ -157,7 +170,7 @@ export default function ReportBuilderPage() {
         templateId,
         title: builderState.title,
         content: builderState.content,
-        targetYear: Number(builderState.year),
+        targetYear: Number(reportYear),
         scope: builderState.scope,
         version: "v1.0",
         fileUrl: "",
@@ -192,8 +205,8 @@ export default function ReportBuilderPage() {
                   확정 실적 불러오기
                 </Button>
                 <Button variant="outline" onClick={() => setIsModalOpen(true)}>기본 설정</Button>
-                <Button variant="outline" onClick={() => downloadWord(previewRef, builderState.year, builderState.title)}>Word 출력</Button>
-                <Button variant="outline" onClick={() => downloadPdf(previewRef, builderState.year, builderState.title)}>PDF 출력</Button>
+                <Button variant="outline" onClick={() => downloadWord(previewRef, reportYear, builderState.title)}>Word 출력</Button>
+                <Button variant="outline" onClick={() => downloadPdf(previewRef, reportYear, builderState.title)}>PDF 출력</Button>
                 <Button onClick={handleSaveReport} disabled={builderState.isSaving}>
                   {builderState.isSaving ? "저장 중..." : "최종 내용 저장"}
                 </Button>
@@ -208,12 +221,12 @@ export default function ReportBuilderPage() {
           <div className="equal-height-card-wrapper" style={{ flex: "1 1 480px", minWidth: 0 }}>
             <Card title="실시간 미리보기" description={`${approvedPeriodLabel} 기준`}>
               <div className="report-builder-scroll preview-editor" ref={previewRef} style={{ flex: 1, overflowY: "auto", padding: "10px", boxSizing: "border-box" }}>
-                <span style={{ color: "#166534", fontWeight: "bold", fontSize: "14px", letterSpacing: "1px" }}>{builderState.year} SUSTAINABILITY REPORT</span>
+                <span style={{ color: "#166534", fontWeight: "bold", fontSize: "14px", letterSpacing: "1px" }}>{reportYear} SUSTAINABILITY REPORT</span>
                 <h1 style={{ borderBottom: "3px solid #166534", paddingBottom: "15px", marginTop: "12px", marginBottom: "24px", fontSize: "28px", color: "#0f172a", wordBreak: "keep-all" }}>
                   {builderState.title || "보고서 제목을 입력해 주세요"}
                 </h1>
                 <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "20px", borderBottom: "2px solid #cbd5e1", paddingBottom: "8px" }}>
-                  <span>● 보고 연도: {builderState.year}년</span> | <span>● 보고 범위: {builderState.scope}</span>
+                  <span>● 보고 연도: {reportYear}년</span> | <span>● 보고 범위: {builderState.scope}</span>
                 </div>
                 <div className="readonly-editor">
                   <ReactQuill theme="snow" value={builderState.content} readOnly modules={{ toolbar: false }} />
@@ -274,7 +287,7 @@ export default function ReportBuilderPage() {
         </div>
       )}
 
-      <ReportSettingsModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} builderState={builderState} />
+      <ReportSettingsModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} builderState={{ ...builderState, year: reportYear }} yearOptions={availableYears} />
       <ReportFAB viewMode={historyState.viewMode} setViewMode={historyState.handleViewModeChange} onCreateNew={handleCreateNew} />
     </div>
   );
