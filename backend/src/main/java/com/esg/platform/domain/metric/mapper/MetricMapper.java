@@ -25,6 +25,14 @@ public interface MetricMapper {
             @Param("search") String search,
             @Param("approvedOnly") boolean approvedOnly);
 
+    List<String> findAvailablePeriods(
+            @Param("companyId") Long companyId,
+            @Param("category") String category,
+            @Param("status") String status,
+            @Param("facilityId") Long facilityId,
+            @Param("approvedOnly") boolean approvedOnly,
+            @Param("benchmarkReady") boolean benchmarkReady);
+
     MetricDto findById(@Param("companyId") Long companyId, @Param("id") Long id);
 
     EsgMetricData findEntityById(@Param("id") Long id);

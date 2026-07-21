@@ -4,6 +4,7 @@ const unwrap = (response) => response.data?.data ?? response.data;
 
 export const metricApi = {
   list: async (params) => unwrap(await apiClient.get("/esg/metrics", { params })),
+  periods: async (params = {}) => unwrap(await apiClient.get("/esg/metrics/periods", { params })),
   detail: async (id) => unwrap(await apiClient.get(`/esg/metrics/${id}`)),
   create: async (data) => unwrap(await apiClient.post("/esg/metrics", data)),
   getIndicators: async () => unwrap(await apiClient.get("/esg/metrics/indicators")),

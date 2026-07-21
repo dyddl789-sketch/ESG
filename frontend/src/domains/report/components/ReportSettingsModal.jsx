@@ -4,7 +4,8 @@ import Button from "../../../shared/components/Button";
 export default function ReportSettingsModal({ 
   isOpen, 
   onClose, 
-  builderState 
+  builderState,
+  yearOptions = [],
 }) {
   if (!isOpen) return null;
 
@@ -41,9 +42,9 @@ export default function ReportSettingsModal({
             <label style={{ display: "flex", flexDirection: "column", gap: "8px", flex: 1 }}>
               <span style={{ fontWeight: "600", fontSize: "14px" }}>보고 연도</span>
               <select value={builderState.year} onChange={(e) => builderState.setYear(e.target.value)} style={{ padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px" }}>
-                <option value="2026">2026년</option>
-                <option value="2025">2025년</option>
-                <option value="2024">2024년</option>
+                {yearOptions.map((year) => (
+                  <option key={year} value={String(year)}>{year}년</option>
+                ))}
               </select>
             </label>
             <label style={{ display: "flex", flexDirection: "column", gap: "8px", flex: 1 }}>

@@ -8,8 +8,8 @@ import Tabs from "../../../shared/components/Tabs";
 import DataTable from "../../../shared/components/DataTable";
 import StatusBadge from "../../../shared/components/StatusBadge";
 import { performanceApi } from "../api/performanceApi";
+import { useMetricPeriods } from "../hooks/useMetricPeriods";
 
-const YEAR_OPTIONS = [2026, 2025, 2024];
 
 const configs = {
   ENVIRONMENT: { label: "환경(E)", codes: ["IND_E_ELEC", "IND_E_SCOPE2"] },
@@ -48,22 +48,33 @@ function CopyIcon({ onClick }) {
 export default function PerformancePage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState("ENVIRONMENT");
-  const [year, setYear] = useState(2026);
+  const [year, setYear] = useState(new Date().getFullYear());
   const [metrics, setMetrics] = useState([]);
   const [prevYearMetrics, setPrevYearMetrics] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const {
+    years,
+    loading: periodLoading,
+  } = useMetricPeriods({
+    approvedOnly: true,
+    category: tab,
+  });
+
+  const selectedYear = years.includes(year) ? year : (years[0] || year);
+
 
   useEffect(() => {
     let active = true;
 
     const fetchMetrics = async () => {
+      if (periodLoading) return;
       setIsLoading(true);
       setErrorMessage("");
       try {
         const [currentResponse, previousResponse] = await Promise.all([
-          performanceApi.getPerformanceMetrics(year),
-          performanceApi.getPerformanceMetrics(year - 1),
+          performanceApi.getPerformanceMetrics(selectedYear),
+          performanceApi.getPerformanceMetrics(selectedYear - 1),
         ]);
 
         if (!active) return;
@@ -84,7 +95,7 @@ export default function PerformancePage() {
     return () => {
       active = false;
     };
-  }, [year]);
+  }, [periodLoading, selectedYear]);
 
   const categoryMetrics = useMemo(
     () => metrics.filter((item) => item.category === tab && item.status === "APPROVED"),
@@ -168,7 +179,7 @@ export default function PerformancePage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `ESG_승인실적_${year}_${tab}.csv`;
+    link.download = `ESG_승인실적_${selectedYear}_${tab}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -183,7 +194,7 @@ export default function PerformancePage() {
         actions={(
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <Button variant="outline" onClick={handleExportCsv} disabled={!categoryMetrics.length}>CSV 다운로드</Button>
-            <Button onClick={() => navigate(`/manager/reports?year=${year}`)}>리포트 작성</Button>
+            <Button onClick={() => navigate(`/manager/reports?year=${selectedYear}`)}>리포트 작성</Button>
           </div>
         )}
       />
@@ -196,8 +207,8 @@ export default function PerformancePage() {
         />
         <label style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 600 }}>
           <span>기준연도</span>
-          <select value={year} onChange={(event) => setYear(Number(event.target.value))}>
-            {YEAR_OPTIONS.map((option) => <option key={option} value={option}>{option}년 실적</option>)}
+          <select value={selectedYear} onChange={(event) => setYear(Number(event.target.value))} disabled={periodLoading || !years.length}>
+            {years.map((option) => <option key={option} value={option}>{option}년 실적</option>)}
           </select>
         </label>
       </div>
@@ -228,7 +239,7 @@ export default function PerformancePage() {
           </div>
 
           <Card
-            title={selected ? `${year}년 ${selected.title} 승인 실적 추이` : `${year}년 핵심 지표 추이`}
+            title={selected ? `${selectedYear}년 ${selected.title} 승인 실적 추이` : `${selectedYear}년 핵심 지표 추이`}
             description="승인 완료된 월만 차트에 반영됩니다."
           >
             <div className="chart-box">
@@ -252,7 +263,7 @@ export default function PerformancePage() {
                 { key: "value", label: "실적", render: (_, row) => formatValue(row) },
                 { key: "status", label: "상태", render: () => <StatusBadge status="APPROVED" /> },
               ]}
-              emptyText={`${year}년 ${configs[tab].label} 승인 완료 실적이 없습니다.`}
+              emptyText={`${selectedYear}년 ${configs[tab].label} 승인 완료 실적이 없습니다.`}
             />
           </Card>
         </>

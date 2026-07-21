@@ -12,6 +12,7 @@ import companyApi from "../../company/api/companyApi";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { ROLES } from "../../../app/config/roles";
 import { facilityNameOf } from "../../metric/utils/approvedMetricView";
+import { resolvePeriodSelection, useMetricPeriods } from "../../metric/hooks/useMetricPeriods";
 import { apiErrorMessage, categoryLabel, formatNumber } from "../../../shared/utils/esgFormat";
 
 const scoreValue = (value) => Number(value || 0);
@@ -57,18 +58,33 @@ const changePresentation = (kpi) => {
 export default function ManagerDashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [year, setYear] = useState(2026);
-  const [month, setMonth] = useState(5);
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
   const [facilityId, setFacilityId] = useState("");
   const [facilityOptions, setFacilityOptions] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
+  const {
+    years,
+    monthsByYear,
+    loading: periodLoading,
+  } = useMetricPeriods({
+    approvedOnly: true,
+    facilityId,
+  });
+
+  const resolvedPeriod = resolvePeriodSelection({ year, month }, years, monthsByYear);
+  const selectedYear = periodLoading ? year : resolvedPeriod.year;
+  const selectedMonth = periodLoading ? month : resolvedPeriod.month;
+
 
   const load = useCallback(async () => {
+    if (periodLoading) return;
     setLoading(true);
     try {
       const [dashboard, facilityResponse] = await Promise.all([
-        dashboardApi.getSummary(year, month, facilityId || undefined),
+        dashboardApi.getSummary(selectedYear, selectedMonth, facilityId || undefined),
         companyApi.getFacilities(),
       ]);
       setSummary(dashboard);
@@ -78,7 +94,7 @@ export default function ManagerDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [facilityId, month, year]);
+  }, [facilityId, periodLoading, selectedMonth, selectedYear]);
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
@@ -109,12 +125,19 @@ export default function ManagerDashboardPage() {
   const goDomain = (category, indicator) => {
     const meta = domainMeta[category];
     if (!meta) return;
-    navigate(`${meta.path}?${queryString({ year, month, facilityId, indicator })}`);
+    navigate(`${meta.path}?${queryString({ year: selectedYear, month: selectedMonth, facilityId, indicator })}`);
   };
 
   const goFacility = (facility) => {
     const base = user?.role === ROLES.SYSTEM_ADMIN ? "/admin/companies" : "/manager/company";
-    navigate(`${base}?${queryString({ year, month, facilityId: facility.facilityId || facility.id })}`);
+    navigate(`${base}?${queryString({ year: selectedYear, month: selectedMonth, facilityId: facility.facilityId || facility.id })}`);
+  };
+
+  const handleYearChange = (event) => {
+    const nextYear = Number(event.target.value);
+    const months = monthsByYear[nextYear] || [];
+    setYear(nextYear);
+    setMonth(months.at(-1) || selectedMonth);
   };
 
   if (loading) return <div className="data-loading page-loading">최종 승인 데이터를 기준으로 대시보드를 구성하는 중입니다.</div>;
@@ -133,8 +156,8 @@ export default function ManagerDashboardPage() {
         title="ESG 종합 대시보드"
         description="최종 승인된 실제값과 KCGS 평가체계 준용 내부 ESG 지수를 제공합니다."
         actions={<div className="dashboard-filter-actions">
-          <select className="select" value={year} onChange={(event) => setYear(Number(event.target.value))}><option value={2026}>2026년</option><option value={2025}>2025년</option></select>
-          <select className="select" value={month} onChange={(event) => setMonth(Number(event.target.value))}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}월</option>)}</select>
+          <select className="select" value={selectedYear} onChange={handleYearChange} disabled={periodLoading || !years.length}>{years.map((optionYear) => <option key={optionYear} value={optionYear}>{optionYear}년</option>)}</select>
+          <select className="select" value={selectedMonth} onChange={(event) => setMonth(Number(event.target.value))} disabled={periodLoading || !(monthsByYear[selectedYear] || []).length}>{(monthsByYear[selectedYear] || []).map((optionMonth) => <option key={optionMonth} value={optionMonth}>{optionMonth}월</option>)}</select>
           <select className="select" value={facilityId} onChange={(event) => setFacilityId(event.target.value)}><option value="">전체 사업장</option>{facilityOptions.map((facility) => <option key={facility.id} value={facility.id}>{facilityNameOf(facility)}</option>)}</select>
         </div>}
       />
@@ -228,7 +251,7 @@ export default function ManagerDashboardPage() {
                         onClick={() => goDomain(kpi.category, kpi.indicatorCode)}
                         onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") goDomain(kpi.category, kpi.indicatorCode); }}
                       >
-                        <div><span>{categoryLabel(kpi.category)}</span><small>{summary?.latestApprovedPeriod || `${year}-${String(month).padStart(2, "0")}`}</small></div>
+                        <div><span>{categoryLabel(kpi.category)}</span><small>{summary?.latestApprovedPeriod || `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`}</small></div>
                         <h3>{kpi.title}</h3>
                         <strong>{formatNumber(kpi.value, kpi.unit === "%" ? 2 : 1)} <small>{kpi.unit}</small></strong>
                         <p className={change.tone}>{change.label}</p>
