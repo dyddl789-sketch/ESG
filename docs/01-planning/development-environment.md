@@ -16,7 +16,7 @@
 ## 프로젝트 최초 실행
 1. frontend 폴더 이동
 2. npm ci
-3. npm run dev (편집됨)
+3. npm run dev
 
 ---
 # Backend
