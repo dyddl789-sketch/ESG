@@ -88,6 +88,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:  # 👈 이 부분을 추가하여 빌드 시점에 환경변수를 주입합니다.
+        - VITE_API_BASE_URL=/api
+        - VITE_BACKEND_URL=https://43.200.217.129:8080
+        - VITE_WS_URL=wss://43.200.217.129:8080/ws/esg
+        - VITE_KAKAO_MAP_KEY=9693dca78bc226b3618605dbc0bce77f
 
     container_name: nginx-frontend
 
@@ -106,7 +111,6 @@ services:
 
     networks:
       - app-network
-
 
 
 volumes:
