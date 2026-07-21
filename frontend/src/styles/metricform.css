@@ -118,4 +118,54 @@
   }
 }
 
-.shipment-input-group small { display: block; margin-top: 6px; color: var(--text-muted, #6b7280); line-height: 1.5; }
+.shipment-input-group small {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-muted, #6b7280);
+  line-height: 1.5;
+}
+
+/* 문서 AI 최종 검토 카드 */
+.document-ai-review .form-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 20px 24px !important;
+}
+
+.document-ai-review .form-span-2 {
+  grid-column: span 2 !important;
+}
+
+.document-ai-review textarea {
+  min-height: 120px !important;
+  resize: none !important;
+}
+
+.card-internal-wrapper .form-group input[readonly],
+.card-internal-wrapper .form-group select[disabled],
+.card-internal-wrapper .form-group textarea[readonly] {
+  background-color: #f8fafc !important;
+  color: #475569 !important;
+  border-color: #cbd5e1 !important;
+  cursor: not-allowed !important;
+}
+
+.card-actions {
+  margin-top: 24px !important;
+  display: flex !important;
+  gap: 8px !important;
+  justify-content: flex-end !important;
+  border-top: 1px solid #f1f5f9 !important;
+  padding-top: 20px !important;
+  width: 100% !important;
+}
+
+@media (max-width: 768px) {
+  .document-ai-review .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .document-ai-review .form-span-2 {
+    grid-column: span 1 !important;
+  }
+}
