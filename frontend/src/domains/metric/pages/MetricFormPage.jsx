@@ -29,11 +29,17 @@ export default function MetricFormPage() {
     value: "",
     shipmentAmount: "",
     textValue: "",
-    evidenceFileUrl: ""
+    evidenceFileUrl: "",
+    evidenceOriginalFilename: "",
+    evidenceContentType: "",
+    evidenceFileSize: null,
+    evidenceUploadedAt: null
   });
 
   const selectedIndicator = indicators.find((indicator) => String(indicator.id) === String(formData.indicatorId));
   const isElectricityMetric = selectedIndicator?.indicatorCode === "IND_E_ELEC";
+  const isCompanyWideGovernance = ["IND_G_ATTENDANCE", "IND_G_OUTSIDE"].includes(selectedIndicator?.indicatorCode);
+  const evidenceLabel = isCompanyWideGovernance ? "기업 거버넌스 증빙 PDF 첨부" : "사업장 ESG 증빙 PDF 첨부";
 
   useEffect(() => {
     const fetchData = async () => {
@@ -87,7 +93,11 @@ export default function MetricFormPage() {
             value: extractedValue !== "" ? String(extractedValue) : "",
             shipmentAmount: d.shipmentAmountMillionKrw !== null && d.shipmentAmountMillionKrw !== undefined ? String(d.shipmentAmountMillionKrw) : "",
             textValue: d.textValue || "",
-            evidenceFileUrl: d.evidence || d.evidenceFileUrl || ""
+            evidenceFileUrl: d.evidence || d.evidenceFileUrl || "",
+            evidenceOriginalFilename: d.evidenceOriginalFilename || "",
+            evidenceContentType: d.evidenceContentType || "",
+            evidenceFileSize: d.evidenceFileSize ?? null,
+            evidenceUploadedAt: d.evidenceUploadedAt || null
           });
         }
       } catch (err) {
@@ -107,11 +117,16 @@ export default function MetricFormPage() {
     setUploading(true);
     try {
       const response = await fileApi.upload(selectedFile);
-      const uploadedUrl = response.data?.data?.fileUrl || response.data?.fileUrl;
+      const uploadData = response.data?.data || response.data || {};
+      const uploadedUrl = uploadData.fileUrl;
 
       setFormData(prev => ({
         ...prev,
-        evidenceFileUrl: uploadedUrl
+        evidenceFileUrl: uploadedUrl,
+        evidenceOriginalFilename: uploadData.originalFilename || selectedFile.name,
+        evidenceContentType: uploadData.contentType || selectedFile.type || "application/pdf",
+        evidenceFileSize: uploadData.size ?? selectedFile.size,
+        evidenceUploadedAt: uploadData.uploadedAt || new Date().toISOString()
       }));
 
       Swal.fire("알림", "증빙 자료가 서버에 안전하게 업로드되었습니다.", "success");
@@ -157,6 +172,7 @@ export default function MetricFormPage() {
       if (name === "indicatorId") {
         const nextIndicator = indicators.find((indicator) => String(indicator.id) === String(value));
         if (nextIndicator?.indicatorCode !== "IND_E_ELEC") next.shipmentAmount = "";
+        if (["IND_G_ATTENDANCE", "IND_G_OUTSIDE"].includes(nextIndicator?.indicatorCode)) next.facilityId = "";
       }
       return next;
     });
@@ -165,18 +181,22 @@ export default function MetricFormPage() {
   const handleProcessSubmit = async (isApprovalClick = false) => {
     if (!formData.indicatorId) return Swal.fire("알림", "지표를 선택해주세요.", "warning");
     if (isElectricityMetric && (!formData.shipmentAmount || Number(formData.shipmentAmount) <= 0)) return Swal.fire("알림", "전력 사용량 등록 시 출하액(백만원)을 입력해주세요.", "warning");
-    if (!formData.evidenceFileUrl) return Swal.fire("알림", "사업장 ESG 내역 PDF를 첨부해주세요.", "warning");
+    if (!formData.evidenceFileUrl) return Swal.fire("알림", `${evidenceLabel}가 필요합니다.`, "warning");
 
     setLoading(true);
     
     const payload = {
       ...formData,
       indicatorId: Number(formData.indicatorId),
-      facilityId: formData.facilityId ? Number(formData.facilityId) : null,
+      facilityId: isCompanyWideGovernance ? null : (formData.facilityId ? Number(formData.facilityId) : null),
       reportingYear: Number(formData.reportingYear),
       periodValue: Number(formData.periodValue),
       value: formData.value !== "" ? Number(formData.value) : null,
       shipmentAmount: isElectricityMetric && formData.shipmentAmount !== "" ? Number(formData.shipmentAmount) : null,
+      evidenceOriginalFilename: formData.evidenceFileUrl ? formData.evidenceOriginalFilename : null,
+      evidenceContentType: formData.evidenceFileUrl ? formData.evidenceContentType : null,
+      evidenceFileSize: formData.evidenceFileUrl ? formData.evidenceFileSize : null,
+      evidenceUploadedAt: formData.evidenceFileUrl ? formData.evidenceUploadedAt : null,
       submitForApproval: isApprovalClick
     };
 
@@ -239,8 +259,8 @@ export default function MetricFormPage() {
 
                 <div className="form-group">
                   <label>사업장</label>
-                  <select name="facilityId" value={formData.facilityId} onChange={handleChange}>
-                    <option value="">전체(본사 공통)</option>
+                  <select name="facilityId" value={formData.facilityId} onChange={handleChange} disabled={isCompanyWideGovernance}>
+                    <option value="">{isCompanyWideGovernance ? "전체 · 기업 기준" : "전체(본사 공통)"}</option>
                     {facilities.map(fac => (
                       <option key={fac.id} value={fac.id}>{fac.facility_name || fac.name}</option>
                     ))}
@@ -334,7 +354,7 @@ export default function MetricFormPage() {
                 {/* 증빙자료 파일 업로드 및 원본 한글파일명 복원 다운로드 흐름 완비 */}
                 <div className="form-group" style={{ marginTop: "15px", borderTop: "1px dashed #eee", paddingTop: "15px" }}>
                   <label style={{ fontWeight: "bold", display: "block", marginBottom: "8px" }}>
-                    사업장 ESG 내역 PDF 첨부 *
+                    {evidenceLabel} *
                   </label>
                   <input 
                     type="file" 
@@ -346,10 +366,7 @@ export default function MetricFormPage() {
                   {uploading && <p style={{ fontSize: "12px", color: "#2563eb", marginTop: "5px" }}>파일을 서버에 업로드하고 있습니다...</p>}
                   
                   {formData.evidenceFileUrl && (() => {
-                    const isOfficeFile = [".xlsx", ".xls", ".docx", ".hwp"].some((ext) =>
-                      formData.evidenceFileUrl.toLowerCase().endsWith(ext),
-                    );
-                    const fileName = formData.evidenceFileUrl.split("/").pop();
+                    const fileName = formData.evidenceOriginalFilename || formData.evidenceFileUrl.split("/").pop();
 
                     return (
                       <div style={{ marginTop: "12px", padding: "10px 14px", background: "#f4fcf7", borderRadius: "6px", border: "1px solid #e1f5e9", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
@@ -357,9 +374,9 @@ export default function MetricFormPage() {
                         <button
                           type="button"
                           className="btn-platform btn-platform-draft"
-                          onClick={() => handleEvidenceAction(isOfficeFile ? "download" : "open")}
+                          onClick={() => handleEvidenceAction("open")}
                         >
-                          {isOfficeFile ? "증빙 다운로드" : "증빙 미리보기"}
+                          증빙 미리보기
                         </button>
                       </div>
                     );

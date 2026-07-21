@@ -31,6 +31,10 @@ public class MetricDto {
     private String method;
     private String status;
     private String evidence;
+    private String evidenceOriginalFilename;
+    private String evidenceContentType;
+    private Long evidenceFileSize;
+    private OffsetDateTime evidenceUploadedAt;
     private String aiStatus;
     private String risk;
     private String aiFinding;

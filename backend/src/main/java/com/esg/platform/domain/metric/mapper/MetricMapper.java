@@ -94,4 +94,6 @@ public interface MetricMapper {
             @Param("gScore") BigDecimal gScore);
 
     int deleteScore(@Param("companyId") Long companyId, @Param("year") int year, @Param("month") int month);
+
+    int countApprovedEvidenceByUrl(@Param("fileUrl") String fileUrl);
 }

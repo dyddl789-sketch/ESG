@@ -23,6 +23,7 @@ import com.esg.platform.domain.metric.dto.MetricCreateRequest;
 import com.esg.platform.domain.metric.dto.MetricDto;
 import com.esg.platform.domain.metric.service.MetricService;
 import com.esg.platform.domain.metric.service.MetricWorkflowService;
+import com.esg.platform.domain.notification.service.NotificationService;
 import com.esg.platform.global.response.ApiResponse;
 import com.esg.platform.global.security.EsgUserPrincipal;
 
@@ -34,10 +35,15 @@ public class MetricController {
 
     private final MetricWorkflowService workflowService;
     private final MetricService metricService;
+    private final NotificationService notificationService;
 
-    public MetricController(MetricWorkflowService workflowService, MetricService metricService) {
+    public MetricController(
+            MetricWorkflowService workflowService,
+            MetricService metricService,
+            NotificationService notificationService) {
         this.workflowService = workflowService;
         this.metricService = metricService;
+        this.notificationService = notificationService;
     }
 
     @GetMapping
@@ -98,7 +104,8 @@ public class MetricController {
                 : principal.getUser().getCompanyId().intValue();
         Long metricId = metricService.createMetric(request, companyId, userId.intValue());
         if (Boolean.TRUE.equals(request.submitForApproval())) {
-            workflowService.requestApproval(metricId, userId);
+            MetricDto submitted = workflowService.requestApproval(metricId, userId);
+            notifyApprovalRequested(submitted, userId);
         }
         log.info("[ESG_METRIC] 지표 등록 metricId={} companyId={} userId={} submit={}",
                 metricId, companyId, userId, Boolean.TRUE.equals(request.submitForApproval()));
@@ -114,7 +121,9 @@ public class MetricController {
         Long userId = principal.getUser().getId();
         metricService.updateMetric(id, request, userId.intValue());
         if (Boolean.TRUE.equals(request.submitForApproval())) {
-            return ApiResponse.ok(workflowService.requestApproval(id, userId));
+            MetricDto submitted = workflowService.requestApproval(id, userId);
+            notifyApprovalRequested(submitted, userId);
+            return ApiResponse.ok(submitted);
         }
         return ApiResponse.ok(workflowService.getMetric(id, false));
     }
@@ -133,7 +142,10 @@ public class MetricController {
     public ApiResponse<MetricDto> requestApproval(
             @PathVariable(name = "id") Long id,
             @AuthenticationPrincipal EsgUserPrincipal principal) {
-        return ApiResponse.ok(workflowService.requestApproval(id, principal.getUser().getId()));
+        Long userId = principal.getUser().getId();
+        MetricDto submitted = workflowService.requestApproval(id, userId);
+        notifyApprovalRequested(submitted, userId);
+        return ApiResponse.ok(submitted);
     }
 
     @PatchMapping("/batch/request-approval")
@@ -143,6 +155,17 @@ public class MetricController {
             @RequestParam(name = "category", required = false) String category,
             @AuthenticationPrincipal EsgUserPrincipal principal) {
         return ApiResponse.ok(workflowService.requestApprovalBatch(period, category, principal.getUser().getId()));
+    }
+
+    private void notifyApprovalRequested(MetricDto metric, Long actorUserId) {
+        try {
+            notificationService.createApprovalRequested(metric, actorUserId);
+        } catch (RuntimeException exception) {
+            log.warn("[NOTIFICATION] 승인 요청 알림 생성 실패 metricId={} actorUserId={} reason={}",
+                    metric == null ? null : metric.getId(),
+                    actorUserId,
+                    exception.getClass().getSimpleName());
+        }
     }
 
     private Long resolveCompanyId(EsgUserPrincipal principal) {
