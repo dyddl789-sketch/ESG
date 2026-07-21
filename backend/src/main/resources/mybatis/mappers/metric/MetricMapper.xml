@@ -27,6 +27,10 @@
         <result property="method" column="data_source_type"/>
         <result property="status" column="status"/>
         <result property="evidence" column="evidence_file_url"/>
+        <result property="evidenceOriginalFilename" column="evidence_original_filename"/>
+        <result property="evidenceContentType" column="evidence_content_type"/>
+        <result property="evidenceFileSize" column="evidence_file_size"/>
+        <result property="evidenceUploadedAt" column="evidence_uploaded_at"/>
         <result property="assignee" column="assignee"/>
         <result property="approver" column="approver"/>
         <result property="rejectReason" column="reject_reason"/>
@@ -70,6 +74,10 @@
             m.data_source_type,
             m.status::text AS status,
             m.evidence_file_url,
+            m.evidence_original_filename,
+            m.evidence_content_type,
+            m.evidence_file_size,
+            m.evidence_uploaded_at,
             input_user.name AS assignee,
             approver.name AS approver,
             m.reject_reason,
@@ -83,8 +91,7 @@
         LEFT JOIN users approver ON approver.id = m.approver_user_id
     </sql>
 
-    <select id="findMetrics" resultMap="MetricMap">
-        <include refid="metricBaseSelect"/>
+    <sql id="metricFilters">
         WHERE m.company_id = #{companyId}
         <if test="year != null">AND m.reporting_year = #{year}</if>
         <if test="period != null and period != ''">
@@ -97,13 +104,38 @@
         <if test="search != null and search != ''">
             AND (i.title ILIKE '%' || #{search} || '%'
                  OR i.indicator_code ILIKE '%' || #{search} || '%'
-                 OR COALESCE(f.facility_name, '') ILIKE '%' || #{search} || '%')
+                 OR COALESCE(f.facility_name, '기업 전체') ILIKE '%' || #{search} || '%')
         </if>
         <if test="approvedOnly">AND m.status = 'APPROVED'</if>
+    </sql>
+
+    <sql id="metricOrder">
         ORDER BY m.reporting_year DESC, m.period_value DESC,
+                 m.updated_at DESC, m.id DESC,
                  i.category, i.indicator_code,
                  CASE WHEN f.facility_type = 'HQ' THEN 0 ELSE 1 END,
                  f.facility_name
+    </sql>
+
+    <select id="findMetrics" resultMap="MetricMap">
+        <include refid="metricBaseSelect"/>
+        <include refid="metricFilters"/>
+        <include refid="metricOrder"/>
+    </select>
+
+    <select id="findMetricsPage" resultMap="MetricMap">
+        <include refid="metricBaseSelect"/>
+        <include refid="metricFilters"/>
+        <include refid="metricOrder"/>
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countMetrics" resultType="long">
+        SELECT COUNT(*)
+        FROM esg_metric_data m
+        JOIN esg_indicators i ON i.id = m.indicator_id
+        LEFT JOIN company_facilities f ON f.id = m.facility_id
+        <include refid="metricFilters"/>
     </select>
 
     <select id="findAvailablePeriods" resultType="string">
@@ -163,6 +195,7 @@
         SELECT id, company_id, facility_id, indicator_id, reporting_year, period_type,
                period_value, activity_value, energy_cost, toe_value, peak_demand_kw,
                emission_factor_id, numerical_value, shipment_amount_million_krw, text_value, evidence_file_url,
+               evidence_original_filename, evidence_content_type, evidence_file_size, evidence_uploaded_at,
                status, data_source_type, input_user_id, approver_user_id, reject_reason,
                hash_signature, additional_info::text AS additional_info, created_at, updated_at
         FROM esg_metric_data
@@ -172,12 +205,15 @@
     <insert id="insertMetricData" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
         INSERT INTO esg_metric_data (
             company_id, facility_id, indicator_id, reporting_year, period_type, period_value,
-            numerical_value, shipment_amount_million_krw, text_value, evidence_file_url, status, data_source_type, input_user_id
+            numerical_value, shipment_amount_million_krw, text_value, evidence_file_url,
+            evidence_original_filename, evidence_content_type, evidence_file_size, evidence_uploaded_at,
+            status, data_source_type, input_user_id
         ) VALUES (
             #{companyId}, #{facilityId}, #{indicatorId}, #{reportingYear},
             CAST(#{periodType} AS period_type_enum), #{periodValue}, #{numericalValue},
-            #{shipmentAmountMillionKrw}, #{textValue}, #{evidenceFileUrl}, CAST(#{status} AS data_status_enum),
-            #{dataSourceType}, #{inputUserId}
+            #{shipmentAmountMillionKrw}, #{textValue}, #{evidenceFileUrl},
+            #{evidenceOriginalFilename}, #{evidenceContentType}, #{evidenceFileSize}, #{evidenceUploadedAt},
+            CAST(#{status} AS data_status_enum), #{dataSourceType}, #{inputUserId}
         )
     </insert>
 
@@ -192,6 +228,10 @@
             shipment_amount_million_krw = #{shipmentAmountMillionKrw},
             text_value = #{textValue},
             evidence_file_url = #{evidenceFileUrl},
+            evidence_original_filename = #{evidenceOriginalFilename},
+            evidence_content_type = #{evidenceContentType},
+            evidence_file_size = #{evidenceFileSize},
+            evidence_uploaded_at = #{evidenceUploadedAt},
             status = CAST(#{status} AS data_status_enum),
             input_user_id = #{inputUserId},
             approver_user_id = NULL,
@@ -329,4 +369,11 @@
         WHERE company_id = #{companyId} AND reporting_year = #{year}
           AND reporting_period = 'MONTHLY' AND period_value = #{month}
     </delete>
+
+    <select id="countApprovedEvidenceByUrl" resultType="int">
+        SELECT COUNT(*)
+        FROM esg_metric_data
+        WHERE evidence_file_url = #{fileUrl}
+          AND status = 'APPROVED'
+    </select>
 </mapper>

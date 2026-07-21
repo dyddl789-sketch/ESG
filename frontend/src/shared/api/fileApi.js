@@ -18,6 +18,11 @@ const extractFileName = (response, fileUrl) => {
 const createObjectUrl = (response) => URL.createObjectURL(response.data);
 
 export const fileApi = {
+  status: async (fileUrl) => {
+    const response = await apiClient.get("/files/status", { params: { fileUrl } });
+    return response.data?.data ?? response.data;
+  },
+
   upload: (fileObject) => {
     const formData = new FormData();
     formData.append("file", fileObject);

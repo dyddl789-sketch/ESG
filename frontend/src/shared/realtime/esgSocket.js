@@ -1,3 +1,5 @@
+import { tokenStorage } from "../auth/tokenStorage";
+
 const listeners = new Set();
 
 let socket = null;
@@ -9,17 +11,22 @@ const MAX_RETRY_DELAY = 15000;
 
 const resolveUrl = () => {
   const explicitUrl = import.meta.env.VITE_WS_URL;
-  if (explicitUrl) {
-    return explicitUrl;
-  }
-
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
-  if (backendUrl) {
-    return `${backendUrl.replace(/^http/, "ws")}/ws/esg`;
+  let baseUrl;
+
+  if (explicitUrl) {
+    baseUrl = explicitUrl;
+  } else if (backendUrl) {
+    baseUrl = `${backendUrl.replace(/^http/, "ws")}/ws/esg`;
+  } else {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    baseUrl = `${protocol}//${window.location.host}/ws/esg`;
   }
 
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${window.location.host}/ws/esg`;
+  const token = tokenStorage.getAccessToken();
+  if (!token) return null;
+  const separator = baseUrl.includes("?") ? "&" : "?";
+  return `${baseUrl}${separator}token=${encodeURIComponent(token)}`;
 };
 
 const notify = (payload) => {
@@ -46,7 +53,9 @@ export const connectEsgSocket = () => {
     return socket;
   }
 
-  socket = new WebSocket(resolveUrl());
+  const url = resolveUrl();
+  if (!url) return null;
+  socket = new WebSocket(url);
 
   socket.onopen = () => {
     if (manualClose) {

@@ -8,4 +8,8 @@ import java.util.Map;
 @Mapper
 public interface PerformanceMapper {
     List<Map<String, Object>> selectPerformanceList(@Param("companyId") Long companyId, @Param("year") int year);
+
+    List<Map<String, Object>> selectGovernanceTargets(
+            @Param("companyId") Long companyId,
+            @Param("year") int year);
 }

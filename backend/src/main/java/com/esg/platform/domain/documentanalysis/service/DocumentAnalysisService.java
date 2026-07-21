@@ -7,6 +7,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -231,7 +233,9 @@ public class DocumentAnalysisService {
             if (value == null && (textValue == null || textValue.isBlank())) {
                 throw new BusinessException(ErrorCode.INVALID_INPUT, "정량 수치 또는 정성 내용을 입력해 주세요.");
             }
-            if (indicatorCode.startsWith("IND_G_") && facilityId == null) {
+            if (indicatorCode.startsWith("IND_G_")
+                    && !isCompanyWideGovernance(indicatorCode)
+                    && facilityId == null) {
                 facilityId = metricMapper.findHeadquartersFacilityId(companyId.longValue());
             }
         }
@@ -242,6 +246,7 @@ public class DocumentAnalysisService {
                 ? "MONTHLY"
                 : request.getPeriodType().trim().toUpperCase();
 
+        Path evidencePath = resolveUploadedFile(request.getFileUrl());
         MetricCreateRequest metricRequest = new MetricCreateRequest(
                 indicatorId,
                 facilityId,
@@ -252,6 +257,10 @@ public class DocumentAnalysisService {
                 shipmentAmount,
                 textValue,
                 request.getFileUrl(),
+                originalEvidenceFilename(request.getFileUrl()),
+                MediaType.APPLICATION_PDF_VALUE,
+                evidenceFileSize(evidencePath),
+                evidenceUploadedAt(evidencePath),
                 false);
 
         Long metricId = metricService.createMetric(metricRequest, companyId, inputUserId);
@@ -571,6 +580,45 @@ public class DocumentAnalysisService {
                     .append('\n');
         }
         return context.toString();
+    }
+
+
+    private boolean isCompanyWideGovernance(String indicatorCode) {
+        return "IND_G_ATTENDANCE".equals(indicatorCode)
+                || "IND_G_OUTSIDE".equals(indicatorCode);
+    }
+
+    private String originalEvidenceFilename(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) {
+            return null;
+        }
+        String savedName = fileUrl.replace('\\', '/');
+        int slash = savedName.lastIndexOf('/');
+        if (slash >= 0) {
+            savedName = savedName.substring(slash + 1);
+        }
+        int separator = savedName.indexOf('_');
+        return separator > 30 && separator < savedName.length() - 1
+                ? savedName.substring(separator + 1)
+                : savedName;
+    }
+
+    private Long evidenceFileSize(Path path) {
+        try {
+            return Files.size(path);
+        } catch (Exception exception) {
+            log.warn("[DOCUMENT_AI] 증빙 파일 크기 확인 실패 reason={}", exception.getClass().getSimpleName());
+            return null;
+        }
+    }
+
+    private OffsetDateTime evidenceUploadedAt(Path path) {
+        try {
+            return OffsetDateTime.ofInstant(Files.getLastModifiedTime(path).toInstant(), ZoneOffset.UTC);
+        } catch (Exception exception) {
+            log.warn("[DOCUMENT_AI] 증빙 업로드 시각 확인 실패 reason={}", exception.getClass().getSimpleName());
+            return null;
+        }
     }
 
     private Path resolveUploadedFile(String fileUrl) {
