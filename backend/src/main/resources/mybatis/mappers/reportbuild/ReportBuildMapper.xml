@@ -65,4 +65,27 @@
         ORDER BY id ASC
     </select>
 
+    <!-- [신규 추가] 105개의 승인 완료 원본 데이터를 사업장 명칭과 함께 그룹핑 없이 모두 가져오는 보고서 전용 쿼리 -->
+    <select id="selectRawMetricsForReport" resultType="com.esg.platform.domain.reportbuild.dto.response.ReportMetricResponse">
+        SELECT
+            m.id,
+            i.indicator_code AS indicatorCode,
+            i.title AS title,
+            i.category::text AS category,
+            i.unit AS unit,
+            m.period_value AS periodValue,
+            m.numerical_value AS numericalValue,
+            m.status::text AS status,
+            m.reporting_year AS reportingYear,
+            f.facility_name AS facilityName,
+            m.additional_info::text AS additionalInfo
+        FROM esg_metric_data m
+        JOIN esg_indicators i ON m.indicator_id = i.id
+        LEFT JOIN company_facilities f ON m.facility_id = f.id
+        WHERE m.company_id = #{companyId}
+          AND m.reporting_year = #{year}
+          AND m.status = 'APPROVED'
+        ORDER BY m.period_value ASC, f.id ASC
+    </select>
+
 </mapper>

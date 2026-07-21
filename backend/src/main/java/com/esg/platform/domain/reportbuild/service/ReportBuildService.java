@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.esg.platform.domain.reportbuild.dto.request.ReportCreateRequest;
 import com.esg.platform.domain.reportbuild.dto.response.ReportBuildResponse;
+import com.esg.platform.domain.reportbuild.dto.response.ReportMetricResponse;
 import com.esg.platform.domain.reportbuild.dto.response.ReportTemplateResponse;
 import com.esg.platform.domain.reportbuild.entity.GeneratedReport;
 import com.esg.platform.domain.reportbuild.exception.ReportNotFoundException;
@@ -90,6 +91,12 @@ public class ReportBuildService {
     public List<String> getFacilities(Long companyId) {
         log.debug("[REPORT] 사업장 목록 조회 companyId={}", companyId);
         return reportMapper.selectFacilityNamesByCompanyId(companyId);
+    }
+
+    // [신규 추가] 리포트 빌더에 매핑될 그룹화되지 않은 원본 실적 리스트를 반환합니다.
+    public List<ReportMetricResponse> getReportMetrics(Long companyId, int year) {
+        log.info("[REPORT] 보고서 작성용 원본 실적 데이터 조회 companyId={} year={}", companyId, year);
+        return reportMapper.selectRawMetricsForReport(companyId, year);
     }
 
     private String normalizeFileUrl(String fileUrl) {
