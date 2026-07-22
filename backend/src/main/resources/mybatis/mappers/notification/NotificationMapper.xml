@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.esg.platform.domain.notification.mapper.NotificationMapper">
+
+    <resultMap id="NotificationMap" type="com.esg.platform.domain.notification.dto.NotificationDto">
+        <id property="id" column="id"/>
+        <result property="recipientUserId" column="recipient_user_id"/>
+        <result property="actorUserId" column="actor_user_id"/>
+        <result property="actorName" column="actor_name"/>
+        <result property="companyId" column="company_id"/>
+        <result property="metricId" column="metric_id"/>
+        <result property="notificationType" column="notification_type"/>
+        <result property="title" column="title"/>
+        <result property="message" column="message"/>
+        <result property="targetUrl" column="target_url"/>
+        <result property="read" column="is_read"/>
+        <result property="readAt" column="read_at"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <sql id="notificationSelect">
+        SELECT n.id,
+               n.recipient_user_id,
+               n.actor_user_id,
+               actor.name AS actor_name,
+               n.company_id,
+               n.metric_id,
+               n.notification_type,
+               n.title,
+               n.message,
+               n.target_url,
+               n.is_read,
+               n.read_at,
+               n.created_at
+        FROM esg_notifications n
+        LEFT JOIN users actor ON actor.id = n.actor_user_id
+    </sql>
+
+    <select id="findSystemAdminUserIds" resultType="long">
+        SELECT id
+        FROM users
+        WHERE role = 'SYSTEM_ADMIN'
+          AND is_active = TRUE
+        ORDER BY CASE WHEN company_id = #{companyId} THEN 0 ELSE 1 END,
+                 id
+    </select>
+
+    <select id="findMetricOwnerUserId" resultType="long">
+        SELECT m.input_user_id
+        FROM esg_metric_data m
+        JOIN users u ON u.id = m.input_user_id
+        WHERE m.id = #{metricId}
+          AND u.role = 'COMPANY_MANAGER'
+          AND u.is_active = TRUE
+    </select>
+
+    <select id="findCompanyManagerUserIds" resultType="long">
+        SELECT id
+        FROM users
+        WHERE role = 'COMPANY_MANAGER'
+          AND is_active = TRUE
+          AND (company_id = #{companyId} OR #{companyId} IS NULL)
+        ORDER BY id
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO esg_notifications (
+            recipient_user_id,
+            actor_user_id,
+            company_id,
+            metric_id,
+            notification_type,
+            title,
+            message,
+            target_url,
+            is_read,
+            created_at
+        ) VALUES (
+            #{recipientUserId},
+            #{actorUserId},
+            #{companyId},
+            #{metricId},
+            #{notificationType},
+            #{title},
+            #{message},
+            #{targetUrl},
+            FALSE,
+            CURRENT_TIMESTAMP
+        )
+    </insert>
+
+    <select id="findById" resultMap="NotificationMap">
+        <include refid="notificationSelect"/>
+        WHERE n.id = #{id}
+    </select>
+
+    <select id="findByIdAndRecipient" resultMap="NotificationMap">
+        <include refid="notificationSelect"/>
+        WHERE n.id = #{id}
+          AND n.recipient_user_id = #{recipientUserId}
+    </select>
+
+    <select id="findByRecipient" resultMap="NotificationMap">
+        <include refid="notificationSelect"/>
+        WHERE n.recipient_user_id = #{recipientUserId}
+        <if test="unreadOnly">AND n.is_read = FALSE</if>
+        ORDER BY n.created_at DESC, n.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countUnread" resultType="int">
+        SELECT COUNT(*)
+        FROM esg_notifications
+        WHERE recipient_user_id = #{recipientUserId}
+          AND is_read = FALSE
+    </select>
+
+    <update id="markRead">
+        UPDATE esg_notifications
+        SET is_read = TRUE,
+            read_at = COALESCE(read_at, CURRENT_TIMESTAMP)
+        WHERE id = #{id}
+          AND recipient_user_id = #{recipientUserId}
+          AND is_read = FALSE
+    </update>
+
+    <update id="markAllRead">
+        UPDATE esg_notifications
+        SET is_read = TRUE,
+            read_at = COALESCE(read_at, CURRENT_TIMESTAMP)
+        WHERE recipient_user_id = #{recipientUserId}
+          AND is_read = FALSE
+    </update>
+
+</mapper>

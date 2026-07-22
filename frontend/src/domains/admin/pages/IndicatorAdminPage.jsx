@@ -38,7 +38,30 @@ export default function IndicatorAdminPage() {
   };
 
   useEffect(() => {
-    fetchIndicators();
+    let isMounted = true;
+
+    indicatorApi
+      .getIndicators()
+      .then((res) => {
+        if (isMounted) {
+          setIndicators(res.data);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setError("ESG 지표 목록을 불러오는데 실패했습니다.");
+        }
+        console.error("Failed to fetch indicators:", err);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleRegister = () => {

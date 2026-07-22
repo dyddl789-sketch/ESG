@@ -73,7 +73,7 @@ export default function LoginPage() {
               type="text"
               autoComplete="username"
               value={loginId}
-              onChange={(event) => setLoginId(event.target.value.replace(/[^A-Za-z0-9_]/g, ""))}
+              onChange={(event) => setLoginId(event.target.value)}
               placeholder="로그인 아이디 입력"
               minLength={4}
               maxLength={20}

@@ -1,161 +1,128 @@
-import { useMemo } from "react";
-import { useAuth } from "../../../app/providers/AuthProvider";
-import { ROLES } from "../../../app/config/roles";
-import { useDemoData } from "../../../app/providers/DemoDataProvider";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import Swal from "sweetalert2";
 import PageHeader from "../../../shared/components/PageHeader";
 import Card from "../../../shared/components/Card";
 import Button from "../../../shared/components/Button";
 import DataTable from "../../../shared/components/DataTable";
-import StatusBadge from "../../../shared/components/StatusBadge";
+import companyApi from "../../company/api/companyApi";
+import { metricApi } from "../../metric/api/metricApi";
+import { resolvePeriodSelection, useMetricPeriods } from "../../metric/hooks/useMetricPeriods";
+import { facilityNameOf, facilityTypeOf } from "../../metric/utils/approvedMetricView";
+import { average, comparison, evidenceCount, metricMap, metricsAt, previousPeriod, valueOf } from "../../metric/utils/domainPerformance";
+import EvidenceModal from "../../metric/components/EvidenceModal";
+import DomainTrendChart from "../../metric/components/DomainTrendChart";
+import { apiErrorMessage, formatDateTime, formatNumber, periodOf } from "../../../shared/utils/esgFormat";
 
-const number = (value, digits = 0) => Number(value || 0).toLocaleString("ko-KR", {
-  minimumFractionDigits: digits,
-  maximumFractionDigits: digits,
-});
+const now = new Date();
+const definitions = {
+  IND_S_INJURY_RATE: { label: "산업재해율", key: "injuryRate", lower: true },
+  IND_S_RISK_ACTION: { label: "위험요인 개선 조치율", key: "actionRate", lower: false },
+  IND_S_SAFETY_EDU: { label: "안전교육 이수율", key: "trainingRate", lower: false },
+  IND_S_TURNOVER: { label: "퇴사율", key: "turnoverRate", lower: true },
+};
+const evidenceLabels = Object.fromEntries(Object.entries(definitions).map(([code, item]) => [code, `${item.label} 증빙`]));
+const aggregate = (metrics) => Object.fromEntries(Object.entries(definitions).map(([code, item]) => [item.key, average(metrics.filter((metric) => metric.indicatorCode === code).map(valueOf))]));
 
 export default function SocialDataPage() {
-  const { user } = useAuth();
-  const canManage = user.role === ROLES.COMPANY_MANAGER;
-  const {
-    db,
-    generateSocialSource,
-    collectSocialData,
-    analyzeRisk,
-    confirmRiskAnalysis,
-    completeRiskAction,
-  } = useDemoData();
+  const [searchParams] = useSearchParams();
+  const selectedIndicator = searchParams.get("indicator") || "";
+  const [filters, setFilters] = useState({ year: Number(searchParams.get("year")) || now.getFullYear(), month: Number(searchParams.get("month")) || now.getMonth() + 1, facilityId: searchParams.get("facilityId") || "", search: "" });
+  const [facilities, setFacilities] = useState([]);
+  const [allMetrics, setAllMetrics] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [trendCode, setTrendCode] = useState(selectedIndicator && definitions[selectedIndicator] ? selectedIndicator : "IND_S_INJURY_RATE");
+  const [compareCode, setCompareCode] = useState("IND_S_SAFETY_EDU");
+  const [evidenceTarget, setEvidenceTarget] = useState(null);
+  const { years, monthsByYear, latestPeriod, loading: periodLoading } = useMetricPeriods({ approvedOnly: true, category: "SOCIAL", facilityId: filters.facilityId });
+  const resolved = resolvePeriodSelection(filters, years, monthsByYear);
+  const year = periodLoading ? filters.year : resolved.year;
+  const month = periodLoading ? filters.month : resolved.month;
+  const period = periodOf(year, month);
 
-  const collection = db.socialCollection;
-  const isProcessing = collection.jobStatus === "PROCESSING";
-  const completed = db.socialWorkplaces.filter((item) => item.collectionStatus === "SUCCESS");
-  const sourceReady = db.socialWorkplaces.filter((item) => item.sourceStatus === "READY").length;
-  const collectionRate = Math.round((completed.length / db.socialWorkplaces.length) * 100);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [facilityResponse, approved] = await Promise.all([companyApi.getFacilities(), metricApi.list({ category: "SOCIAL", status: "APPROVED" })]);
+      setFacilities(facilityResponse?.data || []); setAllMetrics(approved || []);
+    } catch (error) { Swal.fire("조회 실패", apiErrorMessage(error, "사회 확정 실적을 불러오지 못했습니다."), "error"); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
-  const totals = useMemo(() => completed.reduce((acc, item) => ({
-    avgEmployees: acc.avgEmployees + item.avgEmployees,
-    exits: acc.exits + item.exits,
-    totalHours: acc.totalHours + item.totalHours,
-    incidents: acc.incidents + item.incidents,
-    trainingTarget: acc.trainingTarget + item.trainingTarget,
-    trainingCompleted: acc.trainingCompleted + item.trainingCompleted,
-    hazardsTotal: acc.hazardsTotal + item.hazardsTotal,
-    hazardsCompleted: acc.hazardsCompleted + item.hazardsCompleted,
-  }), { avgEmployees: 0, exits: 0, totalHours: 0, incidents: 0, trainingTarget: 0, trainingCompleted: 0, hazardsTotal: 0, hazardsCompleted: 0 }), [completed]);
+  const scoped = useMemo(() => filters.facilityId ? allMetrics.filter((metric) => String(metric.facilityId) === String(filters.facilityId)) : allMetrics, [allMetrics, filters.facilityId]);
+  const current = useMemo(() => metricsAt(scoped, period), [period, scoped]);
+  const priorPeriod = useMemo(() => previousPeriod(scoped, period), [period, scoped]);
+  const previous = useMemo(() => metricsAt(scoped, priorPeriod), [priorPeriod, scoped]);
+  const totals = useMemo(() => aggregate(current), [current]);
+  const previousTotals = useMemo(() => aggregate(previous), [previous]);
 
-  const injuryRate = totals.totalHours ? (totals.incidents / totals.totalHours) * 200000 : 0;
-  const trainingRate = totals.trainingTarget ? (totals.trainingCompleted / totals.trainingTarget) * 100 : 0;
-  const hazardRate = totals.hazardsTotal ? (totals.hazardsCompleted / totals.hazardsTotal) * 100 : 0;
-  const turnoverRate = totals.avgEmployees ? (totals.exits / totals.avgEmployees) * 100 : 0;
+  const rows = useMemo(() => facilities
+    .filter((facility) => !filters.facilityId || String(facility.id) === String(filters.facilityId))
+    .map((facility) => {
+      const related = current.filter((metric) => String(metric.facilityId) === String(facility.id));
+      const map = metricMap(related);
+      const prevRelated = previous.filter((metric) => String(metric.facilityId) === String(facility.id));
+      return {
+        id: facility.id, facilityName: facilityNameOf(facility), facilityType: facilityTypeOf(facility),
+        injuryRate: valueOf(map.IND_S_INJURY_RATE), actionRate: valueOf(map.IND_S_RISK_ACTION),
+        trainingRate: valueOf(map.IND_S_SAFETY_EDU), turnoverRate: valueOf(map.IND_S_TURNOVER),
+        previous: aggregate(prevRelated), metrics: Object.keys(definitions).map((code) => map[code]).filter(Boolean),
+        evidenceCount: evidenceCount(Object.values(map)),
+        approvedAt: related.map((metric) => metric.updatedAt).filter(Boolean).sort().at(-1),
+      };
+    })
+    .filter((row) => Object.values(definitions).some((definition) => row[definition.key] != null)
+      && (!filters.search.trim() || row.facilityName.toLowerCase().includes(filters.search.trim().toLowerCase()))), [current, facilities, filters.facilityId, filters.search, previous]);
 
-  const workplaceColumns = [
-    { key: "facilityName", label: "사업장" },
-    { key: "incidents", label: "재해 건수", render: (value) => `${value}건` },
-    { key: "totalHours", label: "총 근로시간", render: (value) => `${number(value)}시간` },
-    { key: "trainingCompleted", label: "안전교육", render: (value, row) => `${value}/${row.trainingTarget}명` },
-    { key: "hazardsCompleted", label: "위험요인 조치", render: (value, row) => `${value}/${row.hazardsTotal}건` },
-    { key: "exits", label: "퇴사자", render: (value) => `${value}명` },
-    { key: "sourceStatus", label: "원천 데이터", render: (value) => <StatusBadge status={value} label={value === "READY" ? "생성 완료" : "미생성"} /> },
-    { key: "collectionStatus", label: "수집 상태", render: (value) => <StatusBadge status={value} /> },
-    { key: "collectedAt", label: "수집 시각" },
-  ];
+  const monthly = useMemo(() => (monthsByYear[year] || []).map((value) => ({ month: value, ...aggregate(scoped.filter((metric) => metric.period === periodOf(year, value))) })), [monthsByYear, scoped, year]);
+  const trendDefinition = definitions[trendCode];
+  const compareDefinition = definitions[compareCode];
+  const rankedRows = useMemo(() => {
+    const validRows = rows.filter((row) => Number.isFinite(Number(row[compareDefinition.key])));
+    const ordered = [...validRows].sort((left, right) => compareDefinition.lower
+      ? Number(left[compareDefinition.key]) - Number(right[compareDefinition.key])
+      : Number(right[compareDefinition.key]) - Number(left[compareDefinition.key]));
+    const bestId = ordered[0]?.id;
+    const watchId = ordered.length > 1 ? ordered.at(-1)?.id : null;
+    return rows.map((row) => ({
+      ...row,
+      selectedChange: comparison(row[compareDefinition.key], row.previous?.[compareDefinition.key], compareDefinition.lower),
+      managementStatus: row.id === bestId ? "EXCELLENT" : row.id === watchId ? "WATCH" : "NORMAL",
+    }));
+  }, [compareDefinition.key, compareDefinition.lower, rows]);
 
-  const riskColumns = [
-    { key: "facilityName", label: "사업장" },
-    { key: "title", label: "위험요인", render: (value, row) => <><strong>{value}</strong><small className="cell-sub">{row.description}</small></> },
-    { key: "aiType", label: "AI 분류" },
-    { key: "aiSeverity", label: "위험도", render: (value) => <span className={`risk-level risk-${value}`}>{value}</span> },
-    { key: "analysisStatus", label: "AI 상태", render: (value) => <StatusBadge status={value} label={value === "WAITING" ? "분석 대기" : value === "PROCESSING" ? "분석 중" : "분석 완료"} /> },
-    { key: "actionStatus", label: "조치 상태", render: (value) => <StatusBadge status={value === "COMPLETED" ? "COMPLETED" : "INCOMPLETE"} label={value === "COMPLETED" ? "조치 완료" : "조치 필요"} /> },
-    {
-      key: "id",
-      label: "관리",
-      render: (value, row) => (
-        <div className="table-actions">
-          <Button variant="outline" size="sm" disabled={!canManage || collection.aiJob.active || row.analysisStatus === "COMPLETED"} onClick={() => analyzeRisk(value)}>AI 분석</Button>
-          <Button variant="light" size="sm" disabled={!canManage || row.analysisStatus !== "COMPLETED" || row.confirmed} onClick={() => confirmRiskAnalysis(value)}>담당자 확정</Button>
-          <Button size="sm" disabled={!canManage || !row.confirmed || row.actionStatus === "COMPLETED"} onClick={() => completeRiskAction(value)}>조치 완료</Button>
-        </div>
-      ),
-    },
+  const columns = [
+    { key: "facilityName", label: "사업장", render: (value, row) => <div><strong>{value}</strong><small className="cell-sub">{row.facilityType === "HQ" ? "본사" : "공장"}</small></div> },
+    ...Object.values(definitions).map((definition) => ({ key: definition.key, label: definition.label, render: (value) => value == null ? "-" : `${formatNumber(value, 2)}%` })),
+    { key: "selectedChange", label: `${compareDefinition.label} 직전 대비`, render: (value) => <span className={`trend-${value?.tone || "neutral"}`}>{value?.label || "비교 없음"}</span> },
+    { key: "managementStatus", label: "관리 판정", render: (value) => <span className={`performance-status performance-status-${String(value).toLowerCase()}`}>{value === "EXCELLENT" ? "우수" : value === "WATCH" ? "주의" : "관찰"}</span> },
+    { key: "approvedAt", label: "최종 승인", render: (value) => formatDateTime(value) },
+    { key: "evidenceCount", label: "증빙", render: (value) => <span className={value ? "evidence-count" : "evidence-missing"}>{value ? `증빙 ${value}건` : "미등록"}</span> },
+    { key: "details", label: "상세보기", render: (_, row) => <button type="button" className="text-link" onClick={() => setEvidenceTarget(row)}>값·증빙 보기</button> },
   ];
 
   return (
-    <div className="page-stack">
-      <PageHeader
-        breadcrumbs={["데이터 관리", "사회 데이터"]}
-        eyebrow="SOCIAL DATA PIPELINE"
-        title="사회 데이터 수집·안전관리"
-        description="인사·안전·교육 데이터를 수집해 제조업 핵심 사회 지표 4개를 계산합니다."
-      />
+    <div className="page-stack esg-domain-page social-performance-page">
+      <PageHeader breadcrumbs={["ESG 실적", "사회"]} eyebrow="SOCIAL PERFORMANCE" title="사회 실적" description="최종 승인된 사회 핵심지표의 변화와 실제 증빙문서를 조회합니다." />
+      {selectedIndicator && <div className="selected-indicator-notice"><strong>{definitions[selectedIndicator]?.label || selectedIndicator}</strong><span>대시보드에서 선택한 지표와 동일한 기간으로 이동했습니다.</span></div>}
+      <Card className="filter-card" title="조회 조건" description="승인 완료된 실제 연도·월과 사업장을 기준으로 조회합니다."><div className="esg-filter-grid">
+        <label><span>기준연도</span><select value={year} onChange={(event) => { const next = Number(event.target.value); setFilters((currentFilter) => ({ ...currentFilter, year: next, month: (monthsByYear[next] || []).at(-1) || currentFilter.month })); }}>{years.map((item) => <option key={item} value={item}>{item}년</option>)}</select></label>
+        <label><span>기준월</span><select value={month} onChange={(event) => setFilters((currentFilter) => ({ ...currentFilter, year, month: Number(event.target.value) }))}>{(monthsByYear[year] || []).map((item) => <option key={item} value={item}>{item}월</option>)}</select></label>
+        <label><span>사업장</span><select value={filters.facilityId} onChange={(event) => setFilters((currentFilter) => ({ ...currentFilter, facilityId: event.target.value }))}><option value="">전체 사업장</option>{facilities.map((facility) => <option key={facility.id} value={facility.id}>{facilityNameOf(facility)}</option>)}</select></label>
+        <label className="filter-search"><span>검색</span><input value={filters.search} onChange={(event) => setFilters((currentFilter) => ({ ...currentFilter, search: event.target.value }))} placeholder="사업장명" /></label>
+        <div className="filter-actions"><Button variant="outline" onClick={() => setFilters({ ...(latestPeriod || { year: now.getFullYear(), month: now.getMonth() + 1 }), facilityId: "", search: "" })}>초기화</Button><Button onClick={load}>조회</Button></div>
+      </div></Card>
 
-      <section className="domain-control-panel social-panel">
-        <div>
-          <span className="control-kicker">{collection.basePeriod} 사회 데이터</span>
-          <h2>산업안전과 고용 안정성을 중심으로 관리합니다.</h2>
-          <p>산업재해율, 안전교육 이수율, 위험요인 개선 조치율, 퇴사율만 핵심 지표로 사용합니다.</p>
-          <div className="schedule-pills">
-            <span>자동 실행 <b>{collection.schedule}</b></span>
-            <span>대상 사업장 <b>{db.socialWorkplaces.length}개</b></span>
-            <span>대시보드 캐시 <b>{collection.cacheStatus}</b></span>
-          </div>
-          <div className="ems-actions">
-            <Button variant="light" onClick={generateSocialSource} disabled={!canManage || isProcessing}>사회 원천 데이터 생성</Button>
-            <Button onClick={collectSocialData} disabled={!canManage || isProcessing || !collection.sourceGenerated}>
-              {isProcessing ? `${collection.currentWorkplace || "사업장"} 수집 중` : "사회 데이터 즉시 수집"}
-            </Button>
-          </div>
-        </div>
-        <div className="redis-lock-card">
-          <div className="redis-lock-head"><span className={`lock-dot ${collection.redisLock.active ? "active" : ""}`} /><div><b>Redis 수집 락</b><small>인사·안전·교육 중복 수집 방지</small></div></div>
-          <code>{collection.redisLock.key}</code>
-          <div className="lock-meta"><span>상태</span><b>{collection.redisLock.active ? "LOCKED" : "UNLOCKED"}</b></div>
-          <div className="lock-meta"><span>진행률</span><b>{collection.progress}%</b></div>
-          <div className="lock-meta"><span>캐시</span><b>{collection.cacheStatus}</b></div>
-        </div>
-      </section>
+      <div className="summary-card-grid four">{Object.entries(definitions).map(([code, definition]) => { const change = comparison(totals[definition.key], previousTotals[definition.key], definition.lower); return <article key={code} className={selectedIndicator === code ? "is-highlighted" : ""}><span>{definition.label}</span><strong>{totals[definition.key] == null ? "-" : formatNumber(totals[definition.key], 2)}</strong><small>% · {period}</small><p className={change.tone}>{change.label}{priorPeriod ? ` · ${priorPeriod} 대비` : ""}</p></article>; })}</div>
 
-      <div className="summary-grid four">
-        <article className="collection-stat"><span>산업재해율</span><strong>{number(injuryRate, 2)}</strong><small>건/20만 근로시간</small></article>
-        <article className="collection-stat"><span>안전교육 이수율</span><strong>{number(trainingRate, 1)}%</strong><small>{totals.trainingCompleted}/{totals.trainingTarget}명</small></article>
-        <article className="collection-stat"><span>위험요인 개선 조치율</span><strong>{number(hazardRate, 1)}%</strong><small>{totals.hazardsCompleted}/{totals.hazardsTotal}건</small></article>
-        <article className="collection-stat"><span>퇴사율</span><strong>{number(turnoverRate, 1)}%</strong><small>퇴사 {totals.exits}명 / 평균 재직 {totals.avgEmployees}명</small></article>
+      <div className="two-cols domain-chart-grid">
+        <Card title="월별 사회 지표 추이" action={<select className="compact-select" value={trendCode} onChange={(event) => setTrendCode(event.target.value)}>{Object.entries(definitions).map(([code, item]) => <option key={code} value={code}>{item.label}</option>)}</select>}><DomainTrendChart labels={monthly.map((item) => `${item.month}월`)} datasets={[{ label: trendDefinition.label, data: monthly.map((item) => item[trendDefinition.key]), borderColor: "#3a7c9e", backgroundColor: "rgba(58,124,158,.1)", fill: true, tension: .3 }]} unit="%" lowerIsBetter={trendDefinition.lower} /></Card>
+        <Card title="사업장별 비교" action={<select className="compact-select" value={compareCode} onChange={(event) => setCompareCode(event.target.value)}>{Object.entries(definitions).map(([code, item]) => <option key={code} value={code}>{item.label}</option>)}</select>}><DomainTrendChart type="bar" labels={[...rankedRows].sort((a, b) => compareDefinition.lower ? (a[compareDefinition.key] ?? Infinity) - (b[compareDefinition.key] ?? Infinity) : (b[compareDefinition.key] ?? -Infinity) - (a[compareDefinition.key] ?? -Infinity)).map((row) => row.facilityName)} datasets={[{ label: compareDefinition.label, data: [...rankedRows].sort((a, b) => compareDefinition.lower ? (a[compareDefinition.key] ?? Infinity) - (b[compareDefinition.key] ?? Infinity) : (b[compareDefinition.key] ?? -Infinity) - (a[compareDefinition.key] ?? -Infinity)).map((row) => row[compareDefinition.key]), backgroundColor: "rgba(58,124,158,.65)" }]} unit="%" lowerIsBetter={compareDefinition.lower} /></Card>
       </div>
 
-      <Card title="사업장별 사회 데이터 수집 현황" description={`원천 데이터 ${sourceReady}/${db.socialWorkplaces.length} · 수집률 ${collectionRate}%`} action={<StatusBadge status={collectionRate === 100 ? "COMPLETED" : "INCOMPLETE"} />}>
-        <DataTable rows={db.socialWorkplaces} columns={workplaceColumns} />
-      </Card>
-
-      <div className="two-cols social-ai-layout">
-        <Card title="AI 위험요인 분석" description="AI는 위험 유형·위험도·개선 조치 초안을 추천하고 담당자가 최종 확정합니다.">
-          <div className="ai-job-box">
-            <div><span className={`lock-dot ${collection.aiJob.active ? "active" : ""}`} /><b>{collection.aiJob.message}</b></div>
-            <code>{collection.aiJob.key || "job:ai-risk-analysis:{riskId}"}</code>
-            <div className="progress-track"><i style={{ width: `${collection.aiJob.progress}%` }} /></div>
-            <small>처리 중 상태는 Redis, 확정된 AI 결과는 PostgreSQL에 저장하는 구조입니다.</small>
-          </div>
-        </Card>
-        <Card title="사회 지표 반영 원칙" description="수집·조치 결과가 바뀌면 잠정 통계와 캐시를 함께 갱신합니다.">
-          <div className="logic-list">
-            <article><b>정해진 계산식</b><span>재해율·교육 이수율·퇴사율은 AI가 아닌 서비스 로직으로 계산</span></article>
-            <article><b>AI 보조</b><span>위험요인 설명을 분류하고 개선 조치 초안만 생성</span></article>
-            <article><b>승인 전 잠정값</b><span>기업 ESG 관리자만 확인하고 일반 사용자에게는 비공개</span></article>
-          </div>
-        </Card>
-      </div>
-
-      <Card title="위험요인 개선 조치" description="AI 분석 결과를 담당자가 확인한 후 조치 완료 처리하면 개선 조치율이 즉시 재계산됩니다.">
-        <DataTable rows={db.riskItems} columns={riskColumns} />
-        {db.riskItems.some((item) => item.analysisStatus === "COMPLETED") && (
-          <div className="ai-result-stack">
-            {db.riskItems.filter((item) => item.analysisStatus === "COMPLETED").map((item) => (
-              <article key={item.id}>
-                <div><b>{item.facilityName} · {item.aiType}</b><StatusBadge status={item.confirmed ? "COMPLETED" : "DRAFT"} label={item.confirmed ? "담당자 확정" : "검토 필요"} /></div>
-                <p>{item.aiAction}</p>
-              </article>
-            ))}
-          </div>
-        )}
-      </Card>
+      <Card title={`${period} 사회 확정 실적`} description="4개 사회 지표와 지표별 실제 PDF 증빙을 조회합니다.">{loading ? <div className="data-loading">사회 확정 실적을 불러오는 중입니다.</div> : <DataTable rows={rankedRows} columns={columns} emptyText="선택한 기간에 승인 완료된 사회 데이터가 없습니다." />}</Card>
+      {evidenceTarget && <EvidenceModal title={`${evidenceTarget.facilityName} · ${period} 사회 증빙`} metrics={evidenceTarget.metrics} labels={evidenceLabels} onClose={() => setEvidenceTarget(null)} />}
     </div>
   );
 }

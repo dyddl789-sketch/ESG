@@ -1,0 +1,171 @@
+/* 기존 Card 컴포넌트 내부 패딩 및 외부 레이아웃 강제 튜닝 */
+.page-stack .two-cols {
+  display: grid !important;
+  grid-template-columns: 1fr 1.6fr !important;
+  gap: 24px !important;
+  margin-top: 24px !important;
+}
+
+/* 카드 컴포넌트 자체의 룩앤필 제어 */
+.page-stack [class*="Card"],
+.page-stack .card {
+  background-color: #ffffff !important;
+  border-radius: 12px !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02) !important;
+}
+
+/* 카드 내부 데이터 배치 영역 */
+.card-internal-wrapper .form-grid {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 20px !important;
+}
+
+.card-internal-wrapper .form-group {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+}
+
+/* 입력 필드 상단 폰트 및 스타일 */
+.card-internal-wrapper .form-group label {
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  color: #475569 !important;
+}
+
+/* 폼 필드 요소 강제 주입 영역 */
+.card-internal-wrapper .form-group input,
+.card-internal-wrapper .form-group select,
+.card-internal-wrapper .form-group textarea {
+  width: 100% !important;
+  padding: 11px 14px !important;
+  font-size: 14px !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 6px !important;
+  background-color: #ffffff !important;
+  color: #334155 !important;
+  outline: none !important;
+  box-sizing: border-box !important;
+  transition: all 0.15s ease-in-out !important;
+}
+
+/* 텍스트 박스 크기 조절 기능 비활성화 (고정) */
+.card-internal-wrapper .form-group textarea {
+  resize: none !important; /* 👈 이 코드를 추가해 주세요 */
+}
+
+.card-internal-wrapper .form-group input:focus,
+.card-internal-wrapper .form-group select:focus,
+.card-internal-wrapper .form-group textarea:focus {
+  border-color: #1f6b46 !important;
+  box-shadow: 0 0 0 3px rgba(31, 107, 70, 0.08) !important;
+}
+
+/* 셀렉트박스 가로 배치 가반성 */
+.card-internal-wrapper .input-group {
+  display: flex !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+
+/* 체크박스 정렬 */
+.card-internal-wrapper .checkbox-group label {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-size: 13.5px !important;
+}
+
+.card-internal-wrapper .checkbox-group input[type="checkbox"] {
+  width: 16px !important;
+  height: 16px !important;
+  accent-color: #1f6b46 !important;
+}
+
+/* 하단 버튼 배치 및 인터랙션 */
+.form-actions {
+  margin-top: 24px !important;
+  display: flex !important;
+  gap: 8px !important;
+  justify-content: flex-end !important;
+}
+
+.btn-platform {
+  padding: 10px 20px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  border: none !important;
+}
+
+.btn-platform-cancel {
+  background-color: #ffffff !important;
+  color: #475569 !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+.btn-platform-save {
+  background-color: #1f6b46 !important;
+  color: #ffffff !important;
+}
+
+@media (max-width: 1024px) {
+  .page-stack .two-cols {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.shipment-input-group small {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-muted, #6b7280);
+  line-height: 1.5;
+}
+
+/* 문서 AI 최종 검토 카드 */
+.document-ai-review .form-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 20px 24px !important;
+}
+
+.document-ai-review .form-span-2 {
+  grid-column: span 2 !important;
+}
+
+.document-ai-review textarea {
+  min-height: 120px !important;
+  resize: none !important;
+}
+
+.card-internal-wrapper .form-group input[readonly],
+.card-internal-wrapper .form-group select[disabled],
+.card-internal-wrapper .form-group textarea[readonly] {
+  background-color: #f8fafc !important;
+  color: #475569 !important;
+  border-color: #cbd5e1 !important;
+  cursor: not-allowed !important;
+}
+
+.card-actions {
+  margin-top: 24px !important;
+  display: flex !important;
+  gap: 8px !important;
+  justify-content: flex-end !important;
+  border-top: 1px solid #f1f5f9 !important;
+  padding-top: 20px !important;
+  width: 100% !important;
+}
+
+@media (max-width: 768px) {
+  .document-ai-review .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .document-ai-review .form-span-2 {
+    grid-column: span 1 !important;
+  }
+}

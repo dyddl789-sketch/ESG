@@ -25,6 +25,14 @@ public class PerformanceService {
 
     private final PerformanceMapper mapper;
 
+    public List<Map<String, Object>> getGovernanceTargets(Long companyId, int year) {
+        log.info("[PERFORMANCE_TARGET] 거버넌스 목표 조회 companyId={} year={}", companyId, year);
+        List<Map<String, Object>> targets = mapper.selectGovernanceTargets(companyId, year);
+        log.info("[PERFORMANCE_TARGET] 거버넌스 목표 조회 완료 companyId={} year={} count={}",
+                companyId, year, targets.size());
+        return targets;
+    }
+
     public List<PerformanceResponse> getPerformanceList(Long companyId, int year) {
         // 콘솔 로그: 데이터 조회 시작을 알립니다.
         log.info("[Service] ESG 실적 데이터 조회 시작 - companyId: {}, year: {}", companyId, year);

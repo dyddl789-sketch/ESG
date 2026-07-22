@@ -1,19 +1,23 @@
-// 파일 위치: src/main/java/com/esg/platform/domain/reportbuild/service/ReportBuildService.java
 package com.esg.platform.domain.reportbuild.service;
-
-import com.esg.platform.domain.reportbuild.dto.request.ReportCreateRequest;
-import com.esg.platform.domain.reportbuild.dto.response.ReportBuildResponse;
-import com.esg.platform.domain.reportbuild.dto.response.ReportTemplateResponse;
-import com.esg.platform.domain.reportbuild.entity.GeneratedReport;
-import com.esg.platform.domain.reportbuild.exception.ReportNotFoundException;
-import com.esg.platform.domain.reportbuild.mapper.ReportBuildMapper;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.esg.platform.domain.reportbuild.dto.request.ReportCreateRequest;
+import com.esg.platform.domain.reportbuild.dto.response.ReportBuildResponse;
+import com.esg.platform.domain.reportbuild.dto.response.ReportMetricResponse;
+import com.esg.platform.domain.reportbuild.dto.response.ReportTemplateResponse;
+import com.esg.platform.domain.reportbuild.entity.GeneratedReport;
+import com.esg.platform.domain.reportbuild.exception.ReportNotFoundException;
+import com.esg.platform.domain.reportbuild.mapper.ReportBuildMapper;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -34,52 +38,68 @@ public class ReportBuildService {
     }
 
     @Transactional
-    public ReportBuildResponse createReport(ReportCreateRequest request, Long userId) {
-        // 템플릿 존재 여부 검증
+    public ReportBuildResponse createReport(ReportCreateRequest request, Long userId, Long companyId) {
         reportMapper.selectReportTemplateById(request.getTemplateId())
                 .orElseThrow(() -> new ReportNotFoundException("유효하지 않은 템플릿입니다. ID: " + request.getTemplateId()));
 
         GeneratedReport report = GeneratedReport.builder()
-                .companyId(1L) // [추가] 임시 하드코딩. 향후 로그인된 유저의 회사 ID로 치환 필요
+                .companyId(companyId)
                 .templateId(request.getTemplateId())
                 .title(request.getTitle())
                 .content(request.getContent())
-                .targetYear(request.getTargetYear()) // [추가]
-                .scope(request.getScope())           // [추가]
+                .targetYear(request.getTargetYear())
+                .scope(request.getScope())
                 .version(request.getVersion())
-                .fileUrl(request.getFileUrl())
-                .isPublic(request.getIsPublic())
+                .fileUrl(normalizeFileUrl(request.getFileUrl()))
+                .isPublic(Boolean.TRUE.equals(request.getIsPublic()))
                 .generatedBy(userId)
                 .build();
 
-        reportMapper.insertGeneratedReport(report); // DB Insert
+        reportMapper.insertGeneratedReport(report);
+        log.info("[REPORT] 보고서 저장 완료 reportId={} companyId={} userId={}",
+                report.getId(), companyId, userId);
 
         return reportMapper.selectGeneratedReportById(report.getId())
                 .map(ReportBuildResponse::from)
-                .orElseThrow(() -> new RuntimeException("보고서 저장 중 오류가 발생했습니다."));
+                .orElseThrow(() -> new ReportNotFoundException("저장된 보고서를 다시 조회하지 못했습니다. ID: " + report.getId()));
     }
 
-    // [추가] 생성된 보고서 이력 전체 조회
-    public List<ReportBuildResponse> getGeneratedReports() {
-        return reportMapper.selectGeneratedReports().stream()
+    public List<ReportBuildResponse> getGeneratedReports(Long companyId) {
+        return reportMapper.selectGeneratedReportsByCompanyId(companyId).stream()
                 .map(ReportBuildResponse::from)
                 .collect(Collectors.toList());
     }
 
-    // [추가] 대외 공시 상태 토글 변경
     @Transactional
-    public void togglePublicStatus(Long id, Boolean isPublic) {
-        reportMapper.updateReportPublicStatus(id, isPublic);
+    public void togglePublicStatus(Long id, Boolean isPublic, Long companyId) {
+        int updatedCount = reportMapper.updateReportPublicStatus(id, Boolean.TRUE.equals(isPublic), companyId);
+        if (updatedCount == 0) {
+            throw new ReportNotFoundException("해당 기업의 보고서를 찾을 수 없습니다. ID: " + id);
+        }
+        log.info("[REPORT] 공개 상태 변경 reportId={} companyId={} isPublic={}", id, companyId, isPublic);
     }
 
-    // [추가] 보고서 완전 삭제 (물리 삭제)
     @Transactional
-    public void deleteReport(Long id) {
-        reportMapper.deleteGeneratedReport(id); 
+    public void deleteReport(Long id, Long companyId) {
+        int deletedCount = reportMapper.deleteGeneratedReport(id, companyId);
+        if (deletedCount == 0) {
+            throw new ReportNotFoundException("해당 기업의 보고서를 찾을 수 없습니다. ID: " + id);
+        }
+        log.info("[REPORT] 보고서 삭제 reportId={} companyId={}", id, companyId);
     }
 
     public List<String> getFacilities(Long companyId) {
-        System.out.println("[ReportBuildService] 회사 ID " + companyId + "의 사업장 목록 조회를 요청합니다.");
+        log.debug("[REPORT] 사업장 목록 조회 companyId={}", companyId);
         return reportMapper.selectFacilityNamesByCompanyId(companyId);
+    }
+
+    // [신규 추가] 리포트 빌더에 매핑될 그룹화되지 않은 원본 실적 리스트를 반환합니다.
+    public List<ReportMetricResponse> getReportMetrics(Long companyId, int year) {
+        log.info("[REPORT] 보고서 작성용 원본 실적 데이터 조회 companyId={} year={}", companyId, year);
+        return reportMapper.selectRawMetricsForReport(companyId, year);
+    }
+
+    private String normalizeFileUrl(String fileUrl) {
+        return fileUrl == null ? "" : fileUrl.trim();
     }
 }

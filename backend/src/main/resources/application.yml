@@ -40,6 +40,12 @@ spring:
           writetimeout: ${MAIL_WRITE_TIMEOUT:5000}
     test-connection: false
 
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: ${MAX_UPLOAD_FILE_SIZE:20MB}
+      max-request-size: ${MAX_UPLOAD_REQUEST_SIZE:22MB}
+
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -70,11 +76,6 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
   forward-headers-strategy: framework
-  servlet:
-    encoding:
-      charset: UTF-8
-      enabled: true
-      force: true
 
 mybatis:
   mapper-locations: classpath:mybatis/mappers/**/*.xml
@@ -120,3 +121,23 @@ logging:
     root: INFO
     com.esg.platform: ${APP_LOG_LEVEL:DEBUG}
     org.springframework.security: ${SECURITY_LOG_LEVEL:INFO}
+file:
+  upload-dir: ${FILE_UPLOAD_DIR:./upload/evidence/}
+
+openai:
+  api:
+    key: ${OPENAI_API_KEY:}
+    url: ${OPENAI_API_URL:https://api.openai.com/v1/chat/completions}
+    model: ${OPENAI_MODEL:gpt-4o-mini}
+
+external-api:
+  korea-energy-agency:
+    base-url: ${KEA_API_BASE_URL:https://apis.data.go.kr/B553530/GHG_LIST_01/GHG_LIST_01_08_VIEW}
+    service-key: ${KEA_API_KEY:}
+  kosis:
+    base-url: ${KOSIS_API_BASE_URL:https://kosis.kr/openapi/statisticsData.do}
+    api-key: ${KOSIS_API_KEY:}
+  benchmark:
+    base-year: ${EXTERNAL_BENCHMARK_BASE_YEAR:2021}
+    industry-code: ${EXTERNAL_BENCHMARK_INDUSTRY_CODE:C303}
+    industry-name: ${EXTERNAL_BENCHMARK_INDUSTRY_NAME:자동차 신품 부품 제조업}

@@ -76,7 +76,9 @@ logs/
 # =========================
 # Upload files
 # =========================
+upload/
 uploads/
+backend/upload/
 backend/uploads/
 
 # =========================
