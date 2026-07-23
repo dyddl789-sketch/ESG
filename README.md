@@ -295,6 +295,8 @@ domain/environment/
 └── exception/
     └── EnvironmentDataNotFoundException.java
 ```
+> [Backend domain](https://github.com/dyddl789-sketch/ESG/blob/feature/docs/docs/02-design/directory-structure.md#11-domain)을 선택하면 백엔드 도메인의 내부 경로를 확인할 수 있습니다.  
+  
 
 ### MyBatis XML 경로
 
