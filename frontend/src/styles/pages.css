@@ -4912,7 +4912,7 @@
 .target-progress > div { display: flex; justify-content: space-between; gap: 12px; color: #65746d; font-size: 12px; }
 .target-progress > i { height: 7px; overflow: hidden; border-radius: 999px; background: #e6ece9; }
 .target-progress > i > em { display: block; height: 100%; border-radius: inherit; background: #2f7b5c; }
-.governance-filter-grid { grid-template-columns: repeat(2, minmax(150px, 220px)) 1fr; }
+.governance-filter-grid { grid-template-columns: repeat(3, minmax(150px, 220px)) 1fr; }
 
 .table-pagination { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 0 2px; }
 .table-pagination label, .table-pagination > div { display: flex; align-items: center; gap: 8px; }

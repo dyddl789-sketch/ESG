@@ -67,6 +67,8 @@ export default function DocumentAiPage() {
   const isScope2Document = selectedIndicator?.indicatorCode === "IND_E_SCOPE2";
 
   const isAttendanceDocument = selectedIndicator?.indicatorCode === "IND_G_ATTENDANCE";
+  const isCompanyWideGovernance = ["IND_G_ATTENDANCE", "IND_G_OUTSIDE"].includes(selectedIndicator?.indicatorCode);
+  const requiresFacility = Boolean(selectedIndicator) && !isCompanyWideGovernance;
 
   const analyze = async () => {
     if (!file) return;
@@ -75,11 +77,12 @@ export default function DocumentAiPage() {
       const uploadResponse = await fileApi.upload(file);
       const fileUrl = uploadResponse.data?.data?.fileUrl || uploadResponse.data?.fileUrl;
       const analysis = await documentApi.helper(fileUrl);
-      const headquarters = facilities.find((facility) => facility.facility_type === "HQ") || facilities[0];
+      const analyzedIndicator = indicators.find((indicator) => String(indicator.id) === String(analysis?.indicatorId));
+      const analyzedCompanyWide = ["IND_G_ATTENDANCE", "IND_G_OUTSIDE"].includes(analyzedIndicator?.indicatorCode);
 
       setResult({
         indicatorId: analysis?.indicatorId || "",
-        facilityId: analysis?.facilityId || headquarters?.id || "",
+        facilityId: analyzedCompanyWide ? "" : (analysis?.facilityId || ""),
         reportingYear: analysis?.reportingYear || new Date().getFullYear(),
         periodType: analysis?.periodType || "MONTHLY",
         periodValue: analysis?.periodValue || new Date().getMonth() + 1,
@@ -120,6 +123,9 @@ export default function DocumentAiPage() {
         } else {
           next.detectedCategory = indicator?.category || next.detectedCategory;
         }
+        if (["IND_G_ATTENDANCE", "IND_G_OUTSIDE"].includes(indicator?.indicatorCode)) {
+          next.facilityId = "";
+        }
       }
 
       if (key === "electricityUsageKwh") {
@@ -141,6 +147,10 @@ export default function DocumentAiPage() {
       await Swal.fire("확인 필요", "등록할 ESG 지표를 선택해 주세요.", "warning");
       return;
     }
+    if (requiresFacility && !result.facilityId) {
+      await Swal.fire("확인 필요", "해당 지표를 측정한 사업장을 선택해 주세요.", "warning");
+      return;
+    }
     if (isElectricityDocument) {
       if (Number(result.electricityUsageKwh) <= 0) {
         await Swal.fire("확인 필요", "전력 사용량(kWh)을 입력해 주세요.", "warning");
@@ -160,7 +170,7 @@ export default function DocumentAiPage() {
     try {
       const payload = {
         indicatorId: Number(result.indicatorId),
-        facilityId: result.facilityId ? Number(result.facilityId) : null,
+        facilityId: isCompanyWideGovernance ? null : (result.facilityId ? Number(result.facilityId) : null),
         reportingYear: Number(result.reportingYear),
         periodType: result.periodType || "MONTHLY",
         periodValue: Number(result.periodValue),
@@ -267,17 +277,20 @@ export default function DocumentAiPage() {
               </div>
 
               <div className="form-group">
-                <label>사업장</label>
+                <label>사업장 {requiresFacility ? "*" : ""}</label>
                 <select
                   value={result.facilityId || ""}
                   onChange={(event) => update("facilityId", event.target.value)}
-                  disabled={!canEdit}
+                  disabled={!canEdit || isCompanyWideGovernance}
+                  required={requiresFacility}
                 >
-                  <option value="">본사 공통 또는 사업장 선택</option>
+                  <option value="">{isCompanyWideGovernance ? "전체 · 기업 기준" : "사업장을 선택하세요"}</option>
                   {facilities.map((facility) => (
                     <option key={facility.id} value={facility.id}>{facility.facility_name || facility.name}</option>
                   ))}
                 </select>
+                {isCompanyWideGovernance && <small>이사회 참석률과 사외이사 비율은 기업 공통 데이터로 등록됩니다.</small>}
+                {selectedIndicator?.indicatorCode === "IND_G_ETHICS_EDU" && <small>윤리교육 이수율은 선택한 사업장에만 등록됩니다.</small>}
               </div>
 
               <div className="form-group">

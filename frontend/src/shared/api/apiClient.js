@@ -5,14 +5,14 @@ const baseURL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 const apiClient = axios.create({
   baseURL,
-  timeout: 25000,
+  timeout: 35000,
   withCredentials: true,
   headers: { "Content-Type": "application/json" },
 });
 
 const refreshClient = axios.create({
   baseURL,
-  timeout: 25000,
+  timeout: 35000,
   withCredentials: true,
   headers: { "Content-Type": "application/json" },
 });

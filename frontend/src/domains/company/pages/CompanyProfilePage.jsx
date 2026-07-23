@@ -22,6 +22,8 @@ const categoryMeta = {
   SOCIAL: { label: "사회", className: "social" },
   GOVERNANCE: { label: "거버넌스", className: "governance" },
 };
+const COMPANY_WIDE_GOVERNANCE_CODES = new Set(["IND_G_ATTENDANCE", "IND_G_OUTSIDE"]);
+const metricFacilityId = (metric) => metric?.facilityId ?? metric?.facility_id ?? null;
 const companyValue = (company, camelKey, snakeKey, fallback = "-") => company?.[camelKey] ?? company?.[snakeKey] ?? fallback;
 const maskBusinessNumber = (value) => {
   if (!value || value === "-") return value;
@@ -63,11 +65,17 @@ export default function CompanyProfilePage() {
     try {
       const [facilityMetrics, governanceMetrics] = await Promise.all([
         metricApi.list({ period, facilityId: facility.id, status: "APPROVED" }),
-        facility.facilityType === "HQ"
-          ? Promise.resolve([])
-          : metricApi.list({ period, category: "GOVERNANCE", status: "APPROVED" }),
+        metricApi.list({ period, category: "GOVERNANCE", status: "APPROVED" }),
       ]);
-      const merged = [...(facilityMetrics || []), ...(governanceMetrics || [])];
+      const commonGovernance = (governanceMetrics || []).filter((metric) => (
+        COMPANY_WIDE_GOVERNANCE_CODES.has(metric.indicatorCode)
+        && metricFacilityId(metric) == null
+      ));
+      const facilityEthics = (governanceMetrics || []).filter((metric) => (
+        metric.indicatorCode === "IND_G_ETHICS_EDU"
+        && String(metricFacilityId(metric)) === String(facility.id)
+      ));
+      const merged = [...(facilityMetrics || []), ...commonGovernance, ...facilityEthics];
       const unique = Array.from(new Map(merged.map((metric) => [metric.id, metric])).values());
       setSelectedMetrics(unique);
     } catch (error) {
@@ -125,6 +133,10 @@ export default function CompanyProfilePage() {
   }, [selectedMetrics]);
   const latestApprovedAt = selectedMetrics.map((metric) => metric.updatedAt).filter(Boolean).sort().at(-1);
   const evidence = selectedMetrics.map((metric) => metric.evidence).find(Boolean);
+  const selectedFacilityNotOperating = Boolean(
+    selectedFacility?.operationStartDate
+    && selectedPeriod < String(selectedFacility.operationStartDate).slice(0, 7),
+  );
 
   const selectFacility = useCallback(async (facility) => {
     setSelectedFacility(facility);
@@ -259,6 +271,7 @@ export default function CompanyProfilePage() {
               <div className="facility-inline-meta">
                 <div><span>유형</span><strong>{selectedFacility.facilityType === "HQ" ? "본사" : "공장"}</strong></div>
                 <div><span>계약전력</span><strong>{formatNumber(selectedFacility.contractPowerKw)} kW</strong></div>
+                <div><span>운영 기간</span><strong>{selectedFacility.operationStartDate || "-"} ~ {selectedFacility.operationEndDate || "운영 중"}</strong></div>
                 <div><span>최종 승인일</span><strong>{formatDateTime(latestApprovedAt)}</strong></div>
               </div>
 
@@ -266,8 +279,10 @@ export default function CompanyProfilePage() {
                 <div className="facility-esg-groups">
                   {groupedMetrics.map((group) => (
                     <section key={group.category} className={`facility-esg-group ${group.className}`}>
-                      <header><strong>{group.label}</strong>{group.category === "GOVERNANCE" && selectedFacility.facilityType !== "HQ" && <small>기업 공통·본사 기준</small>}</header>
-                      {group.metrics.length ? group.metrics.map((metric) => <div key={metric.id}><span>{metric.title}</span><strong>{formatMetricValue(metric)}</strong></div>) : <p>선택한 기준월에 승인된 {group.label} 실적이 없습니다.</p>}
+                      <header><strong>{group.label}</strong>{group.category === "GOVERNANCE" && <small>이사회·사외이사 기업 공통 / 윤리교육 사업장 기준</small>}</header>
+                      {group.metrics.length
+                        ? group.metrics.map((metric) => <div key={metric.id}><span>{metric.title}</span><strong>{formatMetricValue(metric)}</strong></div>)
+                        : <p>{selectedFacilityNotOperating ? "해당 기간은 사업장 운영 시작 이전입니다." : `선택한 기준월에 승인된 ${group.label} 실적이 없습니다.`}</p>}
                     </section>
                   ))}
                 </div>

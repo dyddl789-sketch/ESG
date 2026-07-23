@@ -233,10 +233,12 @@ public class DocumentAnalysisService {
             if (value == null && (textValue == null || textValue.isBlank())) {
                 throw new BusinessException(ErrorCode.INVALID_INPUT, "정량 수치 또는 정성 내용을 입력해 주세요.");
             }
-            if (indicatorCode.startsWith("IND_G_")
-                    && !isCompanyWideGovernance(indicatorCode)
-                    && facilityId == null) {
-                facilityId = metricMapper.findHeadquartersFacilityId(companyId.longValue());
+            if (isCompanyWideGovernance(indicatorCode)) {
+                facilityId = null;
+            } else if ("IND_G_ETHICS_EDU".equals(indicatorCode) && facilityId == null) {
+                throw new BusinessException(
+                        ErrorCode.INVALID_INPUT,
+                        "윤리교육 이수율은 AI 분석 결과를 등록할 대상 사업장을 선택해 주세요.");
             }
         }
 

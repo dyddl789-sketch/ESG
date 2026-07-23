@@ -68,24 +68,37 @@
         LIMIT 1
     </select>
 
-    <select id="findLatestInternalYear" resultType="int">
-        SELECT MAX(m.reporting_year)
-        FROM esg_metric_data m
-        JOIN esg_indicators i ON i.id = m.indicator_id
-        WHERE m.company_id = #{companyId}
-          AND m.status = 'APPROVED'
-          AND i.indicator_code = 'IND_E_ELEC'
-          AND m.shipment_amount_million_krw &gt; 0
+    <select id="findInternalYears" resultType="int">
+        SELECT DISTINCT metric.reporting_year
+        FROM esg_metric_data metric
+        JOIN esg_indicators indicator ON indicator.id = metric.indicator_id
+        WHERE metric.company_id = #{companyId}
+          AND metric.status = 'APPROVED'
+          AND indicator.indicator_code = 'IND_E_ELEC'
+          AND metric.shipment_amount_million_krw &gt; 0
+        ORDER BY metric.reporting_year DESC
     </select>
 
     <select id="findLatestComparableMonth" resultType="int">
-        WITH active_facilities AS (
-            SELECT COUNT(*)::INT AS facility_count
-            FROM company_facilities
-            WHERE company_id = #{companyId}
-              AND is_active = TRUE
-        ), matched AS (
-            SELECT electricity.period_value,
+        WITH month_periods AS (
+            SELECT month_no,
+                   make_date(#{year}, month_no, 1) AS period_start,
+                   (make_date(#{year}, month_no, 1) + INTERVAL '1 month - 1 day')::DATE AS period_end
+            FROM generate_series(1, 12) AS month_no
+        ), eligible_facilities AS (
+            SELECT period.month_no,
+                   COUNT(facility.id)::INT AS expected_count
+            FROM month_periods period
+            LEFT JOIN company_facilities facility
+              ON facility.company_id = #{companyId}
+             AND facility.operation_start_date &lt;= period.period_end
+             AND (
+                 facility.operation_end_date IS NULL
+                 OR facility.operation_end_date &gt;= period.period_start
+             )
+            GROUP BY period.month_no
+        ), matched_facilities AS (
+            SELECT electricity.period_value AS month_no,
                    COUNT(DISTINCT electricity.facility_id)::INT AS matched_count
             FROM esg_metric_data electricity
             JOIN esg_indicators electricity_indicator
@@ -101,42 +114,78 @@
             JOIN esg_indicators scope_indicator
               ON scope_indicator.id = scope2.indicator_id
              AND scope_indicator.indicator_code = 'IND_E_SCOPE2'
+            JOIN company_facilities facility
+              ON facility.id = electricity.facility_id
+            JOIN month_periods period
+              ON period.month_no = electricity.period_value
+             AND facility.operation_start_date &lt;= period.period_end
+             AND (
+                 facility.operation_end_date IS NULL
+                 OR facility.operation_end_date &gt;= period.period_start
+             )
             WHERE electricity.company_id = #{companyId}
               AND electricity.reporting_year = #{year}
               AND electricity.period_type = 'MONTHLY'
               AND electricity.status = 'APPROVED'
               AND electricity.shipment_amount_million_krw &gt; 0
             GROUP BY electricity.period_value
+        ), month_status AS (
+            SELECT period.month_no,
+                   eligible.expected_count,
+                   COALESCE(matched.matched_count, 0) AS matched_count,
+                   eligible.expected_count &gt; 0
+                       AND COALESCE(matched.matched_count, 0) = eligible.expected_count AS is_complete
+            FROM month_periods period
+            JOIN eligible_facilities eligible ON eligible.month_no = period.month_no
+            LEFT JOIN matched_facilities matched ON matched.month_no = period.month_no
         )
-        SELECT MAX(matched.period_value)
-        FROM matched
-        CROSS JOIN active_facilities
-        WHERE matched.matched_count = active_facilities.facility_count
+        SELECT MAX(status.month_no)
+        FROM month_status status
+        WHERE status.expected_count &gt; 0
+          AND status.is_complete
+          AND NOT EXISTS (
+              SELECT 1
+              FROM month_status previous
+              WHERE previous.month_no &lt;= status.month_no
+                AND previous.expected_count &gt; 0
+                AND NOT previous.is_complete
+          )
     </select>
 
     <select id="findInternalAggregate" resultType="com.esg.platform.domain.benchmark.dto.InternalBenchmarkAggregate">
         WITH electricity AS (
-            SELECT m.facility_id, m.period_value, m.numerical_value,
-                   m.shipment_amount_million_krw
-            FROM esg_metric_data m
-            JOIN esg_indicators i ON i.id = m.indicator_id
-            WHERE m.company_id = #{companyId}
-              AND m.reporting_year = #{year}
-              AND m.period_type = 'MONTHLY'
-              AND m.period_value BETWEEN 1 AND #{throughMonth}
-              AND m.status = 'APPROVED'
-              AND i.indicator_code = 'IND_E_ELEC'
-              AND m.shipment_amount_million_krw &gt; 0
+            SELECT metric.facility_id,
+                   metric.period_value,
+                   metric.numerical_value,
+                   metric.shipment_amount_million_krw
+            FROM esg_metric_data metric
+            JOIN esg_indicators indicator ON indicator.id = metric.indicator_id
+            JOIN company_facilities facility ON facility.id = metric.facility_id
+            WHERE metric.company_id = #{companyId}
+              AND metric.reporting_year = #{year}
+              AND metric.period_type = 'MONTHLY'
+              AND metric.period_value BETWEEN 1 AND #{throughMonth}
+              AND metric.status = 'APPROVED'
+              AND indicator.indicator_code = 'IND_E_ELEC'
+              AND metric.shipment_amount_million_krw &gt; 0
+              AND facility.operation_start_date
+                    &lt;= (make_date(#{year}, metric.period_value, 1) + INTERVAL '1 month - 1 day')::DATE
+              AND (
+                  facility.operation_end_date IS NULL
+                  OR facility.operation_end_date &gt;= make_date(#{year}, metric.period_value, 1)
+              )
         ), scope2 AS (
-            SELECT m.facility_id, m.period_value, m.numerical_value
-            FROM esg_metric_data m
-            JOIN esg_indicators i ON i.id = m.indicator_id
-            WHERE m.company_id = #{companyId}
-              AND m.reporting_year = #{year}
-              AND m.period_type = 'MONTHLY'
-              AND m.period_value BETWEEN 1 AND #{throughMonth}
-              AND m.status = 'APPROVED'
-              AND i.indicator_code = 'IND_E_SCOPE2'
+            SELECT metric.facility_id,
+                   metric.period_value,
+                   metric.numerical_value
+            FROM esg_metric_data metric
+            JOIN esg_indicators indicator ON indicator.id = metric.indicator_id
+            WHERE metric.company_id = #{companyId}
+              AND metric.reporting_year = #{year}
+              AND metric.period_type = 'MONTHLY'
+              AND metric.period_value BETWEEN 1 AND #{throughMonth}
+              AND metric.status = 'APPROVED'
+              AND indicator.indicator_code = 'IND_E_SCOPE2'
         )
         SELECT COALESCE(SUM(electricity.numerical_value) / 1000.0, 0) AS electricity_mwh,
                COALESCE(SUM(electricity.shipment_amount_million_krw) / 100.0, 0) AS shipment_hundred_million_krw,

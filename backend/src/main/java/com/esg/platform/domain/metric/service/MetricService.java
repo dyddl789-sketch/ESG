@@ -139,10 +139,18 @@ public class MetricService {
 
 
     private void validateFacilityScope(String indicatorCode, Integer facilityId) {
+        if (indicatorCode == null || indicatorCode.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "등록할 ESG 지표를 확인할 수 없습니다.");
+        }
         if (isCompanyWideGovernance(indicatorCode) && facilityId != null) {
             throw new BusinessException(
                     ErrorCode.INVALID_INPUT,
                     "이사회 참석률과 사외이사 비율은 전체·기업 기준으로만 등록할 수 있습니다.");
+        }
+        if (!isCompanyWideGovernance(indicatorCode) && facilityId == null) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_INPUT,
+                    "해당 ESG 지표를 측정한 사업장을 선택해 등록해야 합니다.");
         }
     }
 
