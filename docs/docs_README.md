@@ -17,16 +17,14 @@
 
 ## 2. 권장 문서 구조
 
-```text
-docs/
-├── README.md
-├── 01-planning/
-├── 02-design/
-├── 03-api/
-├── 04-test/
-├── 05-presentation/
-└── meeting-notes/
-```
+docs/  
+├── README.md  
+├── [01-planning](https://github.com/dyddl789-sketch/ESG/tree/feature/docs/docs/01-planning)/  
+├── [02-design](https://github.com/dyddl789-sketch/ESG/tree/feature/docs/docs/02-design)/  
+├── [03-api](https://github.com/dyddl789-sketch/ESG/tree/feature/docs/docs/03-api)/  
+├── [04-test](https://github.com/dyddl789-sketch/ESG/tree/feature/docs/docs/04-test)/  
+├── [05-presentation](https://github.com/dyddl789-sketch/ESG/tree/feature/docs/docs/05-presentation)/  
+└── [meeting-notes](https://github.com/dyddl789-sketch/ESG/tree/feature/docs/docs/meeting-notes)/  
 
 각 폴더에는 문서 목록을 빠르게 확인할 수 있도록 필요할 경우 `README.md` 또는 `INDEX.md`를 둡니다.
 
