@@ -67,14 +67,16 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - VITE_API_BASE_URL=/api
-        - VITE_BACKEND_URL=https://43.200.217.129
-        - VITE_WS_URL=wss://43.200.217.129/ws/esg
-        - VITE_KAKAO_MAP_KEY=9693dca78bc226b3618605dbc0bce77f
-        - VITE_KEA_API_KEY=0158e6e63feeaa94d850ceb2717eb35dd38ef7e913623ad5170645f214bc880e
-        - VITE_KOSIS_API_KEY=Y2E5OTlhMTU3NTBhODNjOTY3ZTM5ZmM5Zjk1Y2U4ZjE=
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL}
+        - VITE_BACKEND_URL=${VITE_BACKEND_URL}
+        - VITE_WS_URL=${VITE_WS_URL}
+        - VITE_KAKAO_MAP_KEY=${VITE_KAKAO_MAP_KEY}
+        - VITE_KEA_API_KEY=${VITE_KEA_API_KEY}
+        - VITE_KOSIS_API_KEY=${VITE_KOSIS_API_KEY}
     container_name: nginx-frontend
     restart: unless-stopped
+    env_file:
+      - .env
     depends_on:
       - backend
     ports:
