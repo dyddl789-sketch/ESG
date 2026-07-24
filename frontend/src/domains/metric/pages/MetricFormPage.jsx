@@ -8,6 +8,8 @@ import companyApi from "../../company/api/companyApi";
 import Swal from "sweetalert2";
 import "../../../styles/metricform.css"; 
 import { useEsgData } from "../../../app/providers/EsgDataProvider"; 
+import { apiErrorMessage } from "../../../shared/utils/esgFormat";
+import { facilityOperationPeriodError } from "../utils/facilityPeriod";
 
 export default function MetricFormPage() {
   const { metricId } = useParams(); 
@@ -41,6 +43,7 @@ export default function MetricFormPage() {
   const isCompanyWideGovernance = ["IND_G_ATTENDANCE", "IND_G_OUTSIDE"].includes(selectedIndicator?.indicatorCode);
   const requiresFacility = Boolean(selectedIndicator) && !isCompanyWideGovernance;
   const evidenceLabel = isCompanyWideGovernance ? "기업 거버넌스 증빙 PDF 첨부" : "사업장 ESG 증빙 PDF 첨부";
+  const selectedFacility = facilities.find((facility) => String(facility.id) === String(formData.facilityId));
 
   useEffect(() => {
     const fetchData = async () => {
@@ -182,6 +185,15 @@ export default function MetricFormPage() {
   const handleProcessSubmit = async (isApprovalClick = false) => {
     if (!formData.indicatorId) return Swal.fire("알림", "지표를 선택해주세요.", "warning");
     if (requiresFacility && !formData.facilityId) return Swal.fire("알림", "해당 지표를 측정한 사업장을 선택해주세요.", "warning");
+    if (requiresFacility) {
+      const operationPeriodError = facilityOperationPeriodError({
+        facility: selectedFacility,
+        reportingYear: formData.reportingYear,
+        periodType: formData.periodType,
+        periodValue: formData.periodValue,
+      });
+      if (operationPeriodError) return Swal.fire("등록 기간 확인", operationPeriodError, "warning");
+    }
     if (isElectricityMetric && (!formData.shipmentAmount || Number(formData.shipmentAmount) <= 0)) return Swal.fire("알림", "전력 사용량 등록 시 출하액(백만원)을 입력해주세요.", "warning");
     if (!formData.evidenceFileUrl) return Swal.fire("알림", `${evidenceLabel}가 필요합니다.`, "warning");
 
@@ -223,7 +235,7 @@ export default function MetricFormPage() {
       navigate("/manager/metrics");
     } catch (err) {
       console.error("데이터 저장 실패:", err);
-      Swal.fire("오류", isEditMode ? "데이터 수정 등록에 실패했습니다." : "신규 데이터 등록에 실패했습니다.", "error");
+      Swal.fire("오류", apiErrorMessage(err, isEditMode ? "데이터 수정 등록에 실패했습니다." : "신규 데이터 등록에 실패했습니다."), "error");
     } finally {
       setLoading(false);
     }

@@ -1,10 +1,13 @@
 package com.esg.platform.domain.metric.service;
 
+import java.time.YearMonth;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.esg.platform.domain.company.dto.FacilityDto;
+import com.esg.platform.domain.company.mapper.FacilityMapper;
 import com.esg.platform.domain.metric.dto.IndicatorResponse;
 import com.esg.platform.domain.metric.dto.MetricCreateRequest;
 import com.esg.platform.domain.metric.entity.DataStatus;
@@ -23,10 +26,12 @@ public class MetricService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MetricService.class);
 
     private final MetricMapper metricMapper;
+    private final FacilityMapper facilityMapper;
     private final EsgCacheService cacheService;
 
-    public MetricService(MetricMapper metricMapper, EsgCacheService cacheService) {
+    public MetricService(MetricMapper metricMapper, FacilityMapper facilityMapper, EsgCacheService cacheService) {
         this.metricMapper = metricMapper;
+        this.facilityMapper = facilityMapper;
         this.cacheService = cacheService;
     }
 
@@ -36,9 +41,11 @@ public class MetricService {
         String indicatorCode = metricMapper.findIndicatorCodeById(request.indicatorId());
         validateShipment(indicatorCode, request.shipmentAmount());
         validateFacilityScope(indicatorCode, request.facilityId());
+        Integer facilityId = normalizeFacilityId(indicatorCode, request.facilityId());
+        validateFacilityOperationPeriod(facilityId, companyId, request);
         EsgMetricData data = EsgMetricData.builder()
                 .companyId(companyId)
-                .facilityId(normalizeFacilityId(indicatorCode, request.facilityId()))
+                .facilityId(facilityId)
                 .indicatorId(request.indicatorId())
                 .reportingYear(request.reportingYear())
                 .periodType(parsePeriodType(request.periodType()))
@@ -67,17 +74,19 @@ public class MetricService {
     @Transactional
     public void updateMetric(Long id, MetricCreateRequest request, Integer inputUserId) {
         validate(request);
+        EsgMetricData current = requireEntity(id);
         String indicatorCode = metricMapper.findIndicatorCodeById(request.indicatorId());
         validateShipment(indicatorCode, request.shipmentAmount());
         validateFacilityScope(indicatorCode, request.facilityId());
-        EsgMetricData current = requireEntity(id);
+        Integer facilityId = normalizeFacilityId(indicatorCode, request.facilityId());
+        validateFacilityOperationPeriod(facilityId, current.getCompanyId(), request);
         if (current.getStatus() == DataStatus.PENDING || current.getStatus() == DataStatus.APPROVED) {
             throw new BusinessException(ErrorCode.INVALID_WORKFLOW_STATUS,
                     "승인 대기 또는 승인 완료 데이터는 수정할 수 없습니다.");
         }
         DataStatus previousStatus = current.getStatus();
         current.setIndicatorId(request.indicatorId());
-        current.setFacilityId(normalizeFacilityId(indicatorCode, request.facilityId()));
+        current.setFacilityId(facilityId);
         current.setReportingYear(request.reportingYear());
         current.setPeriodType(parsePeriodType(request.periodType()));
         current.setPeriodValue(request.periodValue());
@@ -132,6 +141,12 @@ public class MetricService {
         if (request.reportingYear() == null || request.periodValue() == null) {
             throw new BusinessException(ErrorCode.INVALID_INPUT, "보고 연도와 기간을 입력해 주세요.");
         }
+        PeriodType periodType = parsePeriodType(request.periodType());
+        if ((periodType == PeriodType.MONTHLY && (request.periodValue() < 1 || request.periodValue() > 12))
+                || (periodType == PeriodType.QUARTERLY && (request.periodValue() < 1 || request.periodValue() > 4))
+                || (periodType == PeriodType.YEARLY && request.periodValue() != 1)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "보고 기간 값이 올바르지 않습니다.");
+        }
         if (request.value() == null && trimToNull(request.textValue()) == null) {
             throw new BusinessException(ErrorCode.INVALID_INPUT, "정량 수치 또는 정성 내용을 입력해 주세요.");
         }
@@ -156,6 +171,63 @@ public class MetricService {
 
     private Integer normalizeFacilityId(String indicatorCode, Integer facilityId) {
         return isCompanyWideGovernance(indicatorCode) ? null : facilityId;
+    }
+
+    private void validateFacilityOperationPeriod(
+            Integer facilityId,
+            Integer companyId,
+            MetricCreateRequest request) {
+        if (facilityId == null) {
+            return;
+        }
+
+        FacilityDto facility = facilityMapper.findByIdAndCompanyId(
+                Long.valueOf(facilityId),
+                Long.valueOf(companyId));
+        if (facility == null) {
+            throw new BusinessException(ErrorCode.FACILITY_NOT_FOUND);
+        }
+
+        PeriodType periodType = parsePeriodType(request.periodType());
+        YearMonth periodStart = periodStart(request.reportingYear(), periodType, request.periodValue());
+        YearMonth periodEnd = periodEnd(request.reportingYear(), periodType, request.periodValue());
+        YearMonth operationStart = facility.getOperationStartDate() == null
+                ? null
+                : YearMonth.from(facility.getOperationStartDate());
+        YearMonth operationEnd = facility.getOperationEndDate() == null
+                ? null
+                : YearMonth.from(facility.getOperationEndDate());
+
+        if (operationStart != null && periodEnd.isBefore(operationStart)) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_INPUT,
+                    facility.getFacilityName() + "의 운영 시작월은 "
+                            + operationStart.getYear() + "년 " + operationStart.getMonthValue()
+                            + "월입니다. 운영 시작월 이전 ESG 데이터는 등록할 수 없습니다.");
+        }
+        if (operationEnd != null && periodStart.isAfter(operationEnd)) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_INPUT,
+                    facility.getFacilityName() + "의 운영 종료월은 "
+                            + operationEnd.getYear() + "년 " + operationEnd.getMonthValue()
+                            + "월입니다. 운영 종료월 이후 ESG 데이터는 등록할 수 없습니다.");
+        }
+    }
+
+    private YearMonth periodStart(Integer year, PeriodType periodType, Integer periodValue) {
+        return switch (periodType) {
+            case MONTHLY -> YearMonth.of(year, periodValue);
+            case QUARTERLY -> YearMonth.of(year, (periodValue - 1) * 3 + 1);
+            case YEARLY -> YearMonth.of(year, 1);
+        };
+    }
+
+    private YearMonth periodEnd(Integer year, PeriodType periodType, Integer periodValue) {
+        return switch (periodType) {
+            case MONTHLY -> YearMonth.of(year, periodValue);
+            case QUARTERLY -> YearMonth.of(year, (periodValue - 1) * 3 + 3);
+            case YEARLY -> YearMonth.of(year, 12);
+        };
     }
 
     private boolean isCompanyWideGovernance(String indicatorCode) {

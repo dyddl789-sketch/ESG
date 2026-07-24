@@ -41,7 +41,7 @@ export default function CompanyProfilePage() {
   const [searchParams] = useSearchParams();
   const isSystemAdmin = user?.role === ROLES.SYSTEM_ADMIN;
   const isExternal = user?.role === ROLES.EXTERNAL_USER;
-  const canManage = [ROLES.SYSTEM_ADMIN, ROLES.COMPANY_MANAGER].includes(user?.role);
+  const canManage = isSystemAdmin;
   const requestedFacilityId = searchParams.get("facilityId");
   const initialYear = Number(searchParams.get("year")) || 2026;
   const initialMonth = Number(searchParams.get("month")) || 5;

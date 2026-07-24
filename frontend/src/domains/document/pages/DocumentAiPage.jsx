@@ -11,6 +11,7 @@ import { apiErrorMessage } from "../../../shared/utils/esgFormat";
 import companyApi from "../../company/api/companyApi";
 import { metricApi } from "../../metric/api/metricApi";
 import { useMetricPeriods } from "../../metric/hooks/useMetricPeriods";
+import { facilityNameOf, facilityOperationPeriodError, findFacilityFromAnalysis } from "../../metric/utils/facilityPeriod";
 import { documentApi } from "../api/documentApi";
 import "../../../styles/metricform.css";
 
@@ -69,6 +70,15 @@ export default function DocumentAiPage() {
   const isAttendanceDocument = selectedIndicator?.indicatorCode === "IND_G_ATTENDANCE";
   const isCompanyWideGovernance = ["IND_G_ATTENDANCE", "IND_G_OUTSIDE"].includes(selectedIndicator?.indicatorCode);
   const requiresFacility = Boolean(selectedIndicator) && !isCompanyWideGovernance;
+  const inferredFacility = useMemo(
+    () => (isCompanyWideGovernance ? null : findFacilityFromAnalysis(facilities, result)),
+    [facilities, isCompanyWideGovernance, result],
+  );
+  const effectiveFacilityId = isCompanyWideGovernance ? "" : (result?.facilityId || inferredFacility?.id || "");
+  const effectiveFacilityMatchStatus = result?.facilityMatchStatus === "MATCHED" || inferredFacility
+    ? "MATCHED"
+    : result?.facilityMatchStatus;
+  const selectedFacility = facilities.find((facility) => String(facility.id) === String(effectiveFacilityId));
 
   const analyze = async () => {
     if (!file) return;
@@ -79,10 +89,14 @@ export default function DocumentAiPage() {
       const analysis = await documentApi.helper(fileUrl);
       const analyzedIndicator = indicators.find((indicator) => String(indicator.id) === String(analysis?.indicatorId));
       const analyzedCompanyWide = ["IND_G_ATTENDANCE", "IND_G_OUTSIDE"].includes(analyzedIndicator?.indicatorCode);
+      const analyzedFacility = analyzedCompanyWide ? null : findFacilityFromAnalysis(facilities, analysis);
 
       setResult({
         indicatorId: analysis?.indicatorId || "",
-        facilityId: analyzedCompanyWide ? "" : (analysis?.facilityId || ""),
+        facilityId: analyzedCompanyWide ? "" : (analyzedFacility?.id || analysis?.facilityId || ""),
+        facilityName: analyzedCompanyWide ? "" : (analysis?.facilityName || (analyzedFacility ? facilityNameOf(analyzedFacility) : "")),
+        facilityEvidence: analysis?.facilityEvidence || "",
+        facilityMatchStatus: analyzedCompanyWide ? "COMPANY_WIDE" : (analysis?.facilityMatchStatus || (analyzedFacility ? "MATCHED" : "UNMATCHED")),
         reportingYear: analysis?.reportingYear || new Date().getFullYear(),
         periodType: analysis?.periodType || "MONTHLY",
         periodValue: analysis?.periodValue || new Date().getMonth() + 1,
@@ -108,6 +122,7 @@ export default function DocumentAiPage() {
     }
   };
 
+
   const update = (key, value) => {
     setResult((current) => {
       if (!current) return current;
@@ -126,6 +141,13 @@ export default function DocumentAiPage() {
         if (["IND_G_ATTENDANCE", "IND_G_OUTSIDE"].includes(indicator?.indicatorCode)) {
           next.facilityId = "";
         }
+      }
+
+      if (key === "facilityId") {
+        const facility = facilities.find((item) => String(item.id) === String(value));
+        next.facilityName = facility ? facilityNameOf(facility) : "";
+        next.facilityEvidence = "";
+        next.facilityMatchStatus = value ? "MANUAL" : "UNMATCHED";
       }
 
       if (key === "electricityUsageKwh") {
@@ -147,9 +169,21 @@ export default function DocumentAiPage() {
       await Swal.fire("확인 필요", "등록할 ESG 지표를 선택해 주세요.", "warning");
       return;
     }
-    if (requiresFacility && !result.facilityId) {
-      await Swal.fire("확인 필요", "해당 지표를 측정한 사업장을 선택해 주세요.", "warning");
+    if (requiresFacility && !effectiveFacilityId) {
+      await Swal.fire("확인 필요", "문서에서 사업장을 자동 확정하지 못했습니다. 해당 지표를 측정한 사업장을 선택해 주세요.", "warning");
       return;
+    }
+    if (requiresFacility) {
+      const operationPeriodError = facilityOperationPeriodError({
+        facility: selectedFacility,
+        reportingYear: result.reportingYear,
+        periodType: result.periodType,
+        periodValue: result.periodValue,
+      });
+      if (operationPeriodError) {
+        await Swal.fire("등록 기간 확인", operationPeriodError, "warning");
+        return;
+      }
     }
     if (isElectricityDocument) {
       if (Number(result.electricityUsageKwh) <= 0) {
@@ -160,7 +194,7 @@ export default function DocumentAiPage() {
         await Swal.fire("확인 필요", "출하액(백만원)을 입력해 주세요.", "warning");
         return;
       }
-      if (!result.facilityId) {
+      if (!effectiveFacilityId) {
         await Swal.fire("확인 필요", "전력·출하액을 등록할 사업장을 선택해 주세요.", "warning");
         return;
       }
@@ -170,7 +204,7 @@ export default function DocumentAiPage() {
     try {
       const payload = {
         indicatorId: Number(result.indicatorId),
-        facilityId: isCompanyWideGovernance ? null : (result.facilityId ? Number(result.facilityId) : null),
+        facilityId: isCompanyWideGovernance ? null : (effectiveFacilityId ? Number(effectiveFacilityId) : null),
         reportingYear: Number(result.reportingYear),
         periodType: result.periodType || "MONTHLY",
         periodValue: Number(result.periodValue),
@@ -279,7 +313,7 @@ export default function DocumentAiPage() {
               <div className="form-group">
                 <label>사업장 {requiresFacility ? "*" : ""}</label>
                 <select
-                  value={result.facilityId || ""}
+                  value={effectiveFacilityId}
                   onChange={(event) => update("facilityId", event.target.value)}
                   disabled={!canEdit || isCompanyWideGovernance}
                   required={requiresFacility}
@@ -290,6 +324,10 @@ export default function DocumentAiPage() {
                   ))}
                 </select>
                 {isCompanyWideGovernance && <small>이사회 참석률과 사외이사 비율은 기업 공통 데이터로 등록됩니다.</small>}
+                {!isCompanyWideGovernance && effectiveFacilityMatchStatus === "MATCHED" && <small>문서의 사업장 정보{result.facilityEvidence ? ` (${result.facilityEvidence})` : ""}를 기준으로 자동 선택했습니다.</small>}
+                {!isCompanyWideGovernance && result.facilityMatchStatus === "MANUAL" && <small>담당자가 대상 사업장을 직접 선택했습니다.</small>}
+                {!isCompanyWideGovernance && !effectiveFacilityId && result.facilityMatchStatus === "AMBIGUOUS" && <small>문서에 여러 사업장이 확인되어 자동 선택하지 않았습니다. 대상 사업장을 직접 선택해 주세요.</small>}
+                {!isCompanyWideGovernance && !effectiveFacilityId && result.facilityMatchStatus === "UNMATCHED" && <small>문서에서 등록된 사업장과 일치하는 대상을 찾지 못했습니다. 대상 사업장을 직접 선택해 주세요.</small>}
                 {selectedIndicator?.indicatorCode === "IND_G_ETHICS_EDU" && <small>윤리교육 이수율은 선택한 사업장에만 등록됩니다.</small>}
               </div>
 
