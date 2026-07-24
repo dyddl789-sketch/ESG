@@ -15,6 +15,7 @@
 
 ## 작업 항목
 
+
 <table>
   <thead>
     <tr>
@@ -71,17 +72,17 @@
     <tr>
       <td align="left">ESG 실적 조회</td>
       <td align="left">2026-07-10</td>
-      <td align="left">완료</td>
+      <td align="left"></td>
     </tr>
     <tr>
       <td align="left">리포트 빌더</td>
       <td align="left">2026-07-10</td>
-      <td align="left">완료</td>
+      <td align="left"></td>
     </tr>
     <tr>
       <td align="left">깃허브 문서 작업</td>
       <td align="left">-</td>
-      <td align="left">진행 중</td>
+      <td align="left"></td>
     </tr>
     <tr>
       <td align="left" rowspan="5">홍현민</td>
@@ -111,12 +112,3 @@
     </tr>
   </tbody>
 </table>
-
-## 미결사항
-
-- 
-
-## 다음 회의
-
-- 일시:
-- 안건:
