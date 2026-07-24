@@ -24,7 +24,6 @@ const ApprovalDetailPage = lazy(() => import("../../domains/approval/pages/Appro
 const ReportBuilderPage = lazy(() => import("../../domains/report/pages/ReportBuilderPage"));
 const PublicReportsPage = lazy(() => import("../../domains/report/pages/PublicReportsPage"));
 const CompanyProfilePage = lazy(() => import("../../domains/company/pages/CompanyProfilePage"));
-const PublicComparePage = lazy(() => import("../../domains/company/pages/PublicComparePage"));
 const UserAdminPage = lazy(() => import("../../domains/admin/pages/UserAdminPage"));
 const AuditLogPage = lazy(() => import("../../domains/admin/pages/AuditLogPage"));
 
@@ -82,7 +81,7 @@ export default function AppRouter() {
 
         <Route path="/public" element={layout([ROLES.EXTERNAL_USER])}>
           <Route index element={<Navigate to="/manager/dashboard" replace />} />
-          <Route path="compare" element={<PublicComparePage />} />
+          <Route path="compare" element={<Navigate to="/public/reports" replace />} />
           <Route path="reports" element={<PublicReportsPage />} />
         </Route>
 

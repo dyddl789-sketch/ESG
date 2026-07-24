@@ -1,5 +1,7 @@
 package com.esg.platform.domain.benchmark.mapper;
 
+import java.util.List;
+
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -27,7 +29,7 @@ public interface ExternalBenchmarkMapper {
 
     ExternalBenchmarkSyncRun findLatestRun(@Param("companyId") Integer companyId);
 
-    Integer findLatestInternalYear(@Param("companyId") Integer companyId);
+    List<Integer> findInternalYears(@Param("companyId") Integer companyId);
 
     Integer findLatestComparableMonth(
             @Param("companyId") Integer companyId,

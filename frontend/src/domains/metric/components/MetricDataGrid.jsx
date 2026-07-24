@@ -24,7 +24,7 @@ export default function MetricDataGrid({ rows, onRowClick }) {
               <td>{index + 1}</td>
               <td><span className={`category category-${String(row.category).toLowerCase()}`}>{categoryLabel(row.category)}</span></td>
               <td><strong>{row.title}</strong><small className="cell-sub">{row.indicatorCode}</small></td>
-              <td><strong>{row.facility}</strong><small className="cell-sub">{row.category === "GOVERNANCE" ? "기업·본사 기준" : "사업장 기준"}</small></td>
+              <td><strong>{row.facility}</strong><small className="cell-sub">{["IND_G_ATTENDANCE", "IND_G_OUTSIDE"].includes(row.indicatorCode) ? "기업 공통" : "사업장 기준"}</small></td>
               <td>{row.period}</td>
               <td><strong>{row.value === null || row.value === undefined ? row.textValue || "-" : formatNumber(row.value, 2)}</strong> <small>{row.value === null || row.value === undefined ? "" : row.unit}</small>{row.indicatorCode === "IND_E_ELEC" && row.shipmentAmountMillionKrw != null && <small className="cell-sub">출하액 {formatNumber(row.shipmentAmountMillionKrw, 2)} 백만원</small>}</td>
               <td>{row.evidence ? "PDF 등록" : "미등록"}</td>

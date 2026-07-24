@@ -10,8 +10,10 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -35,6 +37,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
+import com.esg.platform.domain.company.dto.FacilityDto;
+import com.esg.platform.domain.company.mapper.FacilityMapper;
 import com.esg.platform.domain.documentanalysis.dto.DocumentAnalysisResponse;
 import com.esg.platform.domain.metric.dto.IndicatorResponse;
 import com.esg.platform.domain.metric.dto.MetricCreateRequest;
@@ -88,8 +92,12 @@ public class DocumentAnalysisService {
             Pattern.CASE_INSENSITIVE);
     private static final Pattern SHIPMENT_PATTERN = Pattern.compile(
             "(?:출하액(?:\\s*계)?)\\s*[:：]?\\s*([\\d,]+(?:\\.\\d+)?)\\s*(억원|백만원|천원|원)");
+    private static final Pattern EXPLICIT_FACILITY_PATTERN = Pattern.compile(
+            "(?:대상\\s*사업장|보고\\s*사업장|사업장명|공장명|사업장)\\s*[:：]\\s*([^\\r\\n\\t,;/]{1,50})",
+            Pattern.CASE_INSENSITIVE);
 
     private final MetricMapper metricMapper;
+    private final FacilityMapper facilityMapper;
     private final MetricService metricService;
     private final MetricWorkflowService workflowService;
     private final ObjectMapper objectMapper;
@@ -105,12 +113,21 @@ public class DocumentAnalysisService {
             Integer reportingMonth) {
     }
 
+    private record FacilityMatch(
+            Integer facilityId,
+            String facilityName,
+            String evidence,
+            String status) {
+    }
+
     public DocumentAnalysisService(
             MetricMapper metricMapper,
+            FacilityMapper facilityMapper,
             MetricService metricService,
             MetricWorkflowService workflowService,
             ObjectMapper objectMapper) {
         this.metricMapper = metricMapper;
+        this.facilityMapper = facilityMapper;
         this.metricService = metricService;
         this.workflowService = workflowService;
         this.objectMapper = objectMapper;
@@ -164,12 +181,15 @@ public class DocumentAnalysisService {
         String indicatorCode = result.getIndicatorId() == null
                 ? null
                 : metricMapper.findIndicatorCodeById(result.getIndicatorId());
+        applyFacilityMatch(result, extractedText, uploadedFile, companyId, indicatorCode);
         log.info("[DOCUMENT_AI] 최종 분석 결과 file={} category={} indicatorId={} indicatorCode={} "
-                        + "year={} month={} value={} electricityKwh={} shipmentMillionKrw={} confidence={}",
+                        + "facilityId={} facilityMatch={} year={} month={} value={} electricityKwh={} shipmentMillionKrw={} confidence={}",
                 uploadedFile.getFileName(),
                 result.getDetectedCategory(),
                 result.getIndicatorId(),
                 indicatorCode,
+                result.getFacilityId(),
+                result.getFacilityMatchStatus(),
                 result.getReportingYear(),
                 result.getPeriodValue(),
                 result.getValue(),
@@ -233,10 +253,12 @@ public class DocumentAnalysisService {
             if (value == null && (textValue == null || textValue.isBlank())) {
                 throw new BusinessException(ErrorCode.INVALID_INPUT, "정량 수치 또는 정성 내용을 입력해 주세요.");
             }
-            if (indicatorCode.startsWith("IND_G_")
-                    && !isCompanyWideGovernance(indicatorCode)
-                    && facilityId == null) {
-                facilityId = metricMapper.findHeadquartersFacilityId(companyId.longValue());
+            if (isCompanyWideGovernance(indicatorCode)) {
+                facilityId = null;
+            } else if ("IND_G_ETHICS_EDU".equals(indicatorCode) && facilityId == null) {
+                throw new BusinessException(
+                        ErrorCode.INVALID_INPUT,
+                        "윤리교육 이수율은 AI 분석 결과를 등록할 대상 사업장을 선택해 주세요.");
             }
         }
 
@@ -298,7 +320,9 @@ public class DocumentAnalysisService {
                     + "문서 내용을 읽고 아래 지표 목록 중 가장 적합한 indicatorId와 indicatorCode를 선택하며 "
                     + "반드시 순수 JSON 객체만 반환한다. "
                     + "공통 필드: detectedCategory(ENVIRONMENT/SOCIAL/GOVERNANCE), indicatorId, indicatorCode, "
-                    + "reportingYear, periodValue, value, unit, textValue, type, confidence, date. "
+                    + "reportingYear, periodValue, value, unit, textValue, type, confidence, date, facilityName, facilityEvidence. "
+                    + "facilityName은 문서에 명시된 대상 사업장명만 반환하고, 작성 부서나 추측값은 사용하지 않는다. "
+                    + "대상 사업장이 없거나 여러 곳이면 facilityName은 null로 반환한다. facilityEvidence에는 판단 근거가 된 짧은 원문을 반환한다. "
                     + "보고서 작성일과 보고 기간이 함께 있으면 date는 작성일, reportingYear와 periodValue는 보고 기간 기준으로 반환한다. "
                     + "Scope 2 또는 온실가스 배출량 문서는 IND_E_SCOPE2로 매핑하고 value와 "
                     + "scope2EmissionTco2eq에 tCO2eq 값을 반환한다. 이 경우 electricityUsageKwh는 실제 전력 사용량 수치가 "
@@ -312,7 +336,7 @@ public class DocumentAnalysisService {
                     + "\"textValue\":\"한글 3문장 이내 요약\",\"type\":\"Scope 2 온실가스 배출량 보고서\","
                     + "\"confidence\":95,\"date\":\"2026-07-10\",\"electricityUsageKwh\":null,"
                     + "\"shipmentAmountMillionKrw\":1200,\"total\":0,\"attended\":0,"
-                    + "\"rate\":null,\"agenda\":\"\"}.\n\n"
+                    + "\"rate\":null,\"agenda\":\"\",\"facilityName\":\"대구공장\",\"facilityEvidence\":\"사업장명: 대구공장\"}.\n\n"
                     + "[ESG 지표 마스터 목록]\n" + indicatorContext;
 
             Map<String, Object> requestBody = new HashMap<>();
@@ -451,6 +475,8 @@ public class DocumentAnalysisService {
         return baseResponse(extension, fileUrl)
                 .detectedCategory(category)
                 .indicatorId(indicatorId)
+                .facilityName(textOrNull(result.path("facilityName").asText(null)))
+                .facilityEvidence(textOrNull(result.path("facilityEvidence").asText(null)))
                 .reportingYear(reportingYear)
                 .periodValue(clampMonth(periodValue))
                 .value(genericValue)
@@ -580,6 +606,178 @@ public class DocumentAnalysisService {
                     .append('\n');
         }
         return context.toString();
+    }
+
+
+    private void applyFacilityMatch(
+            DocumentAnalysisResponse result,
+            String extractedText,
+            Path uploadedFile,
+            Long companyId,
+            String indicatorCode) {
+        if (isCompanyWideGovernance(indicatorCode)) {
+            result.setFacilityId(null);
+            result.setFacilityName(null);
+            result.setFacilityEvidence(null);
+            result.setFacilityMatchStatus("COMPANY_WIDE");
+            return;
+        }
+
+        FacilityMatch match = resolveFacilityMatch(
+                companyId,
+                extractedText,
+                originalEvidenceFilename(uploadedFile.getFileName().toString()),
+                result.getFacilityName(),
+                result.getFacilityEvidence());
+        result.setFacilityId(match.facilityId());
+        result.setFacilityName(match.facilityName());
+        result.setFacilityEvidence(match.evidence());
+        result.setFacilityMatchStatus(match.status());
+    }
+
+    private FacilityMatch resolveFacilityMatch(
+            Long companyId,
+            String documentText,
+            String originalFilename,
+            String aiFacilityName,
+            String aiEvidence) {
+        if (companyId == null) {
+            return new FacilityMatch(null, null, null, "UNMATCHED");
+        }
+
+        List<FacilityDto> facilities = facilityMapper.findAllByCompanyId(companyId);
+        if (facilities == null || facilities.isEmpty()) {
+            return new FacilityMatch(null, null, null, "UNMATCHED");
+        }
+
+        Set<FacilityDto> explicitMatches = new LinkedHashSet<>();
+        Matcher explicitMatcher = EXPLICIT_FACILITY_PATTERN.matcher(documentText == null ? "" : documentText);
+        String explicitEvidence = null;
+        while (explicitMatcher.find()) {
+            Set<FacilityDto> matchedCandidates = findMentionedFacilities(facilities, explicitMatcher.group(1));
+            if (matchedCandidates.size() > 1) {
+                return new FacilityMatch(null, null, truncate(explicitMatcher.group(0).trim(), 100), "AMBIGUOUS");
+            }
+            FacilityDto matched = matchedCandidates.size() == 1
+                    ? matchedCandidates.iterator().next()
+                    : matchSingleFacility(facilities, explicitMatcher.group(1));
+            if (matched != null) {
+                explicitMatches.add(matched);
+                if (explicitEvidence == null) {
+                    explicitEvidence = truncate(explicitMatcher.group(0).trim(), 100);
+                }
+            }
+        }
+        if (explicitMatches.size() == 1) {
+            return matchedFacility(explicitMatches.iterator().next(), explicitEvidence);
+        }
+        if (explicitMatches.size() > 1) {
+            return new FacilityMatch(null, null, "문서의 명시적 사업장 항목", "AMBIGUOUS");
+        }
+
+        Set<FacilityDto> aiMatches = findMentionedFacilities(facilities, aiFacilityName);
+        if (aiMatches.size() > 1) {
+            return new FacilityMatch(null, null, textOrNull(aiEvidence), "AMBIGUOUS");
+        }
+        FacilityDto aiMatch = aiMatches.size() == 1
+                ? aiMatches.iterator().next()
+                : matchSingleFacility(facilities, aiFacilityName);
+        if (aiMatch != null) {
+            return matchedFacility(aiMatch, textOrNull(aiEvidence) == null ? "AI 문서 대상 사업장" : aiEvidence);
+        }
+
+        Set<FacilityDto> bodyMatches = findMentionedFacilities(facilities, documentText);
+        if (bodyMatches.size() == 1) {
+            return matchedFacility(bodyMatches.iterator().next(), "문서 제목·본문");
+        }
+        if (bodyMatches.size() > 1) {
+            return new FacilityMatch(null, null, "문서 제목·본문에 여러 사업장 표시", "AMBIGUOUS");
+        }
+
+        Set<FacilityDto> filenameMatches = findMentionedFacilities(facilities, originalFilename);
+        if (filenameMatches.size() == 1) {
+            return matchedFacility(filenameMatches.iterator().next(), "파일명");
+        }
+        if (filenameMatches.size() > 1) {
+            return new FacilityMatch(null, null, "파일명에 여러 사업장 표시", "AMBIGUOUS");
+        }
+        return new FacilityMatch(null, textOrNull(aiFacilityName), textOrNull(aiEvidence), "UNMATCHED");
+    }
+
+    private FacilityMatch matchedFacility(FacilityDto facility, String evidence) {
+        return new FacilityMatch(
+                Math.toIntExact(facility.getId()),
+                facility.getFacilityName(),
+                textOrNull(evidence),
+                "MATCHED");
+    }
+
+    private FacilityDto matchSingleFacility(List<FacilityDto> facilities, String candidate) {
+        String normalizedCandidate = normalizeFacilityText(candidate);
+        if (normalizedCandidate.isBlank()) {
+            return null;
+        }
+        List<FacilityDto> matches = facilities.stream()
+                .filter(facility -> facilityAliases(facility).stream().anyMatch(alias ->
+                        normalizedCandidate.equals(alias)
+                                || normalizedCandidate.startsWith(alias)
+                                || alias.startsWith(normalizedCandidate)))
+                .toList();
+        return matches.size() == 1 ? matches.get(0) : null;
+    }
+
+    private Set<FacilityDto> findMentionedFacilities(List<FacilityDto> facilities, String source) {
+        String normalizedSource = normalizeFacilityText(source);
+        Set<FacilityDto> matches = new LinkedHashSet<>();
+        if (normalizedSource.isBlank()) {
+            return matches;
+        }
+        for (FacilityDto facility : facilities) {
+            boolean mentioned = facilityAliases(facility).stream()
+                    .filter(alias -> alias.length() >= 2)
+                    .anyMatch(normalizedSource::contains);
+            if (mentioned) {
+                matches.add(facility);
+            }
+        }
+        return matches;
+    }
+
+    private Set<String> facilityAliases(FacilityDto facility) {
+        Set<String> aliases = new LinkedHashSet<>();
+        String name = normalizeFacilityText(facility.getFacilityName());
+        if (!name.isBlank()) {
+            aliases.add(name);
+        }
+        if ("HQ".equalsIgnoreCase(facility.getFacilityType())
+                || (facility.getFacilityName() != null && facility.getFacilityName().contains("본사"))) {
+            aliases.add(normalizeFacilityText("본사"));
+            if (facility.getFacilityName() != null && facility.getFacilityName().contains("서울")) {
+                aliases.add(normalizeFacilityText("서울본사"));
+            }
+        }
+        return aliases;
+    }
+
+    private String normalizeFacilityText(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.toLowerCase()
+                .replace("주식회사", "")
+                .replace("㈜", "")
+                .replace("(주)", "")
+                .replace("사업장", "시설")
+                .replace("공장", "시설")
+                .replace("본점", "본사")
+                .replaceAll("[^0-9a-z가-힣]", "");
+    }
+
+    private String textOrNull(String value) {
+        if (value == null || value.trim().isEmpty() || "null".equalsIgnoreCase(value.trim())) {
+            return null;
+        }
+        return value.trim();
     }
 
 

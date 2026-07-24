@@ -8,6 +8,8 @@ import companyApi from "../../company/api/companyApi";
 import Swal from "sweetalert2";
 import "../../../styles/metricform.css"; 
 import { useEsgData } from "../../../app/providers/EsgDataProvider"; 
+import { apiErrorMessage } from "../../../shared/utils/esgFormat";
+import { facilityOperationPeriodError } from "../utils/facilityPeriod";
 
 export default function MetricFormPage() {
   const { metricId } = useParams(); 
@@ -39,7 +41,9 @@ export default function MetricFormPage() {
   const selectedIndicator = indicators.find((indicator) => String(indicator.id) === String(formData.indicatorId));
   const isElectricityMetric = selectedIndicator?.indicatorCode === "IND_E_ELEC";
   const isCompanyWideGovernance = ["IND_G_ATTENDANCE", "IND_G_OUTSIDE"].includes(selectedIndicator?.indicatorCode);
+  const requiresFacility = Boolean(selectedIndicator) && !isCompanyWideGovernance;
   const evidenceLabel = isCompanyWideGovernance ? "기업 거버넌스 증빙 PDF 첨부" : "사업장 ESG 증빙 PDF 첨부";
+  const selectedFacility = facilities.find((facility) => String(facility.id) === String(formData.facilityId));
 
   useEffect(() => {
     const fetchData = async () => {
@@ -180,6 +184,16 @@ export default function MetricFormPage() {
 
   const handleProcessSubmit = async (isApprovalClick = false) => {
     if (!formData.indicatorId) return Swal.fire("알림", "지표를 선택해주세요.", "warning");
+    if (requiresFacility && !formData.facilityId) return Swal.fire("알림", "해당 지표를 측정한 사업장을 선택해주세요.", "warning");
+    if (requiresFacility) {
+      const operationPeriodError = facilityOperationPeriodError({
+        facility: selectedFacility,
+        reportingYear: formData.reportingYear,
+        periodType: formData.periodType,
+        periodValue: formData.periodValue,
+      });
+      if (operationPeriodError) return Swal.fire("등록 기간 확인", operationPeriodError, "warning");
+    }
     if (isElectricityMetric && (!formData.shipmentAmount || Number(formData.shipmentAmount) <= 0)) return Swal.fire("알림", "전력 사용량 등록 시 출하액(백만원)을 입력해주세요.", "warning");
     if (!formData.evidenceFileUrl) return Swal.fire("알림", `${evidenceLabel}가 필요합니다.`, "warning");
 
@@ -221,7 +235,7 @@ export default function MetricFormPage() {
       navigate("/manager/metrics");
     } catch (err) {
       console.error("데이터 저장 실패:", err);
-      Swal.fire("오류", isEditMode ? "데이터 수정 등록에 실패했습니다." : "신규 데이터 등록에 실패했습니다.", "error");
+      Swal.fire("오류", apiErrorMessage(err, isEditMode ? "데이터 수정 등록에 실패했습니다." : "신규 데이터 등록에 실패했습니다."), "error");
     } finally {
       setLoading(false);
     }
@@ -258,13 +272,15 @@ export default function MetricFormPage() {
                 </div>
 
                 <div className="form-group">
-                  <label>사업장</label>
-                  <select name="facilityId" value={formData.facilityId} onChange={handleChange} disabled={isCompanyWideGovernance}>
-                    <option value="">{isCompanyWideGovernance ? "전체 · 기업 기준" : "전체(본사 공통)"}</option>
+                  <label>사업장 {requiresFacility ? "*" : ""}</label>
+                  <select name="facilityId" value={formData.facilityId} onChange={handleChange} disabled={isCompanyWideGovernance} required={requiresFacility}>
+                    <option value="">{isCompanyWideGovernance ? "전체 · 기업 기준" : "사업장을 선택하세요"}</option>
                     {facilities.map(fac => (
                       <option key={fac.id} value={fac.id}>{fac.facility_name || fac.name}</option>
                     ))}
                   </select>
+                  {isCompanyWideGovernance && <small>이사회 참석률과 사외이사 비율은 등록 단계부터 기업 공통 데이터로 저장됩니다.</small>}
+                  {selectedIndicator?.indicatorCode === "IND_G_ETHICS_EDU" && <small>윤리교육 이수율은 선택한 사업장에만 등록되며 전체 조회 시 사업장 승인값을 통합합니다.</small>}
                 </div>
 
                 <div className="form-group">

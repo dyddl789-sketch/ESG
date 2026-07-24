@@ -1,6 +1,6 @@
 /* 파일 위치: src/domains/report/pages/ReportBuilderPage.js */
 /* 버전: v1.11.0 */
-/* 기능 요약: 백엔드 DTO의 period 문자열 포맷("YYYY-MM")을 안전하게 파싱하여 월별 조회가 정상 동작하도록 수정하고, 거버넌스 지표를 '전사 공통'으로 자동 맵핑하여 데이터 누락을 방지합니다. */
+/* 기능 요약: 백엔드 DTO의 기간 포맷을 안전하게 파싱하고, 거버넌스 지표의 기업 공통/사업장별 범위를 구분하여 보고서에 반영합니다. */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactQuill from "react-quill-new";
@@ -38,22 +38,20 @@ const getMonthFromMetric = (metric) => {
   return 0;
 };
 
-/* [핵심 보완] JSONB 형태의 additional_info 내부를 분해하여 사업장 이름을 찾아내고, 거버넌스 지표는 무조건 전사 공통으로 취급합니다. */
+/* [핵심 보완] 이사회 참석률·사외이사 비율만 기업 공통으로, 윤리교육 이수율은 실제 사업장 기준으로 분류합니다. */
+const COMPANY_WIDE_GOVERNANCE_CODES = new Set(["IND_G_ATTENDANCE", "IND_G_OUTSIDE"]);
 const getFacilityName = (metric) => {
-  if (metric.category === "GOVERNANCE") return "전사 공통";
-  
   let info = metric.additionalInfo || metric.additional_info;
-  if (typeof info === 'string') {
-    try { info = JSON.parse(info); } catch (e) { info = {}; }
+  if (typeof info === "string") {
+    try { info = JSON.parse(info); } catch { info = {}; }
   } else if (!info) {
     info = {};
   }
-  
-  if (info.scope === "COMPANY") return "전사 공통";
-  if (metric.facilityName) return metric.facilityName;
-  if (info.facilityName) return info.facilityName;
-  
-  return "전사 공통";
+
+  if (COMPANY_WIDE_GOVERNANCE_CODES.has(metric.indicatorCode) || info.scope === "COMPANY") {
+    return "전사 공통";
+  }
+  return metric.facilityName || metric.facility || info.facilityName || "사업장 미지정";
 };
 
 /* [기능 설명] 필터링 및 집계가 완료된 데이터를 받아 표(Table) HTML 마크업으로 변환합니다. */
@@ -174,7 +172,7 @@ export default function ReportBuilderPage() {
         if (Number(mYear) !== Number(reportYear)) return false;
         
         const fName = getFacilityName(metric);
-        // 거버넌스 등 '전사 공통'은 어느 사업장을 선택해도 통과시킵니다.
+        // 기업 공통 지표만 어느 사업장을 선택해도 포함하고, 윤리교육은 선택 사업장 값만 포함합니다.
         if (builderState.scope !== "전체 사업장" && fName !== builderState.scope && fName !== "전사 공통") return false;
         
         // 월 필터링 로직 수정 (문자열 파싱 처리 추가)

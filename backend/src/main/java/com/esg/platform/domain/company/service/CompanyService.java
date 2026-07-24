@@ -1,5 +1,6 @@
 package com.esg.platform.domain.company.service;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -9,6 +10,7 @@ import com.esg.platform.domain.company.dto.CompanyDto;
 import com.esg.platform.domain.company.dto.FacilityDto;
 import com.esg.platform.domain.company.mapper.CompanyMapper;
 import com.esg.platform.domain.company.mapper.FacilityMapper;
+import com.esg.platform.global.cache.EsgCacheService;
 import com.esg.platform.global.exception.BusinessException;
 import com.esg.platform.global.exception.ErrorCode;
 
@@ -24,6 +26,7 @@ public class CompanyService {
 
     private final CompanyMapper companyMapper;
     private final FacilityMapper facilityMapper;
+    private final EsgCacheService cacheService;
 
     @Transactional(readOnly = true)
     public CompanyDto getCompany() {
@@ -34,6 +37,7 @@ public class CompanyService {
     public CompanyDto updateCompany(CompanyDto dto) {
         dto.setId(COMPANY_ID);
         companyMapper.update(dto);
+        cacheService.evictCompanyAfterCommit(COMPANY_ID);
         log.info("[COMPANY] 기업 기본정보 수정 companyId={}", COMPANY_ID);
         return companyMapper.findById(COMPANY_ID);
     }
@@ -54,30 +58,50 @@ public class CompanyService {
 
     @Transactional
     public FacilityDto createFacility(FacilityDto dto) {
+        normalizeNewFacilityOperationPeriod(dto);
+        validateOperationPeriod(dto);
         facilityMapper.insert(COMPANY_ID, dto);
+        cacheService.evictCompanyAfterCommit(COMPANY_ID);
         log.info(
-                "[FACILITY] 사업장 등록 companyId={} facilityId={} facilityName={} type={} hasCoordinates={}",
+                "[FACILITY] 사업장 등록 companyId={} facilityId={} facilityName={} type={} operationStart={} operationEnd={} hasCoordinates={}",
                 COMPANY_ID,
                 dto.getId(),
                 dto.getFacilityName(),
                 dto.getFacilityType(),
+                dto.getOperationStartDate(),
+                dto.getOperationEndDate(),
                 dto.getLatitude() != null && dto.getLongitude() != null);
         return getFacility(dto.getId());
     }
 
     @Transactional
     public FacilityDto updateFacility(Long id, FacilityDto dto) {
-        getFacility(id);
+        FacilityDto current = getFacility(id);
         dto.setId(id);
+        if (dto.getOperationStartDate() == null) {
+            dto.setOperationStartDate(current.getOperationStartDate());
+        }
+        if (Boolean.FALSE.equals(dto.getActive()) && dto.getOperationEndDate() == null) {
+            dto.setOperationEndDate(LocalDate.now());
+        }
+        if (Boolean.TRUE.equals(dto.getActive()) && dto.getOperationEndDate() != null
+                && dto.getOperationEndDate().isBefore(LocalDate.now())) {
+            dto.setOperationEndDate(null);
+        }
+        validateOperationPeriod(dto);
+
         int updated = facilityMapper.update(COMPANY_ID, dto);
         if (updated == 0) {
             throw new BusinessException(ErrorCode.FACILITY_NOT_FOUND);
         }
+        cacheService.evictCompanyAfterCommit(COMPANY_ID);
         log.info(
-                "[FACILITY] 사업장 수정 companyId={} facilityId={} facilityName={} hasCoordinates={}",
+                "[FACILITY] 사업장 수정 companyId={} facilityId={} facilityName={} operationStart={} operationEnd={} hasCoordinates={}",
                 COMPANY_ID,
                 id,
                 dto.getFacilityName(),
+                dto.getOperationStartDate(),
+                dto.getOperationEndDate(),
                 dto.getLatitude() != null && dto.getLongitude() != null);
         return getFacility(id);
     }
@@ -89,6 +113,29 @@ public class CompanyService {
         if (deleted == 0) {
             throw new BusinessException(ErrorCode.FACILITY_NOT_FOUND);
         }
+        cacheService.evictCompanyAfterCommit(COMPANY_ID);
         log.info("[FACILITY] 사업장 삭제 companyId={} facilityId={}", COMPANY_ID, id);
+    }
+
+    private void normalizeNewFacilityOperationPeriod(FacilityDto dto) {
+        if (dto.getOperationStartDate() == null) {
+            dto.setOperationStartDate(LocalDate.now());
+        }
+        if (dto.getActive() == null) {
+            dto.setActive(Boolean.TRUE);
+        }
+        if (Boolean.FALSE.equals(dto.getActive()) && dto.getOperationEndDate() == null) {
+            dto.setOperationEndDate(LocalDate.now());
+        }
+    }
+
+    private void validateOperationPeriod(FacilityDto dto) {
+        if (dto.getOperationStartDate() == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "사업장 운영 시작일을 입력해 주세요.");
+        }
+        if (dto.getOperationEndDate() != null
+                && dto.getOperationEndDate().isBefore(dto.getOperationStartDate())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "사업장 운영 종료일은 운영 시작일보다 빠를 수 없습니다.");
+        }
     }
 }
