@@ -19,12 +19,12 @@
 
 docs/  
 ├── README.md  
-├── [01-planning](https://github.com/dyddl789-sketch/ESG/tree/feature/docs/docs/01-planning)/  
-├── [02-design](https://github.com/dyddl789-sketch/ESG/tree/feature/docs/docs/02-design)/  
-├── [03-api](https://github.com/dyddl789-sketch/ESG/tree/feature/docs/docs/03-api)/  
-├── [04-test](https://github.com/dyddl789-sketch/ESG/tree/feature/docs/docs/04-test)/  
-├── [05-presentation](https://github.com/dyddl789-sketch/ESG/tree/feature/docs/docs/05-presentation)/  
-└── [meeting-notes](https://github.com/dyddl789-sketch/ESG/tree/feature/docs/docs/meeting-notes)/  
+├── [01-planning](./01-planning)/  
+├── [02-design](./02-design)/  
+├── [03-api](./03-api)/  
+├── [04-test](./04-test)/  
+├── [05-presentation](./05-presentation)/  
+└── [meeting-notes](./meeting-notes)/  
 
 각 폴더에는 문서 목록을 빠르게 확인할 수 있도록 필요할 경우 `README.md` 또는 `INDEX.md`를 둡니다.
 
@@ -38,18 +38,19 @@ docs/
 
 ### 저장할 문서
 
-- 프로젝트 제안서 및 개요
+- [프로젝트 제안서 및 개요](./01-planning/project-overview.md)
 - 사용자 요구사항 정의서
 - 기능 요구사항·비기능 요구사항
 - 프로젝트 범위와 MVP 정의
 - WBS 및 개발 일정
-- 팀원 역할 분담표
-- 메뉴 구조도
-- 사용자 권한 정의
+- [팀원 역할 분담표](./01-planning/team-roles.md)
+- [메뉴 구조도](./01-planning/menu-structure.png)
+- [사용자 권한 정의](./01-planning/role-definition.md)
 - 유스케이스 목록
 - 데이터 수집 시나리오
 - 기술 선정 근거
 - 리스크 및 대응 계획
+- [주간 보고서](./01-planning/weekly-report.xls)
 
 ### 파일 예시
 
@@ -79,12 +80,12 @@ docs/
 
 ### 저장할 문서
 
-- ESG 업무흐름도
-- 시스템 아키텍처
+- [ESG 업무흐름도](./02-design/images/workflow/esg-business-workflow.png)
+- [시스템 아키텍처](./02-design/images/architecture/system-architecture.png)
 - 배포 아키텍처
 - 데이터 수집·승인 흐름도
-- ERD
-- 테이블 정의서
+- [ERD](./02-design/images/erd/erd.png)
+- [테이블 정의서](./02-design/images/workflow/esg-business-workflow.png)
 - Redis Key 설계서
 - 화면설계서
 - 와이어프레임
@@ -93,6 +94,7 @@ docs/
 - 시퀀스 다이어그램
 - 파일 저장 및 S3 연동 설계
 - AI 문서 분석 처리 흐름
+- [프로그램 기술서](./02-design/software-specification.docx)
 
 ### 파일 예시
 
@@ -237,14 +239,16 @@ Postman 실제 환경파일에 API Key나 토큰이 들어 있다면 업로드�
 
 ---
 
-## 3.5 `05-presentation` — 발표 및 시연 자료
+## 3.5 [`05-presentation`](./05-presentation) — 발표 및 시연 자료
 
 최종 발표와 시연에 필요한 자료를 관리합니다.
 
 ### 저장할 문서
 
-- 중간·최종 발표 PPT
-- 발표 대본
+- [중간 발표 PPT](./05-presentation/midterm-presentation.pptx)
+- [중간 발표 대본](./05-presentation/midterm-script.md)
+- [최종 발표 PPT](./05-presentation/final-presentation.pdf)
+- [최종 발표 대본](./05-presentation/final-script.md)
 - 시연 시나리오
 - 슬라이드별 이미지·코드 배치표
 - 발표용 시스템 구조도
@@ -252,6 +256,7 @@ Postman 실제 환경파일에 API Key나 토큰이 들어 있다면 업로드�
 - 시연 영상 링크 문서
 - 예상 질문과 답변
 - 최종 제출 파일 목록
+- [결과 보고서](./05-presentation/result-report.pdf)
 
 ### 파일 예시
 
@@ -300,7 +305,10 @@ meeting-notes/
 ├── 2026-07-07_kickoff.md
 ├── 2026-07-10_database-design.md
 └── 2026-07-14_frontend-review.md
-```
+```    
+  
+### 파일  
+- [2026-07-08_screen-design.md](./meeting-notes/2026-07-08_screen-design.md)
 
 ### 회의록 템플릿
 

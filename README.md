@@ -295,7 +295,7 @@ domain/environment/
 └── exception/
     └── EnvironmentDataNotFoundException.java
 ```
-> [Backend domain](https://github.com/dyddl789-sketch/ESG/blob/feature/docs/docs/02-design/directory-structure.md#11-domain)을 선택하면 백엔드 도메인의 내부 경로를 확인할 수 있습니다.  
+> [`Backend domain`](https://github.com/dyddl789-sketch/ESG/blob/feature/docs/docs/02-design/directory-structure.md#11-domain)을 선택하면 백엔드 도메인의 내부 경로를 확인할 수 있습니다.  
   
 
 ### MyBatis XML 경로
@@ -589,18 +589,18 @@ docker compose logs -f
 
 | 파일 | 역할 | GitHub 업로드 | 수정 시 주의사항 |
 |---|---|---|---|
-| `README.md` | 프로젝트 목적, 기술 스택, 실행 방법, 저장소 구조를 안내하는 대표 문서 | 포함 | 구조·실행 방법이 변경되면 함께 수정 |
-| `CONTRIBUTING.md` | 브랜치, 커밋, PR, 코드 리뷰, 폴더 규칙을 정의하는 공식 협업 규칙 | 포함 | 협업 규칙의 원본 문서로 사용 |
-| `.editorconfig` | Java는 4칸, React·JSON·CSS는 2칸 등 IDE 공통 편집 형식을 지정 | 포함 | 개인 취향으로 임의 변경하지 않음 |
-| `.gitattributes` | Windows와 Linux 사이의 줄바꿈 차이를 제어하고 불필요한 전체 파일 변경을 방지 | 포함 | 배치 파일은 CRLF, 소스 파일은 LF 유지 |
-| `.gitignore` | `node_modules`, `dist`, IDE 설정, 로그 등 Git에 올리지 않을 파일을 정의 | 포함 | 필요한 소스나 설정 파일을 실수로 제외하지 않도록 확인 |
-| `.env.example` | 프로젝트 실행에 필요한 환경변수 이름만 제공하는 견본 | 포함 | 실제 비밀번호·키·토큰은 절대 작성하지 않음 |
+| [`README.md`](./README.md) | 프로젝트 목적, 기술 스택, 실행 방법, 저장소 구조를 안내하는 대표 문서 | 포함 | 구조·실행 방법이 변경되면 함께 수정 |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | 브랜치, 커밋, PR, 코드 리뷰, 폴더 규칙을 정의하는 공식 협업 규칙 | 포함 | 협업 규칙의 원본 문서로 사용 |
+| [`.editorconfig`](./.editorconfig) | Java는 4칸, React·JSON·CSS는 2칸 등 IDE 공통 편집 형식을 지정 | 포함 | 개인 취향으로 임의 변경하지 않음 |
+| [`.gitattributes`](./.gitattributes) | Windows와 Linux 사이의 줄바꿈 차이를 제어하고 불필요한 전체 파일 변경을 방지 | 포함 | 배치 파일은 CRLF, 소스 파일은 LF 유지 |
+| [`.gitignore`](./.gitignore) | `node_modules`, `dist`, IDE 설정, 로그 등 Git에 올리지 않을 파일을 정의 | 포함 | 필요한 소스나 설정 파일을 실수로 제외하지 않도록 확인 |
+| [`.env.example`](./.env.example) | 프로젝트 실행에 필요한 환경변수 이름만 제공하는 견본 | 포함 | 실제 비밀번호·키·토큰은 절대 작성하지 않음 |
 | `.env` | 각 개발자의 실제 로컬 환경변수 | 제외 | GitHub·Slack·Notion에 업로드 금지 |
-| `docker-compose.yml` | Frontend, Backend, PostgreSQL, Redis 등의 컨테이너 실행 구성을 정의 | 포함 | 서비스명과 환경변수 변경 시 팀에 공지 |
+| [`docker-compose.yml`](./docker-compose.yml) | Frontend, Backend, PostgreSQL, Redis 등의 컨테이너 실행 구성을 정의 | 포함 | 서비스명과 환경변수 변경 시 팀에 공지 |
 
 ## 12.1 현재 설정 파일의 실제 의미
 
-### `.editorconfig`
+### [`.editorconfig`](./.editorconfig)
 
 ```text
 전체 파일: UTF-8, LF, 마지막 줄 추가, 불필요한 공백 제거
@@ -609,7 +609,7 @@ JS/JSX/TS/JSON/CSS/HTML/YAML: 공백 2칸
 Markdown: 문장 끝 공백 유지 허용
 ```
 
-### `.env.example`
+### [`.env.example`](./.env.example)
 
 현재 프로젝트에서 사용하는 환경변수의 이름과 형식을 알려줍니다.
 
@@ -632,14 +632,14 @@ copy .env.example .env
 cp .env.example .env
 ```
 
-### `.gitattributes`
+### [`.gitattributes`](./.gitattributes)
 
 ```text
 Java, JavaScript, JSX, YAML, Shell Script → LF
 Windows BAT, CMD → CRLF
 ```
 
-### `.gitignore`
+### [`.gitignore`](./.gitignore)
 
 현재 다음 항목은 GitHub에 올라가지 않습니다.
 
@@ -682,4 +682,3 @@ docs/
 4. 변경 이력은 Git 커밋과 PR로 관리하며 `최종`, `진짜최종`, `최종수정2` 같은 이름을 사용하지 않습니다.
 5. API·DB·화면 흐름이 변경되면 관련 문서를 같은 PR에서 함께 수정합니다.
 6. 실제 개인정보, 운영 DB 백업, 비밀키, 인증서, 대용량 원본 영상은 올리지 않습니다.
-
