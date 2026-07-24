@@ -15,6 +15,7 @@ import com.esg.platform.domain.metric.dto.MetricBatchResult;
 import com.esg.platform.domain.metric.dto.MetricDto;
 import com.esg.platform.domain.metric.dto.MetricScoreValueDto;
 import com.esg.platform.domain.metric.mapper.MetricMapper;
+import com.esg.platform.global.cache.EsgCacheService;
 import com.esg.platform.global.exception.BusinessException;
 import com.esg.platform.global.exception.ErrorCode;
 
@@ -30,6 +31,7 @@ public class MetricWorkflowService {
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
     private final MetricMapper metricMapper;
+    private final EsgCacheService cacheService;
 
     @Transactional(readOnly = true)
     public List<MetricDto> getMetrics(
@@ -114,6 +116,7 @@ public class MetricWorkflowService {
                 "등록값과 증빙자료를 확인하여 최종 승인을 요청했습니다.",
                 userId);
 
+        cacheService.evictCompanyAfterCommit(COMPANY_ID);
         log.info("[ESG_APPROVAL] 승인 요청 metricId={} period={} category={} facilityId={} userId={}",
                 id, metric.getPeriod(), metric.getCategory(), metric.getFacilityId(), userId);
         return getMetric(id, false);
@@ -143,6 +146,7 @@ public class MetricWorkflowService {
                 "등록값과 증빙자료를 확인하여 최종 승인했습니다.",
                 userId);
         refreshScore(metric.getPeriod());
+        cacheService.evictCompanyAfterCommit(COMPANY_ID);
 
         log.info("[ESG_APPROVAL] 최종 승인 metricId={} period={} category={} facilityId={} approverUserId={}",
                 id, metric.getPeriod(), metric.getCategory(), metric.getFacilityId(), userId);
@@ -178,6 +182,7 @@ public class MetricWorkflowService {
                 normalizedReason,
                 userId);
         refreshScore(metric.getPeriod());
+        cacheService.evictCompanyAfterCommit(COMPANY_ID);
 
         log.info("[ESG_APPROVAL] 반려 metricId={} period={} category={} facilityId={} approverUserId={} reasonLength={}",
                 id, metric.getPeriod(), metric.getCategory(), metric.getFacilityId(), userId, normalizedReason.length());

@@ -16,8 +16,6 @@ import com.esg.platform.domain.benchmark.dto.ExternalBenchmarkValue;
 import com.esg.platform.domain.benchmark.dto.InternalBenchmarkAggregate;
 import com.esg.platform.domain.benchmark.mapper.ExternalBenchmarkMapper;
 import com.esg.platform.domain.benchmark.service.PublicDataBenchmarkClient.FetchedValue;
-import com.esg.platform.global.exception.BusinessException;
-import com.esg.platform.global.exception.ErrorCode;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -78,12 +76,9 @@ public class ExternalBenchmarkService {
         ExternalBenchmarkValue shipment = mapper.findValue(
                 companyId, externalBaseYear, industryCode, "SHIPMENT");
 
-        Integer internalYear = requestedInternalYear != null
-                ? requestedInternalYear
-                : mapper.findLatestInternalYear(companyId);
-        Integer throughMonth = internalYear == null
-                ? null
-                : mapper.findLatestComparableMonth(companyId, internalYear);
+        ComparablePeriod comparablePeriod = resolveComparablePeriod(companyId, requestedInternalYear);
+        Integer internalYear = comparablePeriod.year();
+        Integer throughMonth = comparablePeriod.throughMonth();
         InternalBenchmarkAggregate internal = throughMonth == null
                 ? null
                 : mapper.findInternalAggregate(companyId, internalYear, throughMonth);
@@ -94,10 +89,8 @@ public class ExternalBenchmarkService {
         BigDecimal internalCarbonIntensity = divide(
                 internal == null ? null : internal.getScope2Tco2eq(),
                 internal == null ? null : internal.getShipmentHundredMillionKrw());
-        BigDecimal externalElectricityIntensity = divide(
-                valueOf(electricity), valueOf(shipment));
-        BigDecimal externalCarbonIntensity = divide(
-                valueOf(greenhouseGas), valueOf(shipment));
+        BigDecimal externalElectricityIntensity = divide(valueOf(electricity), valueOf(shipment));
+        BigDecimal externalCarbonIntensity = divide(valueOf(greenhouseGas), valueOf(shipment));
 
         String sourceUpdatedAt = Stream.of(electricity, greenhouseGas, shipment)
                 .filter(Objects::nonNull)
@@ -107,6 +100,17 @@ public class ExternalBenchmarkService {
                 .orElse(null);
 
         String status = latestRun == null ? "NOT_SYNCED" : latestRun.getStatus();
+        String internalPeriodLabel = createInternalPeriodLabel(internalYear, throughMonth);
+        boolean provisional = throughMonth != null && throughMonth < 12;
+
+        log.info(
+                "[EXTERNAL_BENCHMARK] 내부 비교 조회 companyId={} requestedYear={} resolvedYear={} throughMonth={} matchedFacilityMonths={}",
+                companyId,
+                requestedInternalYear,
+                internalYear,
+                throughMonth,
+                internal == null ? null : internal.getMatchedFacilityMonths());
+
         return ExternalBenchmarkResponse.builder()
                 .status(status)
                 .lastSyncedAt(latestRun == null ? null : latestRun.getCompletedAt())
@@ -119,10 +123,8 @@ public class ExternalBenchmarkService {
                 .sourceUpdatedAt(sourceUpdatedAt)
                 .internalBaseYear(internalYear)
                 .internalThroughMonth(throughMonth)
-                .internalPeriodLabel(internalYear == null || throughMonth == null
-                        ? "비교 가능한 승인 데이터 없음"
-                        : internalYear + "년 1~" + throughMonth + "월 승인완료 누적")
-                .provisional(throughMonth != null && throughMonth < 12)
+                .internalPeriodLabel(internalPeriodLabel)
+                .provisional(provisional)
                 .internalElectricityMwh(internal == null ? null : internal.getElectricityMwh())
                 .internalShipmentHundredMillionKrw(internal == null ? null : internal.getShipmentHundredMillionKrw())
                 .internalScope2Tco2eq(internal == null ? null : internal.getScope2Tco2eq())
@@ -134,8 +136,45 @@ public class ExternalBenchmarkService {
                 .carbonImprovementPercent(improvement(externalCarbonIntensity, internalCarbonIntensity))
                 .electricityUnit("MWh/출하액 1억원")
                 .carbonUnit("tCO2eq/출하액 1억원")
-                .methodologyNote("외부 기준은 2021년 C303 연간 공공통계이며, 내부 값은 전력·Scope 2·출하액이 모두 승인된 최신 월까지 누적한 잠정 비교입니다.")
+                .methodologyNote(createMethodologyNote(internalYear, throughMonth))
                 .build();
+    }
+
+    private ComparablePeriod resolveComparablePeriod(Integer companyId, Integer requestedInternalYear) {
+        if (requestedInternalYear != null) {
+            return new ComparablePeriod(
+                    requestedInternalYear,
+                    mapper.findLatestComparableMonth(companyId, requestedInternalYear));
+        }
+
+        for (Integer candidateYear : mapper.findInternalYears(companyId)) {
+            Integer comparableMonth = mapper.findLatestComparableMonth(companyId, candidateYear);
+            if (comparableMonth != null) {
+                return new ComparablePeriod(candidateYear, comparableMonth);
+            }
+        }
+        return new ComparablePeriod(null, null);
+    }
+
+    private String createInternalPeriodLabel(Integer year, Integer throughMonth) {
+        if (year == null || throughMonth == null) {
+            return "비교 가능한 승인 데이터 없음";
+        }
+        if (throughMonth == 12) {
+            return year + "년 연간 승인완료 실적";
+        }
+        return year + "년 1~" + throughMonth + "월 승인완료 누적";
+    }
+
+    private String createMethodologyNote(Integer year, Integer throughMonth) {
+        if (year == null || throughMonth == null) {
+            return "전력·Scope 2·출하액이 모두 승인된 사업장 데이터가 필요합니다. 신규 사업장은 운영 시작월 이전 비교 대상에서 제외됩니다.";
+        }
+        if (throughMonth == 12) {
+            return "외부 기준은 2021년 C303 연간 공공통계이며, 내부 값은 해당 연도 운영 사업장의 1~12월 승인 완료 합계로 계산한 연간 확정 비교입니다.";
+        }
+        return "외부 기준은 2021년 C303 연간 공공통계이며, 내부 값은 월별 운영 대상 사업장의 전력·Scope 2·출하액이 모두 승인된 "
+                + year + "년 " + throughMonth + "월까지의 누적 잠정 비교입니다.";
     }
 
     private BigDecimal valueOf(ExternalBenchmarkValue value) {
@@ -157,5 +196,8 @@ public class ExternalBenchmarkService {
                 .divide(external, 6, RoundingMode.HALF_UP)
                 .multiply(HUNDRED)
                 .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private record ComparablePeriod(Integer year, Integer throughMonth) {
     }
 }

@@ -59,7 +59,6 @@ export const NAVIGATION = Object.freeze({
       { to: "/manager/benchmarks", icon: "compare", label: "외부 데이터 비교" },
     ]},
     { label: "성과·보고", items: [
-      { to: "/public/compare", icon: "compare", label: "연도별 실적 비교" },
       { to: "/public/reports", icon: "report", label: "공개 보고서" },
     ]},
     { label: "기업 정보", items: [

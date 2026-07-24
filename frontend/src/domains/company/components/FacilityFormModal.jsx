@@ -4,16 +4,20 @@ import AddressSearchField from "./AddressSearchField";
 import { CustomInput, CustomSelect } from "./CompanyUI";
 import { normalizeFacility } from "../utils/facilityData";
 
+const today = () => new Date().toISOString().slice(0, 10);
+
 const createInitialForm = (facility) => {
   if (!facility) {
     return {
       facility_name: "",
       facility_type: "FACTORY",
       address: "",
-      contract_power_kw: 0,
+      contract_power_kw: "",
       manager_name: "",
       manager_phone: "",
       is_active: true,
+      operation_start_date: today(),
+      operation_end_date: "",
       latitude: null,
       longitude: null,
     };
@@ -25,10 +29,12 @@ const createInitialForm = (facility) => {
     facility_name: normalized.facilityName,
     facility_type: normalized.facilityType,
     address: normalized.address === "주소 미등록" ? "" : normalized.address,
-    contract_power_kw: normalized.contractPowerKw,
+    contract_power_kw: normalized.contractPowerKw ?? "",
     manager_name: normalized.managerName === "담당자 미지정" ? "" : normalized.managerName,
     manager_phone: normalized.managerPhone,
     is_active: normalized.active,
+    operation_start_date: normalized.operationStartDate || today(),
+    operation_end_date: normalized.operationEndDate || "",
     latitude: normalized.latitude,
     longitude: normalized.longitude,
   };
@@ -43,17 +49,18 @@ export default function FacilityFormModal({ facility, onClose, onSave }) {
     const { name, value, type, checked } = event.target;
     setFormData((current) => ({
       ...current,
-      [name]: type === "checkbox"
-        ? checked
-        : name === "contract_power_kw"
-          ? Number(value)
-          : value,
+      [name]: type === "checkbox" ? checked : value,
     }));
   };
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    onSave(formData);
+    const payload = {
+      ...formData,
+      contract_power_kw: formData.contract_power_kw === "" ? null : Number(formData.contract_power_kw),
+      operation_end_date: formData.operation_end_date || null,
+    };
+    onSave(payload);
   };
 
   return (
@@ -63,7 +70,7 @@ export default function FacilityFormModal({ facility, onClose, onSave }) {
           <div>
             <span className="section-kicker">FACILITY MASTER DATA</span>
             <h2>{isEdit ? "사업장 정보 수정" : "신규 사업장 등록"}</h2>
-            <p>ESG 실적이 연결될 사업장 기준정보를 입력합니다.</p>
+            <p>ESG 실적이 연결될 사업장 기준정보와 실제 운영 기간을 입력합니다.</p>
           </div>
           <button type="button" className="modal-close-button" onClick={onClose} aria-label="닫기">×</button>
         </header>
@@ -99,12 +106,31 @@ export default function FacilityFormModal({ facility, onClose, onSave }) {
             <CustomInput
               label="한전 계약전력 (kW)"
               type="number"
-              min="0"
+              min="0.01"
+              step="0.01"
               name="contract_power_kw"
               value={formData.contract_power_kw}
               onChange={handleChange}
-              placeholder="0"
+              placeholder="계약전력을 입력하세요"
               required
+            />
+
+            <CustomInput
+              label="운영 시작일"
+              type="date"
+              name="operation_start_date"
+              value={formData.operation_start_date}
+              onChange={handleChange}
+              required
+            />
+
+            <CustomInput
+              label="운영 종료일"
+              type="date"
+              name="operation_end_date"
+              value={formData.operation_end_date}
+              onChange={handleChange}
+              min={formData.operation_start_date || undefined}
             />
 
             <CustomInput
@@ -139,7 +165,7 @@ export default function FacilityFormModal({ facility, onClose, onSave }) {
             </label>
           </div>
 
-          <p className="form-required-note"><span>*</span> 표시는 필수 입력 항목입니다.</p>
+          <p className="form-required-note"><span>*</span> 운영 시작일은 기간별 외부데이터 비교 대상 사업장을 판정하는 기준입니다.</p>
 
           <footer className="form-modal-footer">
             <Button type="button" variant="outline" onClick={onClose}>취소</Button>

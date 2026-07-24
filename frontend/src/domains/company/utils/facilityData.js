@@ -28,6 +28,8 @@ export const normalizeFacility = (facility, index = 0) => {
     managerName: valueOf(facility, "managerName", "manager_name") || "담당자 미지정",
     managerPhone: valueOf(facility, "managerPhone", "manager_phone") || "",
     active: valueOf(facility, "active", "is_active") !== false,
+    operationStartDate: valueOf(facility, "operationStartDate", "operation_start_date"),
+    operationEndDate: valueOf(facility, "operationEndDate", "operation_end_date"),
     createdAt: valueOf(facility, "createdAt", "created_at"),
     latitude: Number(valueOf(facility, "latitude")) || fallback.latitude,
     longitude: Number(valueOf(facility, "longitude")) || fallback.longitude,

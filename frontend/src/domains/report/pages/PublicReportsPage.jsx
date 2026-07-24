@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import html2pdf from "html2pdf.js";
 import PageHeader from "../../../shared/components/PageHeader";
 import Card from "../../../shared/components/Card";
 import DataTable from "../../../shared/components/DataTable";
@@ -14,6 +15,7 @@ export default function PublicReportsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState("latest");
   const [currentPage, setCurrentPage] = useState(1);
+  const [downloadingId, setDownloadingId] = useState(null);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -58,8 +60,147 @@ export default function PublicReportsPage() {
     void Promise.resolve().then(() => setCurrentPage(1));
   }, [searchTerm, sortOrder]);
 
-  const handleDownload = (fileUrl) => {
-    window.open(fileUrl, "_blank");
+  const handleDownload = async (report) => {
+    if (!report?.content) {
+      window.alert("다운로드할 보고서 본문이 없습니다. 관리자에게 보고서 저장 상태를 확인해 주세요.");
+      return;
+    }
+
+    setDownloadingId(report.id);
+
+    const container = document.createElement("section");
+    const safeTitle = String(report.title || "ESG_공개_보고서")
+      .replace(/[\\/:*?"<>|]/g, "_")
+      .trim();
+    const reportYear = report.target_year || new Date(report.created_at).getFullYear();
+    const issuedAt = new Date(report.created_at).toLocaleDateString("ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+
+    container.style.width = "190mm";
+    container.style.padding = "8mm";
+    container.style.background = "#ffffff";
+    container.style.color = "#111827";
+    container.style.fontFamily = 'Arial, "Noto Sans KR", sans-serif';
+    container.style.fontSize = "12px";
+    container.style.lineHeight = "1.7";
+    // html2canvas는 화면 밖(-10000px)에 배치된 요소를 빈 캔버스로 처리할 수 있습니다.
+    // 실제 화면 좌표에 렌더링하고, 별도 로딩 오버레이로 사용자에게만 가립니다.
+    container.style.position = "fixed";
+    container.style.left = "0";
+    container.style.top = "0";
+    container.style.zIndex = "2147483646";
+    container.style.boxSizing = "border-box";
+    container.style.pointerEvents = "none";
+
+    const header = document.createElement("header");
+    header.innerHTML = `
+      <div style="color:#166534;font-size:13px;font-weight:700;letter-spacing:1px;">${reportYear} SUSTAINABILITY REPORT</div>
+      <h1 style="margin:10px 0 14px;padding-bottom:12px;border-bottom:3px solid #166534;font-size:26px;line-height:1.35;">${report.title}</h1>
+      <div style="margin-bottom:22px;padding-bottom:8px;border-bottom:1px solid #cbd5e1;color:#64748b;font-size:11px;">
+        보고 연도: ${reportYear}년 · 보고 범위: ${report.scope || "전체 사업장"} · 발행일: ${issuedAt}
+      </div>
+    `;
+
+    const body = document.createElement("article");
+    const rawContent = String(report.content || "").trim();
+    const containsHtml = /<\/?[a-z][\s\S]*>/i.test(rawContent);
+
+    if (containsHtml) {
+      body.innerHTML = rawContent;
+    } else {
+      body.textContent = rawContent;
+      body.style.whiteSpace = "pre-wrap";
+      body.style.wordBreak = "keep-all";
+    }
+
+    body.querySelectorAll("script, iframe, object, embed").forEach((node) => node.remove());
+    body.querySelectorAll("*").forEach((node) => {
+      [...node.attributes].forEach((attribute) => {
+        if (attribute.name.toLowerCase().startsWith("on")) {
+          node.removeAttribute(attribute.name);
+        }
+      });
+    });
+    body.querySelectorAll("table").forEach((table) => {
+      table.style.width = "100%";
+      table.style.borderCollapse = "collapse";
+      table.style.margin = "12px 0";
+    });
+    body.querySelectorAll("th, td").forEach((cell) => {
+      cell.style.border = "1px solid #cbd5e1";
+      cell.style.padding = "7px";
+      cell.style.verticalAlign = "top";
+    });
+    body.querySelectorAll("img").forEach((image) => {
+      image.style.maxWidth = "100%";
+      image.style.height = "auto";
+    });
+
+    const loadingOverlay = document.createElement("div");
+    loadingOverlay.style.position = "fixed";
+    loadingOverlay.style.inset = "0";
+    loadingOverlay.style.zIndex = "2147483647";
+    loadingOverlay.style.display = "flex";
+    loadingOverlay.style.alignItems = "center";
+    loadingOverlay.style.justifyContent = "center";
+    loadingOverlay.style.background = "rgba(255, 255, 255, 0.98)";
+    loadingOverlay.style.color = "#166534";
+    loadingOverlay.style.fontSize = "15px";
+    loadingOverlay.style.fontWeight = "700";
+    loadingOverlay.textContent = "공개 보고서 PDF를 생성하고 있습니다...";
+
+    container.appendChild(header);
+    container.appendChild(body);
+    document.body.appendChild(container);
+    document.body.appendChild(loadingOverlay);
+
+    try {
+      // DOM 배치·웹폰트·이미지 로딩이 끝난 뒤 캡처해야 빈 PDF가 생성되지 않습니다.
+      await new Promise((resolve) => {
+        window.requestAnimationFrame(() => window.requestAnimationFrame(resolve));
+      });
+
+      if (document.fonts?.ready) {
+        await document.fonts.ready;
+      }
+
+      await Promise.all(
+        Array.from(body.querySelectorAll("img")).map(
+          (image) =>
+            new Promise((resolve) => {
+              if (image.complete) {
+                resolve();
+                return;
+              }
+              image.addEventListener("load", resolve, { once: true });
+              image.addEventListener("error", resolve, { once: true });
+              window.setTimeout(resolve, 3000);
+            })
+        )
+      );
+
+      await html2pdf()
+        .set({
+          margin: 10,
+          filename: `${reportYear}_${safeTitle}.pdf`,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+          pagebreak: { mode: ["css", "legacy"] },
+        })
+        .from(container)
+        .save();
+    } catch (downloadError) {
+      console.error("공개 보고서 PDF 생성 실패:", downloadError);
+      window.alert("PDF 다운로드에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      loadingOverlay.remove();
+      container.remove();
+      setDownloadingId(null);
+    }
   };
 
   if (loading) {
@@ -204,7 +345,8 @@ export default function PublicReportsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDownload(row.file_url)}
+                      onClick={() => handleDownload(row)}
+                      disabled={downloadingId === row.id}
                       style={{
                         borderColor: "#2a7d55",
                         color: "#2a7d55",
@@ -215,7 +357,7 @@ export default function PublicReportsPage() {
                         fontSize: "0.8rem",
                       }}
                     >
-                      <Icon name="download" size={14} /> PDF 받기
+                      <Icon name="download" size={14} /> {downloadingId === row.id ? "생성 중..." : "PDF 받기"}
                     </Button>
                   ),
                 },

@@ -1,5 +1,6 @@
 package com.esg.platform.domain.company.dto;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -24,7 +25,7 @@ public class FacilityDto {
     @Size(max = 512, message = "주소는 512자 이하여야 합니다.")
     private String address;
 
-    @DecimalMin(value = "0", message = "계약전력은 0 이상이어야 합니다.")
+    @DecimalMin(value = "0", inclusive = false, message = "계약전력은 0보다 커야 합니다.")
     @JsonProperty("contract_power_kw")
     private Double contractPowerKw;
 
@@ -38,6 +39,12 @@ public class FacilityDto {
 
     @JsonProperty("is_active")
     private Boolean active;
+
+    @JsonProperty("operation_start_date")
+    private LocalDate operationStartDate;
+
+    @JsonProperty("operation_end_date")
+    private LocalDate operationEndDate;
 
     @JsonProperty("created_at")
     private OffsetDateTime createdAt;
@@ -61,6 +68,10 @@ public class FacilityDto {
     public void setManagerPhone(String managerPhone) { this.managerPhone = managerPhone; }
     public Boolean getActive() { return active; }
     public void setActive(Boolean active) { this.active = active; }
+    public LocalDate getOperationStartDate() { return operationStartDate; }
+    public void setOperationStartDate(LocalDate operationStartDate) { this.operationStartDate = operationStartDate; }
+    public LocalDate getOperationEndDate() { return operationEndDate; }
+    public void setOperationEndDate(LocalDate operationEndDate) { this.operationEndDate = operationEndDate; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
     public Double getLatitude() { return latitude; }

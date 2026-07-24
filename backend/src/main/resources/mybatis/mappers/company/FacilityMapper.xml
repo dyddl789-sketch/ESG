@@ -13,6 +13,8 @@
         <result property="managerName" column="manager_name" />
         <result property="managerPhone" column="manager_phone" />
         <result property="active" column="is_active" />
+        <result property="operationStartDate" column="operation_start_date" />
+        <result property="operationEndDate" column="operation_end_date" />
         <result property="createdAt" column="created_at" />
         <result property="latitude" column="latitude" />
         <result property="longitude" column="longitude" />
@@ -27,6 +29,8 @@
         manager_name,
         manager_phone,
         is_active,
+        operation_start_date,
+        operation_end_date,
         created_at,
         ST_Y(facility_center::geometry) AS latitude,
         ST_X(facility_center::geometry) AS longitude
@@ -60,6 +64,8 @@
             manager_name,
             manager_phone,
             is_active,
+            operation_start_date,
+            operation_end_date,
             facility_center,
             created_at
         ) VALUES (
@@ -71,6 +77,8 @@
             #{dto.managerName},
             #{dto.managerPhone},
             COALESCE(#{dto.active}, TRUE),
+            #{dto.operationStartDate},
+            #{dto.operationEndDate},
             CASE
                 WHEN #{dto.longitude} IS NOT NULL AND #{dto.latitude} IS NOT NULL
                     THEN ST_SetSRID(ST_MakePoint(#{dto.longitude}, #{dto.latitude}), 4326)
@@ -89,6 +97,8 @@
             manager_name = #{dto.managerName},
             manager_phone = #{dto.managerPhone},
             is_active = COALESCE(#{dto.active}, is_active),
+            operation_start_date = #{dto.operationStartDate},
+            operation_end_date = #{dto.operationEndDate},
             facility_center = CASE
                 WHEN #{dto.longitude} IS NOT NULL AND #{dto.latitude} IS NOT NULL
                     THEN ST_SetSRID(ST_MakePoint(#{dto.longitude}, #{dto.latitude}), 4326)

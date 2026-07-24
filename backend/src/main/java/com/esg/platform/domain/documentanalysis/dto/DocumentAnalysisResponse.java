@@ -17,6 +17,9 @@ public class DocumentAnalysisResponse {
     private Long id;
     private Integer indicatorId;
     private Integer facilityId;
+    private String facilityName;
+    private String facilityEvidence;
+    private String facilityMatchStatus;
     private Integer reportingYear;
     private String periodType;
     private Integer periodValue;

@@ -9,6 +9,11 @@ public class ReportDto {
     private Long id;
     private String title;
     private String version;
+    private String content;
+    private String scope;
+
+    @JsonProperty("target_year")
+    private Integer targetYear;
 
     @JsonProperty("file_url")
     private String fileUrl;

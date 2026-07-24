@@ -139,41 +139,88 @@
     </select>
 
     <select id="findAvailablePeriods" resultType="string">
-        SELECT DISTINCT m.reporting_year::text || '-' || LPAD(m.period_value::text, 2, '0')
-        FROM esg_metric_data m
-        JOIN esg_indicators i ON i.id = m.indicator_id
-        WHERE m.company_id = #{companyId}
-        <if test="category != null and category != ''">AND i.category::text = #{category}</if>
-        <if test="status != null and status != '' and status != 'ALL'">AND m.status::text = #{status}</if>
-        <if test="facilityId != null">AND m.facility_id = #{facilityId}</if>
-        <if test="approvedOnly or benchmarkReady">AND m.status = 'APPROVED'</if>
-        <if test="benchmarkReady">
-            AND EXISTS (
-                SELECT 1
-                FROM esg_metric_data electricity
-                JOIN esg_indicators electricity_indicator ON electricity_indicator.id = electricity.indicator_id
-                WHERE electricity.company_id = m.company_id
-                  AND electricity.reporting_year = m.reporting_year
-                  AND electricity.period_value = m.period_value
-                  AND electricity.status = 'APPROVED'
-                  AND electricity_indicator.indicator_code = 'IND_E_ELEC'
-                  AND electricity.shipment_amount_million_krw IS NOT NULL
-                  AND electricity.shipment_amount_million_krw &gt; 0
-                  <if test="facilityId != null">AND electricity.facility_id = #{facilityId}</if>
-            )
-            AND EXISTS (
-                SELECT 1
-                FROM esg_metric_data scope2
-                JOIN esg_indicators scope2_indicator ON scope2_indicator.id = scope2.indicator_id
-                WHERE scope2.company_id = m.company_id
-                  AND scope2.reporting_year = m.reporting_year
-                  AND scope2.period_value = m.period_value
-                  AND scope2.status = 'APPROVED'
-                  AND scope2_indicator.indicator_code = 'IND_E_SCOPE2'
-                  <if test="facilityId != null">AND scope2.facility_id = #{facilityId}</if>
-            )
-        </if>
-        ORDER BY 1 DESC
+        <choose>
+            <when test="benchmarkReady">
+                WITH candidate_periods AS (
+                    SELECT DISTINCT electricity.reporting_year,
+                           electricity.period_value
+                    FROM esg_metric_data electricity
+                    JOIN esg_indicators electricity_indicator
+                      ON electricity_indicator.id = electricity.indicator_id
+                     AND electricity_indicator.indicator_code = 'IND_E_ELEC'
+                    WHERE electricity.company_id = #{companyId}
+                      AND electricity.period_type = 'MONTHLY'
+                      AND electricity.period_value BETWEEN 1 AND 12
+                      AND electricity.status = 'APPROVED'
+                      AND electricity.shipment_amount_million_krw &gt; 0
+                    <if test="facilityId != null">AND electricity.facility_id = #{facilityId}</if>
+                ), comparable_periods AS (
+                    SELECT period.reporting_year,
+                           period.period_value,
+                           (
+                               SELECT COUNT(*)
+                               FROM company_facilities facility
+                               WHERE facility.company_id = #{companyId}
+                                 AND facility.operation_start_date
+                                       &lt;= (make_date(period.reporting_year, period.period_value, 1) + INTERVAL '1 month - 1 day')::DATE
+                                 AND (
+                                     facility.operation_end_date IS NULL
+                                     OR facility.operation_end_date &gt;= make_date(period.reporting_year, period.period_value, 1)
+                                 )
+                               <if test="facilityId != null">AND facility.id = #{facilityId}</if>
+                           ) AS expected_count,
+                           (
+                               SELECT COUNT(DISTINCT electricity.facility_id)
+                               FROM esg_metric_data electricity
+                               JOIN esg_indicators electricity_indicator
+                                 ON electricity_indicator.id = electricity.indicator_id
+                                AND electricity_indicator.indicator_code = 'IND_E_ELEC'
+                               JOIN esg_metric_data scope2
+                                 ON scope2.company_id = electricity.company_id
+                                AND scope2.facility_id = electricity.facility_id
+                                AND scope2.reporting_year = electricity.reporting_year
+                                AND scope2.period_type = electricity.period_type
+                                AND scope2.period_value = electricity.period_value
+                                AND scope2.status = 'APPROVED'
+                               JOIN esg_indicators scope2_indicator
+                                 ON scope2_indicator.id = scope2.indicator_id
+                                AND scope2_indicator.indicator_code = 'IND_E_SCOPE2'
+                               JOIN company_facilities matched_facility
+                                 ON matched_facility.id = electricity.facility_id
+                                AND matched_facility.operation_start_date
+                                      &lt;= (make_date(period.reporting_year, period.period_value, 1) + INTERVAL '1 month - 1 day')::DATE
+                                AND (
+                                    matched_facility.operation_end_date IS NULL
+                                    OR matched_facility.operation_end_date &gt;= make_date(period.reporting_year, period.period_value, 1)
+                                )
+                               WHERE electricity.company_id = #{companyId}
+                                 AND electricity.reporting_year = period.reporting_year
+                                 AND electricity.period_type = 'MONTHLY'
+                                 AND electricity.period_value = period.period_value
+                                 AND electricity.status = 'APPROVED'
+                                 AND electricity.shipment_amount_million_krw &gt; 0
+                               <if test="facilityId != null">AND electricity.facility_id = #{facilityId}</if>
+                           ) AS matched_count
+                    FROM candidate_periods period
+                )
+                SELECT reporting_year::TEXT || '-' || LPAD(period_value::TEXT, 2, '0')
+                FROM comparable_periods
+                WHERE expected_count &gt; 0
+                  AND matched_count = expected_count
+                ORDER BY reporting_year DESC, period_value DESC
+            </when>
+            <otherwise>
+                SELECT DISTINCT m.reporting_year::TEXT || '-' || LPAD(m.period_value::TEXT, 2, '0')
+                FROM esg_metric_data m
+                JOIN esg_indicators i ON i.id = m.indicator_id
+                WHERE m.company_id = #{companyId}
+                <if test="category != null and category != ''">AND i.category::text = #{category}</if>
+                <if test="status != null and status != '' and status != 'ALL'">AND m.status::text = #{status}</if>
+                <if test="facilityId != null">AND m.facility_id = #{facilityId}</if>
+                <if test="approvedOnly">AND m.status = 'APPROVED'</if>
+                ORDER BY 1 DESC
+            </otherwise>
+        </choose>
     </select>
 
     <select id="findById" resultMap="MetricMap">
