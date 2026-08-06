@@ -19,13 +19,19 @@ public interface DashboardMapper {
     List<DashboardScoreDto> findScoreTrend(
             @Param("companyId") Long companyId,
             @Param("year") int year,
-            @Param("month") Integer month);
+            @Param("month") Integer month,
+            @Param("publishedOnly") boolean publishedOnly);
 
     String findApprovedPeriod(
             @Param("companyId") Long companyId,
             @Param("year") int year,
             @Param("month") Integer month,
             @Param("facilityId") Long facilityId);
+
+    String findPublishedPeriod(
+            @Param("companyId") Long companyId,
+            @Param("year") int year,
+            @Param("month") Integer month);
 
     String findLatestRegisteredPeriod(
             @Param("companyId") Long companyId,

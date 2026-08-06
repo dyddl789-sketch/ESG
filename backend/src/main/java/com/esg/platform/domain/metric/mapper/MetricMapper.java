@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import com.esg.platform.domain.metric.dto.IndicatorResponse;
+import com.esg.platform.domain.metric.dto.MetricCompletionDto;
 import com.esg.platform.domain.metric.dto.MetricDto;
 import com.esg.platform.domain.metric.dto.MetricHistoryDto;
 import com.esg.platform.domain.metric.dto.MetricScoreValueDto;
@@ -23,7 +24,8 @@ public interface MetricMapper {
             @Param("status") String status,
             @Param("facilityId") Long facilityId,
             @Param("search") String search,
-            @Param("approvedOnly") boolean approvedOnly);
+            @Param("approvedOnly") boolean approvedOnly,
+            @Param("publishedOnly") boolean publishedOnly);
 
     List<String> findAvailablePeriods(
             @Param("companyId") Long companyId,
@@ -31,9 +33,16 @@ public interface MetricMapper {
             @Param("status") String status,
             @Param("facilityId") Long facilityId,
             @Param("approvedOnly") boolean approvedOnly,
+            @Param("publishedOnly") boolean publishedOnly,
             @Param("benchmarkReady") boolean benchmarkReady);
 
     MetricDto findById(@Param("companyId") Long companyId, @Param("id") Long id);
+
+    boolean isPublishedPeriod(
+            @Param("companyId") Long companyId,
+            @Param("year") Integer year,
+            @Param("periodType") String periodType,
+            @Param("periodValue") Integer periodValue);
 
     EsgMetricData findEntityById(@Param("id") Long id);
 
@@ -79,6 +88,10 @@ public interface MetricMapper {
 
     List<MetricScoreValueDto> findScoreValues(@Param("companyId") Long companyId, @Param("period") String period);
 
+    MetricCompletionDto findCompletion(
+            @Param("companyId") Long companyId,
+            @Param("period") String period);
+
     BigDecimal findPreviousApprovedTotal(
             @Param("companyId") Long companyId,
             @Param("period") String period,
@@ -91,7 +104,11 @@ public interface MetricMapper {
             @Param("totalScore") BigDecimal totalScore,
             @Param("eScore") BigDecimal eScore,
             @Param("sScore") BigDecimal sScore,
-            @Param("gScore") BigDecimal gScore);
+            @Param("gScore") BigDecimal gScore,
+            @Param("environmentComplete") boolean environmentComplete,
+            @Param("socialComplete") boolean socialComplete,
+            @Param("governanceComplete") boolean governanceComplete,
+            @Param("overallComplete") boolean overallComplete);
 
     int deleteScore(@Param("companyId") Long companyId, @Param("year") int year, @Param("month") int month);
 

@@ -78,6 +78,19 @@ public class EsgWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+    public void sendToRoles(Set<String> roles, Object event) {
+        if (roles == null || roles.isEmpty()) {
+            return;
+        }
+        TextMessage message = serialize(event);
+        for (WebSocketSession session : sessions) {
+            String role = roleOf(session);
+            if (role != null && roles.contains(role)) {
+                send(session, message);
+            }
+        }
+    }
+
     private TextMessage serialize(Object event) {
         try {
             return new TextMessage(objectMapper.writeValueAsString(event));
@@ -109,5 +122,10 @@ public class EsgWebSocketHandler extends TextWebSocketHandler {
             return number.longValue();
         }
         return null;
+    }
+
+    private String roleOf(WebSocketSession session) {
+        Object value = session.getAttributes().get(JwtWebSocketHandshakeInterceptor.ATTR_ROLE);
+        return value == null ? null : String.valueOf(value);
     }
 }

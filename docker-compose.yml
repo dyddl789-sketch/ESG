@@ -70,8 +70,6 @@ services:
         - VITE_BACKEND_URL=${VITE_BACKEND_URL}
         - VITE_WS_URL=${VITE_WS_URL}
         - VITE_KAKAO_MAP_KEY=${VITE_KAKAO_MAP_KEY}
-        - VITE_KEA_API_KEY=${VITE_KEA_API_KEY}
-        - VITE_KOSIS_API_KEY=${VITE_KOSIS_API_KEY}
     container_name: nginx-frontend
     restart: unless-stopped
     env_file:

@@ -1,19 +1,16 @@
 package com.esg.platform.domain.metric.service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.YearMonth;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.esg.platform.domain.auditlog.event.AuditLogChangedEvent;
 import com.esg.platform.domain.metric.dto.MetricBatchResult;
 import com.esg.platform.domain.metric.dto.MetricDto;
-import com.esg.platform.domain.metric.dto.MetricScoreValueDto;
 import com.esg.platform.domain.metric.mapper.MetricMapper;
 import com.esg.platform.global.cache.EsgCacheService;
 import com.esg.platform.global.exception.BusinessException;
@@ -28,10 +25,10 @@ import lombok.extern.slf4j.Slf4j;
 public class MetricWorkflowService {
 
     private static final Long COMPANY_ID = 1L;
-    private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
-
     private final MetricMapper metricMapper;
     private final EsgCacheService cacheService;
+    private final EsgScoreCalculationService scoreCalculationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public List<MetricDto> getMetrics(
@@ -41,7 +38,8 @@ public class MetricWorkflowService {
             String status,
             Long facilityId,
             String search,
-            boolean approvedOnly) {
+            boolean approvedOnly,
+            boolean publishedOnly) {
         return metricMapper.findMetrics(
                 COMPANY_ID,
                 year,
@@ -50,7 +48,8 @@ public class MetricWorkflowService {
                 normalizeOptional(status),
                 facilityId,
                 trimToNull(search),
-                approvedOnly);
+                approvedOnly,
+                publishedOnly);
     }
 
     @Transactional(readOnly = true)
@@ -60,6 +59,7 @@ public class MetricWorkflowService {
             String status,
             Long facilityId,
             boolean approvedOnly,
+            boolean publishedOnly,
             boolean benchmarkReady) {
         Long resolvedCompanyId = companyId == null ? COMPANY_ID : companyId;
         List<String> periods = metricMapper.findAvailablePeriods(
@@ -68,17 +68,26 @@ public class MetricWorkflowService {
                 normalizeOptional(status),
                 facilityId,
                 approvedOnly,
+                publishedOnly,
                 benchmarkReady);
-        log.debug("[ESG_PERIOD] 조회 companyId={} category={} status={} facilityId={} approvedOnly={} benchmarkReady={} count={}",
-                resolvedCompanyId, category, status, facilityId, approvedOnly, benchmarkReady, periods.size());
+        log.debug("[ESG_PERIOD] 조회 companyId={} category={} status={} facilityId={} approvedOnly={} publishedOnly={} benchmarkReady={} count={}",
+                resolvedCompanyId, category, status, facilityId, approvedOnly, publishedOnly, benchmarkReady, periods.size());
         return periods;
     }
 
     @Transactional(readOnly = true)
     public MetricDto getMetric(Long id, boolean approvedOnly) {
         MetricDto metric = requireMetric(id);
-        if (approvedOnly && !"APPROVED".equals(metric.getStatus())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
+        if (approvedOnly) {
+            boolean approved = "APPROVED".equals(metric.getStatus());
+            boolean publishedPeriod = approved && metricMapper.isPublishedPeriod(
+                    COMPANY_ID,
+                    metric.getYear(),
+                    metric.getPeriodType(),
+                    metric.getPeriodValue());
+            if (!publishedPeriod) {
+                throw new BusinessException(ErrorCode.FORBIDDEN);
+            }
         }
         metric.setHistory(metricMapper.findHistory(id));
         return metric;
@@ -115,6 +124,7 @@ public class MetricWorkflowService {
                 "PENDING",
                 "등록값과 증빙자료를 확인하여 최종 승인을 요청했습니다.",
                 userId);
+        publishAuditChanged(metric, "APPROVAL_REQUESTED");
 
         cacheService.evictCompanyAfterCommit(COMPANY_ID);
         log.info("[ESG_APPROVAL] 승인 요청 metricId={} period={} category={} facilityId={} userId={}",
@@ -145,7 +155,8 @@ public class MetricWorkflowService {
                 "APPROVED",
                 "등록값과 증빙자료를 확인하여 최종 승인했습니다.",
                 userId);
-        refreshScore(metric.getPeriod());
+        scoreCalculationService.refreshScore(COMPANY_ID, metric.getPeriod());
+        publishAuditChanged(metric, "FINAL_APPROVED");
         cacheService.evictCompanyAfterCommit(COMPANY_ID);
 
         log.info("[ESG_APPROVAL] 최종 승인 metricId={} period={} category={} facilityId={} approverUserId={}",
@@ -181,7 +192,8 @@ public class MetricWorkflowService {
                 "REJECTED",
                 normalizedReason,
                 userId);
-        refreshScore(metric.getPeriod());
+        scoreCalculationService.refreshScore(COMPANY_ID, metric.getPeriod());
+        publishAuditChanged(metric, "REJECTED");
         cacheService.evictCompanyAfterCommit(COMPANY_ID);
 
         log.info("[ESG_APPROVAL] 반려 metricId={} period={} category={} facilityId={} approverUserId={} reasonLength={}",
@@ -237,115 +249,14 @@ public class MetricWorkflowService {
         return metric;
     }
 
-    private void refreshScore(String period) {
-        YearMonth yearMonth = YearMonth.parse(period);
-        if (metricMapper.countApprovedForPeriod(COMPANY_ID, period) == 0) {
-            metricMapper.deleteScore(COMPANY_ID, yearMonth.getYear(), yearMonth.getMonthValue());
-            return;
-        }
-
-        Map<String, MetricScoreValueDto> values = new LinkedHashMap<>();
-        for (MetricScoreValueDto row : metricMapper.findScoreValues(COMPANY_ID, period)) {
-            values.put(row.getIndicatorCode(), row);
-        }
-
-        BigDecimal currentElectricity = total(values, "IND_E_ELEC");
-        BigDecimal previousElectricity = metricMapper.findPreviousApprovedTotal(COMPANY_ID, period, "IND_E_ELEC");
-        BigDecimal currentScope2 = total(values, "IND_E_SCOPE2");
-        BigDecimal previousScope2 = metricMapper.findPreviousApprovedTotal(COMPANY_ID, period, "IND_E_SCOPE2");
-        BigDecimal eScore = weightedAverage(
-                List.of(trendScore(currentElectricity, previousElectricity), trendScore(currentScope2, previousScope2)),
-                List.of(BigDecimal.valueOf(50), BigDecimal.valueOf(50)));
-
-        BigDecimal sScore = weightedAverage(
-                List.of(
-                        lowerIsBetter(avg(values, "IND_S_INJURY_RATE"), BigDecimal.valueOf(0.20)),
-                        higherIsBetter(avg(values, "IND_S_SAFETY_EDU"), BigDecimal.valueOf(95)),
-                        higherIsBetter(avg(values, "IND_S_RISK_ACTION"), BigDecimal.valueOf(90)),
-                        lowerIsBetter(avg(values, "IND_S_TURNOVER"), BigDecimal.valueOf(2))),
-                List.of(BigDecimal.TEN, BigDecimal.TEN, BigDecimal.TEN, BigDecimal.valueOf(5)));
-
-        BigDecimal gScore = weightedAverage(
-                List.of(
-                        higherIsBetter(avg(values, "IND_G_ATTENDANCE"), BigDecimal.valueOf(90)),
-                        higherIsBetter(avg(values, "IND_G_OUTSIDE"), BigDecimal.valueOf(37.5)),
-                        higherIsBetter(avg(values, "IND_G_ETHICS_EDU"), BigDecimal.valueOf(95))),
-                List.of(BigDecimal.valueOf(40), BigDecimal.valueOf(20), BigDecimal.valueOf(40)));
-
-        BigDecimal totalScore = eScore.multiply(BigDecimal.valueOf(0.40))
-                .add(sScore.multiply(BigDecimal.valueOf(0.35)))
-                .add(gScore.multiply(BigDecimal.valueOf(0.25)))
-                .setScale(2, RoundingMode.HALF_UP);
-
-        metricMapper.upsertScore(
+    private void publishAuditChanged(MetricDto metric, String action) {
+        eventPublisher.publishEvent(new AuditLogChangedEvent(
                 COMPANY_ID,
-                yearMonth.getYear(),
-                yearMonth.getMonthValue(),
-                totalScore,
-                eScore,
-                sScore,
-                gScore);
-        log.info("[ESG_SCORE] 승인 데이터 기반 내부 ESG 지수 갱신 period={} total={} e={} s={} g={}",
-                period, totalScore, eScore, sScore, gScore);
-    }
-
-    private BigDecimal trendScore(BigDecimal current, BigDecimal previous) {
-        if (current == null) {
-            return BigDecimal.ZERO;
-        }
-        if (previous == null || previous.signum() <= 0) {
-            return BigDecimal.valueOf(85);
-        }
-        BigDecimal rate = previous.subtract(current)
-                .divide(previous, 6, RoundingMode.HALF_UP)
-                .multiply(HUNDRED);
-        return clamp(BigDecimal.valueOf(85).add(rate.multiply(BigDecimal.valueOf(2))));
-    }
-
-    private BigDecimal avg(Map<String, MetricScoreValueDto> values, String code) {
-        MetricScoreValueDto row = values.get(code);
-        return row == null ? null : row.getAverageValue();
-    }
-
-    private BigDecimal total(Map<String, MetricScoreValueDto> values, String code) {
-        MetricScoreValueDto row = values.get(code);
-        return row == null ? null : row.getTotalValue();
-    }
-
-    private BigDecimal higherIsBetter(BigDecimal actual, BigDecimal target) {
-        if (actual == null || target == null || target.signum() <= 0) {
-            return BigDecimal.ZERO;
-        }
-        return clamp(actual.divide(target, 6, RoundingMode.HALF_UP).multiply(HUNDRED));
-    }
-
-    private BigDecimal lowerIsBetter(BigDecimal actual, BigDecimal target) {
-        if (actual == null) {
-            return BigDecimal.ZERO;
-        }
-        if (actual.signum() <= 0 || actual.compareTo(target) <= 0) {
-            return HUNDRED;
-        }
-        return clamp(target.divide(actual, 6, RoundingMode.HALF_UP).multiply(HUNDRED));
-    }
-
-    private BigDecimal weightedAverage(List<BigDecimal> scores, List<BigDecimal> weights) {
-        BigDecimal total = BigDecimal.ZERO;
-        BigDecimal weightTotal = BigDecimal.ZERO;
-        for (int index = 0; index < scores.size(); index++) {
-            total = total.add(scores.get(index).multiply(weights.get(index)));
-            weightTotal = weightTotal.add(weights.get(index));
-        }
-        return weightTotal.signum() == 0
-                ? BigDecimal.ZERO
-                : total.divide(weightTotal, 2, RoundingMode.HALF_UP);
-    }
-
-    private BigDecimal clamp(BigDecimal value) {
-        if (value == null || value.signum() < 0) {
-            return BigDecimal.ZERO;
-        }
-        return value.min(HUNDRED).setScale(2, RoundingMode.HALF_UP);
+                metric.getId(),
+                action,
+                metric.getPeriod(),
+                metric.getCategory(),
+                metric.getFacilityId()));
     }
 
     private String normalizePeriod(String period) {

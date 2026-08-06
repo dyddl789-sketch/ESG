@@ -10,6 +10,10 @@
         <result property="socialScore" column="s_score"/>
         <result property="governanceScore" column="g_score"/>
         <result property="grade" column="grade"/>
+        <result property="environmentComplete" column="environment_complete"/>
+        <result property="socialComplete" column="social_complete"/>
+        <result property="governanceComplete" column="governance_complete"/>
+        <result property="overallComplete" column="overall_complete"/>
         <result property="calculatedAt" column="calculated_at"/>
     </resultMap>
 
@@ -40,6 +44,7 @@
     <sql id="scoreSelect">
         SELECT reporting_year || '-' || LPAD(period_value::text, 2, '0') AS period,
                total_score, e_score, s_score, g_score,
+               environment_complete, social_complete, governance_complete, overall_complete,
                CASE
                    WHEN total_score &gt;= 90 THEN 'S'
                    WHEN total_score &gt;= 85 THEN 'A+'
@@ -67,6 +72,7 @@
     <select id="findScoreTrend" resultMap="ScoreMap">
         <include refid="scoreSelect"/>
         <if test="month != null">AND period_value &lt;= #{month}</if>
+        <if test="publishedOnly">AND overall_complete = TRUE</if>
         ORDER BY period_value
     </select>
 
@@ -78,6 +84,16 @@
           AND m.status = 'APPROVED'
           <if test="month != null">AND m.period_value = #{month}</if>
           <if test="facilityId != null">AND m.facility_id = #{facilityId}</if>
+    </select>
+
+    <select id="findPublishedPeriod" resultType="string">
+        SELECT MAX(reporting_year || '-' || LPAD(period_value::text, 2, '0'))
+        FROM esg_scores
+        WHERE company_id = #{companyId}
+          AND reporting_year = #{year}
+          AND reporting_period = 'MONTHLY'
+          AND overall_complete = TRUE
+          <if test="month != null">AND period_value &lt;= #{month}</if>
     </select>
 
     <select id="findLatestRegisteredPeriod" resultType="string">

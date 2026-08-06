@@ -3,9 +3,11 @@ package com.esg.platform.domain.metric.service;
 import java.time.YearMonth;
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.esg.platform.domain.auditlog.event.AuditLogChangedEvent;
 import com.esg.platform.domain.company.dto.FacilityDto;
 import com.esg.platform.domain.company.mapper.FacilityMapper;
 import com.esg.platform.domain.metric.dto.IndicatorResponse;
@@ -28,11 +30,17 @@ public class MetricService {
     private final MetricMapper metricMapper;
     private final FacilityMapper facilityMapper;
     private final EsgCacheService cacheService;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public MetricService(MetricMapper metricMapper, FacilityMapper facilityMapper, EsgCacheService cacheService) {
+    public MetricService(
+            MetricMapper metricMapper,
+            FacilityMapper facilityMapper,
+            EsgCacheService cacheService,
+            ApplicationEventPublisher eventPublisher) {
         this.metricMapper = metricMapper;
         this.facilityMapper = facilityMapper;
         this.cacheService = cacheService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -65,6 +73,7 @@ public class MetricService {
         metricMapper.insertMetricData(data);
         metricMapper.insertHistory(data.getId(), "CREATE", null, "DRAFT",
                 "기업 ESG 관리자가 지표 실적을 신규 등록했습니다.", Long.valueOf(inputUserId));
+        publishAuditChanged(data, indicatorCode, "DATA_CREATED");
         cacheService.evictCompanyAfterCommit(Long.valueOf(companyId));
         log.info("[ESG_METRIC] 지표 데이터 임시저장 metricId={} companyId={} indicatorId={} userId={}",
                 data.getId(), companyId, request.indicatorId(), inputUserId);
@@ -104,6 +113,7 @@ public class MetricService {
         metricMapper.updateMetricData(current);
         metricMapper.insertHistory(id, "UPDATE", previousStatus.name(), "DRAFT",
                 "기업 ESG 관리자가 지표 실적과 증빙자료를 수정했습니다.", Long.valueOf(inputUserId));
+        publishAuditChanged(current, indicatorCode, "DATA_UPDATED");
         cacheService.evictCompanyAfterCommit(Long.valueOf(current.getCompanyId()));
         log.info("[ESG_METRIC] 지표 데이터 수정 metricId={} indicatorId={} userId={}", id, request.indicatorId(), inputUserId);
     }
@@ -118,6 +128,8 @@ public class MetricService {
         if (deleted == 0) {
             throw new BusinessException(ErrorCode.INVALID_WORKFLOW_STATUS);
         }
+        String indicatorCode = metricMapper.findIndicatorCodeById(current.getIndicatorId());
+        publishAuditChanged(current, indicatorCode, "DELETED");
         cacheService.evictCompanyAfterCommit(Long.valueOf(current.getCompanyId()));
         log.info("[ESG_METRIC] 반려 지표 삭제 metricId={} userId={}", id, userId);
     }
@@ -294,6 +306,35 @@ public class MetricService {
 
     private java.time.OffsetDateTime normalizeEvidenceUploadedAt(MetricCreateRequest request) {
         return trimToNull(request.evidenceFileUrl()) == null ? null : request.evidenceUploadedAt();
+    }
+
+    private void publishAuditChanged(EsgMetricData metric, String indicatorCode, String action) {
+        String period = metric.getPeriodType() == PeriodType.MONTHLY
+                ? String.format("%d-%02d", metric.getReportingYear(), metric.getPeriodValue())
+                : metric.getReportingYear() + "-" + metric.getPeriodValue();
+        eventPublisher.publishEvent(new AuditLogChangedEvent(
+                Long.valueOf(metric.getCompanyId()),
+                metric.getId(),
+                action,
+                period,
+                categoryOf(indicatorCode),
+                metric.getFacilityId() == null ? null : Long.valueOf(metric.getFacilityId())));
+    }
+
+    private String categoryOf(String indicatorCode) {
+        if (indicatorCode == null) {
+            return null;
+        }
+        if (indicatorCode.startsWith("IND_E_")) {
+            return "ENVIRONMENT";
+        }
+        if (indicatorCode.startsWith("IND_S_")) {
+            return "SOCIAL";
+        }
+        if (indicatorCode.startsWith("IND_G_")) {
+            return "GOVERNANCE";
+        }
+        return null;
     }
 
     private PeriodType parsePeriodType(String value) {

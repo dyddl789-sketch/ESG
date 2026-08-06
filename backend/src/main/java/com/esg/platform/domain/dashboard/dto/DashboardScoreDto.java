@@ -19,6 +19,10 @@ public class DashboardScoreDto {
     private BigDecimal governanceScore;
 
     private String grade;
+    private boolean environmentComplete;
+    private boolean socialComplete;
+    private boolean governanceComplete;
+    private boolean overallComplete;
     private OffsetDateTime calculatedAt;
 
     public String getPeriod() { return period; }
@@ -33,6 +37,14 @@ public class DashboardScoreDto {
     public void setGovernanceScore(BigDecimal governanceScore) { this.governanceScore = governanceScore; }
     public String getGrade() { return grade; }
     public void setGrade(String grade) { this.grade = grade; }
+    public boolean isEnvironmentComplete() { return environmentComplete; }
+    public void setEnvironmentComplete(boolean environmentComplete) { this.environmentComplete = environmentComplete; }
+    public boolean isSocialComplete() { return socialComplete; }
+    public void setSocialComplete(boolean socialComplete) { this.socialComplete = socialComplete; }
+    public boolean isGovernanceComplete() { return governanceComplete; }
+    public void setGovernanceComplete(boolean governanceComplete) { this.governanceComplete = governanceComplete; }
+    public boolean isOverallComplete() { return overallComplete; }
+    public void setOverallComplete(boolean overallComplete) { this.overallComplete = overallComplete; }
     public OffsetDateTime getCalculatedAt() { return calculatedAt; }
     public void setCalculatedAt(OffsetDateTime calculatedAt) { this.calculatedAt = calculatedAt; }
 }

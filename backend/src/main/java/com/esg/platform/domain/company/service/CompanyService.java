@@ -1,6 +1,7 @@
 package com.esg.platform.domain.company.service;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -10,6 +11,8 @@ import com.esg.platform.domain.company.dto.CompanyDto;
 import com.esg.platform.domain.company.dto.FacilityDto;
 import com.esg.platform.domain.company.mapper.CompanyMapper;
 import com.esg.platform.domain.company.mapper.FacilityMapper;
+import com.esg.platform.domain.metric.mapper.MetricMapper;
+import com.esg.platform.domain.metric.service.EsgScoreCalculationService;
 import com.esg.platform.global.cache.EsgCacheService;
 import com.esg.platform.global.exception.BusinessException;
 import com.esg.platform.global.exception.ErrorCode;
@@ -26,6 +29,8 @@ public class CompanyService {
 
     private final CompanyMapper companyMapper;
     private final FacilityMapper facilityMapper;
+    private final MetricMapper metricMapper;
+    private final EsgScoreCalculationService scoreCalculationService;
     private final EsgCacheService cacheService;
 
     @Transactional(readOnly = true)
@@ -61,6 +66,7 @@ public class CompanyService {
         normalizeNewFacilityOperationPeriod(dto);
         validateOperationPeriod(dto);
         facilityMapper.insert(COMPANY_ID, dto);
+        refreshScoresFrom(dto.getOperationStartDate(), "CREATE");
         cacheService.evictCompanyAfterCommit(COMPANY_ID);
         log.info(
                 "[FACILITY] 사업장 등록 companyId={} facilityId={} facilityName={} type={} operationStart={} operationEnd={} hasCoordinates={}",
@@ -94,6 +100,7 @@ public class CompanyService {
         if (updated == 0) {
             throw new BusinessException(ErrorCode.FACILITY_NOT_FOUND);
         }
+        refreshScoresFrom(earlierOf(current.getOperationStartDate(), dto.getOperationStartDate()), "UPDATE");
         cacheService.evictCompanyAfterCommit(COMPANY_ID);
         log.info(
                 "[FACILITY] 사업장 수정 companyId={} facilityId={} facilityName={} operationStart={} operationEnd={} hasCoordinates={}",
@@ -108,13 +115,47 @@ public class CompanyService {
 
     @Transactional
     public void deleteFacility(Long id) {
-        getFacility(id);
+        FacilityDto current = getFacility(id);
         int deleted = facilityMapper.delete(id, COMPANY_ID);
         if (deleted == 0) {
             throw new BusinessException(ErrorCode.FACILITY_NOT_FOUND);
         }
+        refreshScoresFrom(current.getOperationStartDate(), "DELETE");
         cacheService.evictCompanyAfterCommit(COMPANY_ID);
         log.info("[FACILITY] 사업장 삭제 companyId={} facilityId={}", COMPANY_ID, id);
+    }
+
+    private void refreshScoresFrom(LocalDate startDate, String reason) {
+        if (startDate == null) {
+            return;
+        }
+
+        YearMonth threshold = YearMonth.from(startDate);
+        List<String> periods = metricMapper.findAvailablePeriods(
+                COMPANY_ID,
+                null,
+                null,
+                null,
+                true,
+                false,
+                false);
+        int refreshed = 0;
+        for (String period : periods) {
+            YearMonth candidate = YearMonth.parse(period);
+            if (candidate.isBefore(threshold)) {
+                continue;
+            }
+            scoreCalculationService.refreshScore(COMPANY_ID, period);
+            refreshed++;
+        }
+        log.info("[FACILITY_SCORE] 사업장 변경 후 기간별 점수·완성상태 재계산 companyId={} reason={} startPeriod={} refreshed={}",
+                COMPANY_ID, reason, threshold, refreshed);
+    }
+
+    private LocalDate earlierOf(LocalDate left, LocalDate right) {
+        if (left == null) return right;
+        if (right == null) return left;
+        return left.isBefore(right) ? left : right;
     }
 
     private void normalizeNewFacilityOperationPeriod(FacilityDto dto) {

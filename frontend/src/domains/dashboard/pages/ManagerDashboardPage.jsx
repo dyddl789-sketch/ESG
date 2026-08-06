@@ -10,6 +10,7 @@ import FacilityMap from "../../company/components/FacilityMap";
 import dashboardApi from "../api/dashboardApi";
 import companyApi from "../../company/api/companyApi";
 import { useAuth } from "../../../app/providers/AuthProvider";
+import { useRealtime } from "../../../app/providers/RealtimeProvider";
 import { ROLES } from "../../../app/config/roles";
 import { facilityNameOf } from "../../metric/utils/approvedMetricView";
 import { resolvePeriodSelection, useMetricPeriods } from "../../metric/hooks/useMetricPeriods";
@@ -58,6 +59,7 @@ const changePresentation = (kpi) => {
 export default function ManagerDashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { latestEvent } = useRealtime();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -98,7 +100,15 @@ export default function ManagerDashboardPage() {
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
+  useEffect(() => {
+    if (!["ESG_APPROVAL_REQUESTED", "ESG_APPROVED", "ESG_REJECTED", "AUDIT_LOG_UPDATED"].includes(latestEvent?.type)) return undefined;
+    const timer = window.setTimeout(() => void load(), 200);
+    return () => window.clearTimeout(timer);
+  }, [latestEvent, load]);
+
   const score = normalizedScore(summary?.score);
+  const completion = summary?.completion || {};
+  const overallComplete = Boolean(completion.overallComplete ?? score?.overallComplete ?? false);
   const trend = (summary?.scoreTrend || []).map(normalizedScore);
   const kpis = useMemo(() => summary?.kpis || [], [summary]);
   const groupedKpis = useMemo(() => domainOrder.map((category) => ({
@@ -115,10 +125,10 @@ export default function ManagerDashboardPage() {
   const chart = {
     labels: trend.map((item) => `${Number(item.period?.slice(5))}월`),
     datasets: [
-      { label: "종합 내부 ESG 지수", data: trend.map((item) => scoreValue(item.totalScore)), borderColor: "#1f6b46", backgroundColor: "rgba(31,107,70,.12)", tension: 0.35, fill: true },
-      { label: "환경", data: trend.map((item) => scoreValue(item.environmentScore)), borderColor: "#2f88c6", tension: 0.3 },
-      { label: "사회", data: trend.map((item) => scoreValue(item.socialScore)), borderColor: "#d58a1f", tension: 0.3 },
-      { label: "거버넌스", data: trend.map((item) => scoreValue(item.governanceScore)), borderColor: "#7c62b6", tension: 0.3 },
+      { label: "종합 내부 ESG 지수", data: trend.map((item) => item.overallComplete ? scoreValue(item.totalScore) : null), borderColor: "#1f6b46", backgroundColor: "rgba(31,107,70,.12)", tension: 0.35, fill: true, spanGaps: false },
+      { label: "환경", data: trend.map((item) => item.environmentComplete ? scoreValue(item.environmentScore) : null), borderColor: "#2f88c6", tension: 0.3, spanGaps: false },
+      { label: "사회", data: trend.map((item) => item.socialComplete ? scoreValue(item.socialScore) : null), borderColor: "#d58a1f", tension: 0.3, spanGaps: false },
+      { label: "거버넌스", data: trend.map((item) => item.governanceComplete ? scoreValue(item.governanceScore) : null), borderColor: "#7c62b6", tension: 0.3, spanGaps: false },
     ],
   };
 
@@ -143,9 +153,27 @@ export default function ManagerDashboardPage() {
   if (loading) return <div className="data-loading page-loading">최종 승인 데이터를 기준으로 대시보드를 구성하는 중입니다.</div>;
 
   const scoreCards = [
-    { category: "ENVIRONMENT", value: score?.environmentScore },
-    { category: "SOCIAL", value: score?.socialScore },
-    { category: "GOVERNANCE", value: score?.governanceScore },
+    {
+      category: "ENVIRONMENT",
+      value: score?.environmentScore,
+      complete: Boolean(completion.environmentComplete ?? score?.environmentComplete),
+      approved: Number(completion.environmentApproved || 0),
+      required: Number(completion.environmentRequired || 0),
+    },
+    {
+      category: "SOCIAL",
+      value: score?.socialScore,
+      complete: Boolean(completion.socialComplete ?? score?.socialComplete),
+      approved: Number(completion.socialApproved || 0),
+      required: Number(completion.socialRequired || 0),
+    },
+    {
+      category: "GOVERNANCE",
+      value: score?.governanceScore,
+      complete: Boolean(completion.governanceComplete ?? score?.governanceComplete),
+      approved: Number(completion.governanceApproved || 0),
+      required: Number(completion.governanceRequired || 0),
+    },
   ];
 
   return (
@@ -165,8 +193,14 @@ export default function ManagerDashboardPage() {
       <section className="official-data-banner">
         <div>
           <span className="section-kicker">APPROVED DATA ONLY</span>
-          <h2>{summary?.latestApprovedPeriod ? `${summary.latestApprovedPeriod}까지 최종 승인 완료` : "승인 완료 데이터 없음"}</h2>
-          <p>대시보드의 수치와 점수는 최종 승인된 데이터만 사용합니다.</p>
+          <h2>{summary?.latestApprovedPeriod
+            ? overallComplete
+              ? `${summary.latestApprovedPeriod} 전체 필수 지표 승인 완료`
+              : `${summary.latestApprovedPeriod} 승인 데이터 실시간 반영 중`
+            : "승인 완료 데이터 없음"}</h2>
+          <p>{overallComplete
+            ? "필수 지표가 모두 승인되어 월별 최종 점수와 공개 데이터가 확정되었습니다."
+            : `승인된 실제값은 즉시 반영되며, 전체 ${Number(completion.totalApproved || 0)}/${Number(completion.totalRequired || 0)}개 구성요소가 완료되면 종합 점수가 확정됩니다.`}</p>
         </div>
         <div className="official-data-meta">
           <div><span>최근 등록월</span><strong>{summary?.latestCollectedPeriod || "-"}</strong></div>
@@ -201,9 +235,13 @@ export default function ManagerDashboardPage() {
                 <div><strong>{meta.label}</strong><small>{meta.english}</small></div>
                 <em>가중치 {meta.weight}</em>
               </div>
-              <div className="domain-score-value"><strong>{score ? formatNumber(value, 1) : "-"}</strong><span>/ 100점</span></div>
-              <div className="domain-score-progress"><i style={{ width: `${score ? Math.min(100, value) : 0}%` }} /></div>
-              <p>{score ? `${score.period} 최종 승인 기준` : "승인 완료 데이터 집계 전"} · {meta.description}</p>
+              <div className="domain-score-value"><strong>{item.complete ? formatNumber(value, 1) : "산정 중"}</strong><span>{item.complete ? "/ 100점" : `${item.approved}/${item.required}`}</span></div>
+              <div className="domain-score-progress"><i style={{ width: `${item.complete
+                ? Math.min(100, value)
+                : item.required > 0 ? Math.min(100, (item.approved / item.required) * 100) : 0}%` }} /></div>
+              <p>{item.complete
+                ? `${score?.period || summary?.latestApprovedPeriod} 영역 필수 데이터 승인 완료`
+                : `필수 구성요소 승인 ${item.approved}/${item.required}`} · {meta.description}</p>
               <span className="card-navigation-hint">상세 실적 보기 →</span>
             </article>
           );
@@ -212,7 +250,7 @@ export default function ManagerDashboardPage() {
 
       <div className="dashboard-score-layout">
         <Card className="internal-score-card" title={summary?.evaluationName || "KCGS 평가체계 준용 내부 ESG 지수"} description={`${summary?.evaluationVersion || "내부 기준"} · 외부 평가기관의 공식등급이 아닙니다.`}>
-          {score ? (
+          {score && overallComplete ? (
             <div className="internal-score-content">
               <ScoreRing score={scoreValue(score.totalScore).toFixed(1)} />
               <div className="score-grade-block"><span>내부 추정등급</span><strong>{score.grade}</strong><small>{score.period} 확정</small></div>
@@ -222,7 +260,7 @@ export default function ManagerDashboardPage() {
                 ))}
               </div>
             </div>
-          ) : <div className="empty-state"><strong>확정 점수 없음</strong><p>월별 E·S·G 지표 전체가 최종 승인되면 내부 ESG 지수가 생성됩니다.</p></div>}
+          ) : <div className="empty-state"><strong>종합 점수 산정 중</strong><p>승인된 실제값은 대시보드에 즉시 반영됩니다. 운영 사업장 기준 필수 구성요소 {Number(completion.totalApproved || 0)}/{Number(completion.totalRequired || 0)}개가 모두 승인되면 종합 점수가 확정됩니다.</p></div>}
         </Card>
 
         <Card title="월별 내부 ESG 지수 추이" description="최종 승인된 월만 선으로 연결합니다.">

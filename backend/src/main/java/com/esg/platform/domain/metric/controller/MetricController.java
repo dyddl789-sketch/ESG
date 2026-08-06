@@ -56,8 +56,9 @@ public class MetricController {
             @RequestParam(name = "facilityId", required = false) Long facilityId,
             @RequestParam(name = "search", required = false) String search,
             @AuthenticationPrincipal EsgUserPrincipal principal) {
+        boolean external = isExternal(principal);
         return ApiResponse.ok(workflowService.getMetrics(
-                year, period, category, status, facilityId, search, isExternal(principal)));
+                year, period, category, status, facilityId, search, external, external));
     }
 
     @GetMapping("/periods")
@@ -76,6 +77,7 @@ public class MetricController {
                 status,
                 facilityId,
                 resolvedApprovedOnly,
+                isExternal(principal),
                 benchmarkReady));
     }
 

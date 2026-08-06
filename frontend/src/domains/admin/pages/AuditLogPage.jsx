@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Swal from "sweetalert2";
 
 import PageHeader from "../../../shared/components/PageHeader";
@@ -8,6 +8,7 @@ import Button from "../../../shared/components/Button";
 import apiClient from "../../../shared/api/apiClient";
 import companyApi from "../../company/api/companyApi";
 import indicatorApi from "../api/indicatorApi";
+import { useRealtime } from "../../../app/providers/RealtimeProvider";
 
 const INITIAL_FILTERS = {
   facilityId: "",
@@ -45,6 +46,8 @@ function createPageNumbers(currentPage, totalPages) {
 }
 
 export default function AuditLogPage() {
+  const { latestEvent, connectionStatus } = useRealtime();
+  const refreshTimerRef = useRef(null);
   const [auditRows, setAuditRows] = useState([]);
   const [facilities, setFacilities] = useState([]);
   const [indicators, setIndicators] = useState([]);
@@ -73,39 +76,72 @@ export default function AuditLogPage() {
     fetchFilterOptions();
   }, []);
 
-  useEffect(() => {
-    const fetchAuditLogs = async () => {
-      setLoading(true);
-      try {
-        const params = {
-          page,
-          size,
-          ...(appliedFilters.facilityId && { facilityId: appliedFilters.facilityId }),
-          ...(appliedFilters.indicatorId && { indicatorId: appliedFilters.indicatorId }),
-          ...(appliedFilters.action && { action: appliedFilters.action }),
-          ...(appliedFilters.fromDate && { fromDate: appliedFilters.fromDate }),
-          ...(appliedFilters.toDate && { toDate: appliedFilters.toDate }),
-        };
+  const fetchAuditLogs = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
+    try {
+      const params = {
+        page,
+        size,
+        ...(appliedFilters.facilityId && { facilityId: appliedFilters.facilityId }),
+        ...(appliedFilters.indicatorId && { indicatorId: appliedFilters.indicatorId }),
+        ...(appliedFilters.action && { action: appliedFilters.action }),
+        ...(appliedFilters.fromDate && { fromDate: appliedFilters.fromDate }),
+        ...(appliedFilters.toDate && { toDate: appliedFilters.toDate }),
+      };
 
-        const response = await apiClient.get("/audit-logs", { params });
-        const result = unwrapApiData(response.data) || {};
+      const response = await apiClient.get("/audit-logs", { params });
+      const result = unwrapApiData(response.data) || {};
 
-        setAuditRows(result.content || []);
-        setTotalElements(Number(result.totalElements || 0));
-        setTotalPages(Number(result.totalPages || 0));
-      } catch (error) {
-        console.error("데이터베이스 감사 로그 로드 실패:", error);
+      setAuditRows(result.content || []);
+      setTotalElements(Number(result.totalElements || 0));
+      setTotalPages(Number(result.totalPages || 0));
+    } catch (error) {
+      console.error("데이터베이스 감사 로그 로드 실패:", error);
+      if (!silent) {
         setAuditRows([]);
         setTotalElements(0);
         setTotalPages(0);
-        Swal.fire("오류", "감사 로그를 불러오지 못했습니다.", "error");
-      } finally {
-        setLoading(false);
+        void Swal.fire("오류", "감사 로그를 불러오지 못했습니다.", "error");
+      }
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, [appliedFilters, page, size]);
+
+  useEffect(() => {
+    const timerId = window.setTimeout(() => {
+      void fetchAuditLogs();
+    }, 0);
+    return () => window.clearTimeout(timerId);
+  }, [fetchAuditLogs]);
+
+  useEffect(() => {
+    if (latestEvent?.type !== "AUDIT_LOG_UPDATED") return undefined;
+
+    if (refreshTimerRef.current) {
+      window.clearTimeout(refreshTimerRef.current);
+    }
+    refreshTimerRef.current = window.setTimeout(() => {
+      refreshTimerRef.current = null;
+      void fetchAuditLogs({ silent: true });
+    }, 250);
+
+    return () => {
+      if (refreshTimerRef.current) {
+        window.clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
       }
     };
+  }, [fetchAuditLogs, latestEvent]);
 
-    fetchAuditLogs();
-  }, [appliedFilters, page, size]);
+  useEffect(() => {
+    if (connectionStatus !== "CONNECTED") return undefined;
+
+    const timerId = window.setTimeout(() => {
+      void fetchAuditLogs({ silent: true });
+    }, 0);
+    return () => window.clearTimeout(timerId);
+  }, [connectionStatus, fetchAuditLogs]);
 
   const pageNumbers = useMemo(
     () => createPageNumbers(page, totalPages),

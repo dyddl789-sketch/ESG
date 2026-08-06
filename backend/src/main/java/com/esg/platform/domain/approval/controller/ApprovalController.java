@@ -46,7 +46,14 @@ public class ApprovalController {
             @RequestParam(name = "facilityId", required = false) Long facilityId,
             @RequestParam(name = "search", required = false) String search) {
         return ApiResponse.ok(workflowService.getMetrics(
-                null, period, category, "PENDING", facilityId, search, false));
+                null,
+                period,
+                category,
+                "PENDING",
+                facilityId,
+                search,
+                false,
+                false));
     }
 
     @PatchMapping("/{id}/approve")

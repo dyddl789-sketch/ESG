@@ -107,6 +107,17 @@
                  OR COALESCE(f.facility_name, '기업 전체') ILIKE '%' || #{search} || '%')
         </if>
         <if test="approvedOnly">AND m.status = 'APPROVED'</if>
+        <if test="publishedOnly">
+            AND EXISTS (
+                SELECT 1
+                FROM esg_scores score
+                WHERE score.company_id = m.company_id
+                  AND score.reporting_year = m.reporting_year
+                  AND score.reporting_period = m.period_type
+                  AND score.period_value = m.period_value
+                  AND score.overall_complete = TRUE
+            )
+        </if>
     </sql>
 
     <sql id="metricOrder">
@@ -207,6 +218,17 @@
                 FROM comparable_periods
                 WHERE expected_count &gt; 0
                   AND matched_count = expected_count
+                <if test="publishedOnly">
+                  AND EXISTS (
+                      SELECT 1
+                      FROM esg_scores score
+                      WHERE score.company_id = #{companyId}
+                        AND score.reporting_year = comparable_periods.reporting_year
+                        AND score.reporting_period = 'MONTHLY'
+                        AND score.period_value = comparable_periods.period_value
+                        AND score.overall_complete = TRUE
+                  )
+                </if>
                 ORDER BY reporting_year DESC, period_value DESC
             </when>
             <otherwise>
@@ -218,6 +240,17 @@
                 <if test="status != null and status != '' and status != 'ALL'">AND m.status::text = #{status}</if>
                 <if test="facilityId != null">AND m.facility_id = #{facilityId}</if>
                 <if test="approvedOnly">AND m.status = 'APPROVED'</if>
+                <if test="publishedOnly">
+                    AND EXISTS (
+                        SELECT 1
+                        FROM esg_scores score
+                        WHERE score.company_id = m.company_id
+                          AND score.reporting_year = m.reporting_year
+                          AND score.reporting_period = m.period_type
+                          AND score.period_value = m.period_value
+                          AND score.overall_complete = TRUE
+                    )
+                </if>
                 ORDER BY 1 DESC
             </otherwise>
         </choose>
@@ -226,6 +259,18 @@
     <select id="findById" resultMap="MetricMap">
         <include refid="metricBaseSelect"/>
         WHERE m.company_id = #{companyId} AND m.id = #{id}
+    </select>
+
+    <select id="isPublishedPeriod" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM esg_scores score
+            WHERE score.company_id = #{companyId}
+              AND score.reporting_year = #{year}
+              AND score.reporting_period = CAST(#{periodType} AS period_type_enum)
+              AND score.period_value = #{periodValue}
+              AND score.overall_complete = TRUE
+        )
     </select>
 
     <select id="findHistory" resultMap="HistoryMap">
@@ -317,7 +362,7 @@
     <update id="updateMetricStatus">
         UPDATE esg_metric_data
         SET status = CAST(#{toStatus} AS data_status_enum),
-            approver_user_id = CASE WHEN #{toStatus} = 'APPROVED' THEN #{userId} ELSE NULL END,
+            approver_user_id = CASE WHEN #{toStatus} IN ('APPROVED', 'REJECTED') THEN #{userId} ELSE NULL END,
             reject_reason = #{rejectReason},
             updated_at = CURRENT_TIMESTAMP
         WHERE company_id = #{companyId}
@@ -377,6 +422,78 @@
         GROUP BY i.indicator_code
     </select>
 
+    <select id="findCompletion" resultType="com.esg.platform.domain.metric.dto.MetricCompletionDto">
+        WITH period_bounds AS (
+            SELECT make_date(
+                       SUBSTRING(#{period}, 1, 4)::INT,
+                       SUBSTRING(#{period}, 6, 2)::INT,
+                       1
+                   ) AS period_start,
+                   (make_date(
+                       SUBSTRING(#{period}, 1, 4)::INT,
+                       SUBSTRING(#{period}, 6, 2)::INT,
+                       1
+                   ) + INTERVAL '1 month - 1 day')::DATE AS period_end
+        ), operating_facilities AS (
+            SELECT facility.id
+            FROM company_facilities facility
+            CROSS JOIN period_bounds bounds
+            WHERE facility.company_id = #{companyId}
+              AND facility.operation_start_date &lt;= bounds.period_end
+              AND (facility.operation_end_date IS NULL OR facility.operation_end_date &gt;= bounds.period_start)
+        ), approved_metrics AS (
+            SELECT metric.facility_id, indicator.indicator_code, metric.shipment_amount_million_krw
+            FROM esg_metric_data metric
+            JOIN esg_indicators indicator ON indicator.id = metric.indicator_id
+            WHERE metric.company_id = #{companyId}
+              AND metric.reporting_year = SUBSTRING(#{period}, 1, 4)::INT
+              AND metric.period_type = 'MONTHLY'
+              AND metric.period_value = SUBSTRING(#{period}, 6, 2)::INT
+              AND metric.status = 'APPROVED'
+        ), facility_count AS (
+            SELECT COUNT(*)::INT AS value FROM operating_facilities
+        )
+        SELECT facility_count.value AS operating_facility_count,
+               (facility_count.value * 3)::INT AS environment_required,
+               (
+                   (SELECT COUNT(*) FROM approved_metrics approved
+                    JOIN operating_facilities facility ON facility.id = approved.facility_id
+                    WHERE approved.indicator_code = 'IND_E_ELEC')
+                   +
+                   (SELECT COUNT(*) FROM approved_metrics approved
+                    JOIN operating_facilities facility ON facility.id = approved.facility_id
+                    WHERE approved.indicator_code = 'IND_E_ELEC'
+                      AND approved.shipment_amount_million_krw IS NOT NULL
+                      AND approved.shipment_amount_million_krw &gt; 0)
+                   +
+                   (SELECT COUNT(*) FROM approved_metrics approved
+                    JOIN operating_facilities facility ON facility.id = approved.facility_id
+                    WHERE approved.indicator_code = 'IND_E_SCOPE2')
+               )::INT AS environment_approved,
+               (facility_count.value * 4)::INT AS social_required,
+               (SELECT COUNT(*)::INT
+                FROM approved_metrics approved
+                JOIN operating_facilities facility ON facility.id = approved.facility_id
+                WHERE approved.indicator_code IN (
+                    'IND_S_INJURY_RATE',
+                    'IND_S_SAFETY_EDU',
+                    'IND_S_RISK_ACTION',
+                    'IND_S_TURNOVER'
+                )) AS social_approved,
+               (facility_count.value + 2)::INT AS governance_required,
+               (
+                   (SELECT COUNT(*) FROM approved_metrics approved
+                    JOIN operating_facilities facility ON facility.id = approved.facility_id
+                    WHERE approved.indicator_code = 'IND_G_ETHICS_EDU')
+                   +
+                   (SELECT COUNT(DISTINCT approved.indicator_code)
+                    FROM approved_metrics approved
+                    WHERE approved.indicator_code IN ('IND_G_ATTENDANCE', 'IND_G_OUTSIDE')
+                      AND approved.facility_id IS NULL)
+               )::INT AS governance_approved
+        FROM facility_count
+    </select>
+
     <select id="findPreviousApprovedTotal" resultType="java.math.BigDecimal">
         SELECT SUM(m.numerical_value)
         FROM esg_metric_data m
@@ -398,16 +515,24 @@
     <insert id="upsertScore">
         INSERT INTO esg_scores (
             company_id, reporting_year, reporting_period, period_value,
-            total_score, e_score, s_score, g_score, calculated_at
+            total_score, e_score, s_score, g_score,
+            environment_complete, social_complete, governance_complete, overall_complete,
+            calculated_at
         ) VALUES (
             #{companyId}, #{year}, 'MONTHLY', #{month},
-            #{totalScore}, #{eScore}, #{sScore}, #{gScore}, CURRENT_TIMESTAMP
+            #{totalScore}, #{eScore}, #{sScore}, #{gScore},
+            #{environmentComplete}, #{socialComplete}, #{governanceComplete}, #{overallComplete},
+            CURRENT_TIMESTAMP
         )
         ON CONFLICT (company_id, reporting_year, reporting_period, period_value) DO UPDATE
         SET total_score = EXCLUDED.total_score,
             e_score = EXCLUDED.e_score,
             s_score = EXCLUDED.s_score,
             g_score = EXCLUDED.g_score,
+            environment_complete = EXCLUDED.environment_complete,
+            social_complete = EXCLUDED.social_complete,
+            governance_complete = EXCLUDED.governance_complete,
+            overall_complete = EXCLUDED.overall_complete,
             calculated_at = CURRENT_TIMESTAMP
     </insert>
 
