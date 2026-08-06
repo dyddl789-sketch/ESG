@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.esg.platform.domain.company.mapper.FacilityMapper">
+
+    <resultMap id="FacilityResultMap" type="com.esg.platform.domain.company.dto.FacilityDto">
+        <id property="id" column="id" />
+        <result property="facilityName" column="facility_name" />
+        <result property="facilityType" column="facility_type" />
+        <result property="address" column="address" />
+        <result property="contractPowerKw" column="contract_power_kw" />
+        <result property="managerName" column="manager_name" />
+        <result property="managerPhone" column="manager_phone" />
+        <result property="active" column="is_active" />
+        <result property="operationStartDate" column="operation_start_date" />
+        <result property="operationEndDate" column="operation_end_date" />
+        <result property="createdAt" column="created_at" />
+        <result property="latitude" column="latitude" />
+        <result property="longitude" column="longitude" />
+    </resultMap>
+
+    <sql id="facilityColumns">
+        id,
+        facility_name,
+        facility_type,
+        address,
+        contract_power_kw,
+        manager_name,
+        manager_phone,
+        is_active,
+        operation_start_date,
+        operation_end_date,
+        created_at,
+        ST_Y(facility_center::geometry) AS latitude,
+        ST_X(facility_center::geometry) AS longitude
+    </sql>
+
+    <select id="findAllByCompanyId" resultMap="FacilityResultMap">
+        SELECT
+            <include refid="facilityColumns" />
+        FROM company_facilities
+        WHERE company_id = #{companyId}
+        ORDER BY
+            CASE WHEN facility_type = 'HQ' OR facility_name LIKE '%본사%' THEN 0 ELSE 1 END,
+            created_at ASC
+    </select>
+
+    <select id="findByIdAndCompanyId" resultMap="FacilityResultMap">
+        SELECT
+            <include refid="facilityColumns" />
+        FROM company_facilities
+        WHERE id = #{id}
+          AND company_id = #{companyId}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="dto.id">
+        INSERT INTO company_facilities (
+            company_id,
+            facility_name,
+            facility_type,
+            address,
+            contract_power_kw,
+            manager_name,
+            manager_phone,
+            is_active,
+            operation_start_date,
+            operation_end_date,
+            facility_center,
+            created_at
+        ) VALUES (
+            #{companyId},
+            #{dto.facilityName},
+            #{dto.facilityType},
+            #{dto.address},
+            #{dto.contractPowerKw},
+            #{dto.managerName},
+            #{dto.managerPhone},
+            COALESCE(#{dto.active}, TRUE),
+            #{dto.operationStartDate},
+            #{dto.operationEndDate},
+            CASE
+                WHEN #{dto.longitude} IS NOT NULL AND #{dto.latitude} IS NOT NULL
+                    THEN ST_SetSRID(ST_MakePoint(#{dto.longitude}, #{dto.latitude}), 4326)
+                ELSE NULL
+            END,
+            CURRENT_TIMESTAMP
+        )
+    </insert>
+
+    <update id="update">
+        UPDATE company_facilities
+        SET facility_name = #{dto.facilityName},
+            facility_type = #{dto.facilityType},
+            address = #{dto.address},
+            contract_power_kw = #{dto.contractPowerKw},
+            manager_name = #{dto.managerName},
+            manager_phone = #{dto.managerPhone},
+            is_active = COALESCE(#{dto.active}, is_active),
+            operation_start_date = #{dto.operationStartDate},
+            operation_end_date = #{dto.operationEndDate},
+            facility_center = CASE
+                WHEN #{dto.longitude} IS NOT NULL AND #{dto.latitude} IS NOT NULL
+                    THEN ST_SetSRID(ST_MakePoint(#{dto.longitude}, #{dto.latitude}), 4326)
+                ELSE facility_center
+            END
+        WHERE id = #{dto.id}
+          AND company_id = #{companyId}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM company_facilities
+        WHERE id = #{id}
+          AND company_id = #{companyId}
+    </delete>
+
+</mapper>

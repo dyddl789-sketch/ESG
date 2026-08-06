@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.esg.platform.domain.company.mapper.CompanyMapper">
+
+    <resultMap id="CompanyResultMap" type="com.esg.platform.domain.company.dto.CompanyDto">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="industry" column="industry"/>
+        <result property="scale" column="scale"/>
+        <result property="businessNumber" column="business_number"/>
+        <result property="representative" column="representative"/>
+        <result property="foundedOn" column="founded_on"/>
+        <result property="businessType" column="business_type"/>
+        <result property="businessItem" column="business_item"/>
+        <result property="representativePhone" column="representative_phone"/>
+        <result property="representativeEmail" column="representative_email"/>
+        <result property="operationStatus" column="operation_status"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <select id="findById" parameterType="Long" resultMap="CompanyResultMap">
+        SELECT
+            c.id,
+            c.name,
+            i.name AS industry,
+            c.company_scale AS scale,
+            c.business_number,
+            c.representative_name AS representative,
+            c.founded_on,
+            c.business_type,
+            c.business_item,
+            c.representative_phone,
+            c.representative_email,
+            c.operation_status,
+            c.created_at
+        FROM companies c
+        JOIN industry_types i ON c.industry_code = i.code
+        WHERE c.id = #{id}
+    </select>
+
+    <update id="update" parameterType="com.esg.platform.domain.company.dto.CompanyDto">
+        UPDATE companies
+        SET name = COALESCE(#{name}, name),
+            company_scale = COALESCE(#{scale}, company_scale),
+            business_number = COALESCE(#{businessNumber}, business_number),
+            representative_name = COALESCE(#{representative}, representative_name),
+            founded_on = COALESCE(#{foundedOn}, founded_on),
+            business_type = COALESCE(#{businessType}, business_type),
+            business_item = COALESCE(#{businessItem}, business_item),
+            representative_phone = COALESCE(#{representativePhone}, representative_phone),
+            representative_email = COALESCE(#{representativeEmail}, representative_email),
+            operation_status = COALESCE(#{operationStatus}, operation_status)
+        WHERE id = #{id}
+    </update>
+
+</mapper>

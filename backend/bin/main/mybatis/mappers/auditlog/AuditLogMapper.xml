@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.esg.platform.domain.auditlog.mapper.AuditLogMapper">
+
+    <resultMap id="auditLogResponseMap" type="com.esg.platform.domain.auditlog.dto.AuditLogResponse">
+        <constructor>
+            <idArg column="id" javaType="Long" />
+            <arg column="at" javaType="String" />
+            <arg column="reporter" javaType="String" />
+            <arg column="approver" javaType="String" />
+            <arg column="action" javaType="String" />
+            <arg column="action_code" javaType="String" />
+            <arg column="facility_id" javaType="Long" />
+            <arg column="facility" javaType="String" />
+            <arg column="indicator_id" javaType="Long" />
+            <arg column="target" javaType="String" />
+            <arg column="detail" javaType="String" />
+        </constructor>
+    </resultMap>
+
+    <sql id="normalizedAuditLogs">
+        WITH normalized AS (
+            SELECT
+                a.id,
+                a.performed_at,
+                a.user_id,
+                a.action_type,
+                a.old_values,
+                a.new_values,
+                NULLIF(
+                    COALESCE(a.new_values ->> 'facility_id', a.old_values ->> 'facility_id'),
+                    ''
+                )::BIGINT AS facility_id,
+                NULLIF(
+                    COALESCE(a.new_values ->> 'indicator_id', a.old_values ->> 'indicator_id'),
+                    ''
+                )::BIGINT AS indicator_id,
+                NULLIF(
+                    COALESCE(a.new_values ->> 'input_user_id', a.old_values ->> 'input_user_id'),
+                    ''
+                )::BIGINT AS reporter_id,
+                COALESCE(
+                    NULLIF(a.new_values ->> 'approver_user_id', '')::BIGINT,
+                    NULLIF(a.old_values ->> 'approver_user_id', '')::BIGINT,
+                    CASE
+                        WHEN a.new_values ->> 'status' = 'APPROVED' THEN a.user_id::BIGINT
+                        ELSE NULL
+                    END
+                ) AS approver_id,
+                COALESCE(a.new_values ->> 'reporting_year', a.old_values ->> 'reporting_year') AS reporting_year,
+                COALESCE(a.new_values ->> 'period_type', a.old_values ->> 'period_type') AS period_type,
+                COALESCE(a.new_values ->> 'period_value', a.old_values ->> 'period_value') AS period_value,
+                COALESCE(a.new_values ->> 'numerical_value', a.old_values ->> 'numerical_value') AS numerical_value,
+                CASE
+                    WHEN a.action_type = 'DELETE' THEN 'DELETED'
+                    WHEN a.action_type = 'INSERT' AND a.new_values ->> 'status' = 'PENDING'
+                        THEN 'APPROVAL_REQUESTED'
+                    WHEN a.action_type = 'INSERT' AND a.new_values ->> 'status' = 'APPROVED'
+                        THEN 'FINAL_APPROVED'
+                    WHEN a.action_type = 'INSERT' AND a.new_values ->> 'status' = 'REJECTED'
+                        THEN 'REJECTED'
+                    WHEN a.action_type = 'INSERT' THEN 'DATA_CREATED'
+                    WHEN a.old_values ->> 'status' = 'PENDING'
+                         AND a.new_values ->> 'status' = 'DRAFT'
+                        THEN 'APPROVAL_CANCELED'
+                    WHEN (a.old_values ->> 'status') IS DISTINCT FROM (a.new_values ->> 'status')
+                         AND a.new_values ->> 'status' = 'PENDING'
+                        THEN 'APPROVAL_REQUESTED'
+                    WHEN (a.old_values ->> 'status') IS DISTINCT FROM (a.new_values ->> 'status')
+                         AND a.new_values ->> 'status' = 'APPROVED'
+                        THEN 'FINAL_APPROVED'
+                    WHEN (a.old_values ->> 'status') IS DISTINCT FROM (a.new_values ->> 'status')
+                         AND a.new_values ->> 'status' = 'REJECTED'
+                        THEN 'REJECTED'
+                    ELSE 'DATA_UPDATED'
+                END AS action_code
+            FROM audit_logs a
+            WHERE a.table_name = 'esg_metric_data'
+        )
+    </sql>
+
+    <sql id="auditLogFilters">
+        <where>
+            <if test="facilityId != null">
+                normalized.facility_id = #{facilityId}
+            </if>
+            <if test="indicatorId != null">
+                AND normalized.indicator_id = #{indicatorId}
+            </if>
+            <if test="actionCode != null and actionCode != ''">
+                AND normalized.action_code = #{actionCode}
+            </if>
+            <if test="fromDate != null">
+                AND normalized.performed_at &gt;= #{fromDate}
+            </if>
+            <if test="toDate != null">
+                AND normalized.performed_at &lt; (CAST(#{toDate} AS DATE) + INTERVAL '1 day')
+            </if>
+        </where>
+    </sql>
+
+    <select id="findAuditLogs" resultMap="auditLogResponseMap">
+        <include refid="normalizedAuditLogs" />
+        SELECT
+            normalized.id,
+            TO_CHAR(normalized.performed_at, 'YYYY-MM-DD HH24:MI:SS') AS at,
+            COALESCE(reporter.name, actor.name, '시스템') AS reporter,
+            COALESCE(approver.name, '-') AS approver,
+            CASE normalized.action_code
+                WHEN 'DATA_CREATED' THEN '데이터 등록'
+                WHEN 'DATA_UPDATED' THEN '데이터 수정'
+                WHEN 'APPROVAL_REQUESTED' THEN '승인 요청'
+                WHEN 'APPROVAL_CANCELED' THEN '승인 요청 취소'
+                WHEN 'FINAL_APPROVED' THEN '최종 승인'
+                WHEN 'REJECTED' THEN '반려'
+                WHEN 'DELETED' THEN '삭제'
+                ELSE '기타 작업'
+            END AS action,
+            normalized.action_code,
+            normalized.facility_id,
+            COALESCE(facility.facility_name, '기업 공통') AS facility,
+            normalized.indicator_id,
+            COALESCE(indicator.title, '미식별 지표') AS target,
+            CONCAT(
+                '[', COALESCE(facility.facility_name, '기업 공통'), '] ',
+                COALESCE(normalized.reporting_year, '-'), '년 ',
+                CASE
+                    WHEN UPPER(TRIM(COALESCE(normalized.period_type, 'MONTHLY'))) = 'YEARLY'
+                        THEN '연간'
+                    WHEN UPPER(TRIM(COALESCE(normalized.period_type, 'MONTHLY'))) = 'QUARTERLY'
+                        THEN CONCAT(COALESCE(normalized.period_value, '-'), '분기')
+                    WHEN UPPER(TRIM(COALESCE(normalized.period_type, 'MONTHLY'))) = 'HALFYEARLY'
+                        THEN CONCAT(COALESCE(normalized.period_value, '-'), '반기')
+                    ELSE CONCAT(COALESCE(normalized.period_value, '-'), '월')
+                END,
+                ' ',
+                CASE normalized.action_code
+                    WHEN 'DATA_CREATED' THEN '실적 등록'
+                    WHEN 'DATA_UPDATED' THEN '실적 수정'
+                    WHEN 'APPROVAL_REQUESTED' THEN '최종 승인 요청'
+                    WHEN 'APPROVAL_CANCELED' THEN '승인 요청 취소'
+                    WHEN 'FINAL_APPROVED' THEN '최종 공시 확정'
+                    WHEN 'REJECTED' THEN '승인 반려'
+                    WHEN 'DELETED' THEN '실적 삭제'
+                    ELSE '데이터 변경'
+                END,
+                CASE
+                    WHEN normalized.numerical_value IS NOT NULL
+                        THEN CONCAT(' (수치: ', normalized.numerical_value, ')')
+                    ELSE ''
+                END
+            ) AS detail
+        FROM normalized
+        LEFT JOIN users reporter ON reporter.id = normalized.reporter_id
+        LEFT JOIN users actor ON actor.id = normalized.user_id
+        LEFT JOIN users approver ON approver.id = normalized.approver_id
+        LEFT JOIN company_facilities facility ON facility.id = normalized.facility_id
+        LEFT JOIN esg_indicators indicator ON indicator.id = normalized.indicator_id
+        <include refid="auditLogFilters" />
+        ORDER BY normalized.performed_at DESC, normalized.id DESC
+        LIMIT #{size}
+        OFFSET #{offset}
+    </select>
+
+    <select id="countAuditLogs" resultType="long">
+        <include refid="normalizedAuditLogs" />
+        SELECT COUNT(*)
+        FROM normalized
+        <include refid="auditLogFilters" />
+    </select>
+</mapper>

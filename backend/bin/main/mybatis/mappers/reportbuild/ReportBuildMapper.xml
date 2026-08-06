@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.esg.platform.domain.reportbuild.mapper.ReportBuildMapper">
+
+    <select id="selectReportTemplateById" resultType="com.esg.platform.domain.reportbuild.entity.ReportTemplate">
+        SELECT id, company_id AS companyId, title, content, 
+               included_indicators::text AS includedIndicators, 
+               layout_settings::text AS layoutSettings, created_at AS createdAt
+        FROM report_templates
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insertGeneratedReport" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO generated_reports (
+            company_id, template_id, target_year, scope, title, content, version, file_url, is_public, generated_by
+        ) VALUES (
+            #{companyId}, #{templateId}, #{targetYear}, #{scope}, #{title}, #{content}, #{version}, #{fileUrl}, #{isPublic}, #{generatedBy}
+        )
+    </insert>
+
+    <select id="selectReportTemplates" resultType="com.esg.platform.domain.reportbuild.entity.ReportTemplate">
+        SELECT id, company_id AS companyId, title, content, 
+               included_indicators::text AS includedIndicators, 
+               layout_settings::text AS layoutSettings, created_at AS createdAt
+        FROM report_templates
+        ORDER BY id ASC
+    </select>
+
+    <select id="selectGeneratedReportById" resultType="com.esg.platform.domain.reportbuild.entity.GeneratedReport">
+        SELECT id, company_id AS companyId, template_id AS templateId, 
+               target_year AS targetYear, scope, title, content, version,
+               file_url AS fileUrl, is_public AS isPublic,
+               generated_by AS generatedBy, created_at AS createdAt
+        FROM generated_reports
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectGeneratedReportsByCompanyId" resultType="com.esg.platform.domain.reportbuild.entity.GeneratedReport">
+        SELECT id, company_id AS companyId, template_id AS templateId,
+               target_year AS targetYear, scope, title, content, version,
+               file_url AS fileUrl, is_public AS isPublic,
+               generated_by AS generatedBy, created_at AS createdAt
+        FROM generated_reports
+        WHERE company_id = #{companyId}
+        ORDER BY created_at DESC
+    </select>
+
+    <delete id="deleteGeneratedReport">
+        DELETE FROM generated_reports
+        WHERE id = #{id}
+          AND company_id = #{companyId}
+    </delete>
+
+    <update id="updateReportPublicStatus">
+        UPDATE generated_reports
+        SET is_public = #{isPublic}
+        WHERE id = #{id}
+          AND company_id = #{companyId}
+    </update>
+
+    <select id="selectFacilityNamesByCompanyId" resultType="java.lang.String">
+        SELECT facility_name
+        FROM company_facilities
+        WHERE company_id = #{companyId}
+        ORDER BY id ASC
+    </select>
+
+    <!-- [신규 추가] 105개의 승인 완료 원본 데이터를 사업장 명칭과 함께 그룹핑 없이 모두 가져오는 보고서 전용 쿼리 -->
+    <select id="selectRawMetricsForReport" resultType="com.esg.platform.domain.reportbuild.dto.response.ReportMetricResponse">
+        SELECT
+            m.id,
+            i.indicator_code AS indicatorCode,
+            i.title AS title,
+            i.category::text AS category,
+            i.unit AS unit,
+            m.period_value AS periodValue,
+            m.numerical_value AS numericalValue,
+            m.status::text AS status,
+            m.reporting_year AS reportingYear,
+            f.facility_name AS facilityName,
+            m.additional_info::text AS additionalInfo
+        FROM esg_metric_data m
+        JOIN esg_indicators i ON m.indicator_id = i.id
+        LEFT JOIN company_facilities f ON m.facility_id = f.id
+        WHERE m.company_id = #{companyId}
+          AND m.reporting_year = #{year}
+          AND m.status = 'APPROVED'
+        ORDER BY m.period_value ASC, f.id ASC
+    </select>
+
+</mapper>

@@ -1,0 +1,143 @@
+spring:
+  application:
+    name: esg-backend
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/esg}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:1234}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: 30000
+
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2s
+
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    default-encoding: UTF-8
+    properties:
+      mail:
+        debug: ${MAIL_DEBUG:false}
+        smtp:
+          auth: true
+          auth.mechanisms: LOGIN
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: ${MAIL_CONNECTION_TIMEOUT:5000}
+          timeout: ${MAIL_READ_TIMEOUT:5000}
+          writetimeout: ${MAIL_WRITE_TIMEOUT:5000}
+    test-connection: false
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: ${MAX_UPLOAD_FILE_SIZE:20MB}
+      max-request-size: ${MAX_UPLOAD_REQUEST_SIZE:22MB}
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+    clean-disabled: true
+
+  security:
+    oauth2:
+      client:
+        registration:
+          kakao:
+            client-name: Kakao
+            client-id: ${KAKAO_CLIENT_ID:change-me}
+            client-secret: ${KAKAO_CLIENT_SECRET:}
+            client-authentication-method: client_secret_post
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope:
+              - profile_nickname
+              - account_email
+        provider:
+          kakao:
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            token-uri: https://kauth.kakao.com/oauth/token
+            user-info-uri: https://kapi.kakao.com/v2/user/me
+            user-name-attribute: id
+
+server:
+  port: ${SERVER_PORT:8080}
+  forward-headers-strategy: framework
+
+mybatis:
+  mapper-locations: classpath:mybatis/mappers/**/*.xml
+  type-aliases-package: com.esg.platform.domain
+  configuration:
+    map-underscore-to-camel-case: true
+    jdbc-type-for-null: 'NULL'
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  cookie:
+    secure: ${COOKIE_SECURE:false}
+    same-site: ${COOKIE_SAME_SITE:Lax}
+    domain: ${COOKIE_DOMAIN:}
+  jwt:
+    secret: ${JWT_SECRET:ZXNnLWRldmVsb3BtZW50LW9ubHktc2VjcmV0LWtleS1jaGFuZ2UtaW4tcHJvZHVjdGlvbi0yMDI2LTA3LTA4}
+    access-token-expiration: ${JWT_ACCESS_EXPIRATION:15m}
+    refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:14d}
+  auth:
+    refresh-cookie-name: ${REFRESH_COOKIE_NAME:ESG_REFRESH_TOKEN}
+    login-max-failures: ${LOGIN_MAX_FAILURES:5}
+    login-failure-window: ${LOGIN_FAILURE_WINDOW:10m}
+    login-lock-duration: ${LOGIN_LOCK_DURATION:15m}
+    oauth-code-expiration: ${OAUTH_CODE_EXPIRATION:60s}
+    email-verification-code-expiration: ${EMAIL_VERIFICATION_CODE_EXPIRATION:5m}
+    email-verification-result-expiration: ${EMAIL_VERIFICATION_RESULT_EXPIRATION:30m}
+    email-verification-resend-cooldown: ${EMAIL_VERIFICATION_RESEND_COOLDOWN:60s}
+    email-verification-dev-log-enabled: ${EMAIL_VERIFICATION_DEV_LOG_ENABLED:true}
+
+logging:
+  level:
+    root: INFO
+    com.esg.platform: ${APP_LOG_LEVEL:DEBUG}
+    org.springframework.security: ${SECURITY_LOG_LEVEL:INFO}
+file:
+  upload-dir: ${FILE_UPLOAD_DIR:./upload/evidence/}
+
+openai:
+  api:
+    key: ${OPENAI_API_KEY:}
+    url: ${OPENAI_API_URL:https://api.openai.com/v1/chat/completions}
+    model: ${OPENAI_MODEL:gpt-4o-mini}
+
+external-api:
+  korea-energy-agency:
+    base-url: ${KEA_API_BASE_URL:https://apis.data.go.kr/B553530/GHG_LIST_01/GHG_LIST_01_08_VIEW}
+    service-key: ${KEA_API_KEY:}
+  kosis:
+    base-url: ${KOSIS_API_BASE_URL:https://kosis.kr/openapi/statisticsData.do}
+    api-key: ${KOSIS_API_KEY:}
+  benchmark:
+    base-year: ${EXTERNAL_BENCHMARK_BASE_YEAR:2021}
+    industry-code: ${EXTERNAL_BENCHMARK_INDUSTRY_CODE:C303}
+    industry-name: ${EXTERNAL_BENCHMARK_INDUSTRY_NAME:자동차 신품 부품 제조업}
